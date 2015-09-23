@@ -1,2 +1,2 @@
-# mscr-dissertation
-MSc by Research dissertation
+# Master of Science by Research dissertation
+Repository for my MSc by Research dissertation and related work.
