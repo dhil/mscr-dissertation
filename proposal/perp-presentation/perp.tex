@@ -1,0 +1,44 @@
+\documentclass[10pt,compress]{beamer}
+\usepackage[utf8]{inputenc}          % UTF-8 Encoding
+\usepackage{hyperref}                % Interactive PDF
+
+% Layout
+\useinnertheme[sectionpage=none]{metropolis}
+\useoutertheme[numbering=fraction]{metropolis}
+\usetheme[everytitleformat=regular]{m}
+\metroset{block=fill}
+
+%% Hide navigation buttons
+\beamertemplatenavigationsymbolsempty
+
+%% Meta-stuff like authors, title, etc.
+\author[Daniel Hillerström]{Daniel Hillerström\\\footnotesize{\href{mailto:daniel.hillerstrom@ed.ac.uk}{daniel.hillerstrom@ed.ac.uk}}\\\footnotesize{\href{http://homepages.inf.ed.ac.uk/s1467124}{http://homepages.inf.ed.ac.uk/s1467124}}}
+\institute[University of Edinburgh]{CDT Pervasive Parallelism, University of Edinburgh}
+\date{\today}
+\title{Effective Concurrency} % Just some title; change at a later point.
+\subtitle{Pervasive Parallelism Presentation}
+
+% The document
+\begin{document}
+  \maketitle
+  % Input the content
+
+  \begin{frame}
+    \frametitle{Different concurrent programming models}
+    \textbf{Messaging-passing programming (distributed memory)}
+    \begin{itemize}
+      \item MPI
+      \item Erlang
+    \end{itemize}
+    \textbf{Multi-threaded programming (shared memory)}
+    \begin{itemize}
+      \item OpenMP
+      \item Java
+    \end{itemize}
+    \textbf{Partition Global Address Space programming (hybrid)}
+    \begin{itemize}
+      \item Coarray Fortran
+      \item Unified Parallel C
+    \end{itemize}
+  \end{frame}
+\end{document}
