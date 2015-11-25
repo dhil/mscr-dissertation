@@ -25,7 +25,7 @@
 
   \begin{frame}
     \frametitle{Different concurrent programming models}
-    \textbf{Messaging-passing programming (distributed memory)}
+    \textbf{Message-passing programming (distributed memory)}
     \begin{itemize}
       \item MPI
       \item Erlang
@@ -39,6 +39,52 @@
     \begin{itemize}
       \item Coarray Fortran
       \item Unified Parallel C
+    \end{itemize}
+  \end{frame}
+
+  \begin{frame}
+    \frametitle{Combining concurrency models}
+    Different concurrency models are tailored for particular idioms
+    \begin{description}
+      \item[\alert<1->{MPI}] Process-centric; interaction among processes across many machines.
+      \item[\alert<1->{OpenMP}] Thread-centric; interaction between cores on a chip.
+    \end{description}
+    Sometimes it makes sense to combine different concurrency models.
+  \end{frame}
+
+  % Slide 3
+  \begin{frame}
+    \frametitle{Commonalities}
+    \begin{center}
+      \begin{figure}
+        \includegraphics[scale=0.3]{venn.png}
+      \end{figure}
+    \end{center}
+    \uncover<2->{What is the proper abstraction?}
+  \end{frame}
+
+  % Aims and objectives
+  \begin{frame}
+    \frametitle{Aims and objectives}
+    The aim is to implement an optimizing compiler for Links.
+    \begin{itemize}
+       \item Efficient implementation of handlers.
+       \item Concurrency for ``free'' through handlers.
+    \end{itemize}
+  \end{frame}
+
+  % Evaluation
+  \begin{frame}
+    \frametitle{Evaluation}
+    Collection of micro-benchmarks
+    \begin{itemize}
+      \item Sanity checks
+      \item Already written
+    \end{itemize}
+    Collection of performance benchmarks
+    \begin{itemize}
+      \item Measuring the feasibility of my implementation
+      \item Building the benchmark suite from PLDI\dots
     \end{itemize}
   \end{frame}
 \end{document}
