@@ -1,16 +1,37 @@
 \documentclass[a4paper,11pt,twoside]{article}
 \usepackage[utf8]{inputenc}          % UTF-8 Encoding
 \usepackage{hyperref}                % Interactive PDF
+\usepackage{float}                   % Float control
+\usepackage{multirow}                % Span multiple rows & columns in a table
+\usepackage{amsmath}                 % Mathematics library
+\usepackage{amssymb}                 % Provides math fonts
+\usepackage{amsthm}                  % Provides \newtheorem, \theoremstyle, etc.
+\usepackage[T1]{fontenc}             % Fixes font issues
+\usepackage{lmodern}
+\usepackage[
+backend=bibtex,
+style=numeric,
+sorting=nyt
+]{biblatex}                   % Bibliography
+\addbibresource{references.bib}
 
+
+% Convenient macros
+\newcommand{\defas}[0]{\mathrel{\overset{\makebox[0pt]{\mbox{\normalfont\tiny\sffamily def}}}{=}}} % "defined-as-equal"
 
 %% Meta-stuff like authors, title, etc.
-\author{Daniel Hillerström\\\small{\href{mailto:daniel.hillerstrom@ed.ac.uk}{daniel.hillerstrom@ed.ac.uk}}}
+\author{Daniel Hillerström\\\small{CDT in Pervasive Parallelism}\\\small{\href{mailto:daniel.hillerstrom@ed.ac.uk}{daniel.hillerstrom@ed.ac.uk}}}
 \date{\today}
-\title{CDT PPar research proposal} % Just some title; change at a later point.
+\title{Proposal: Efficient Effect Handlers in Links} % Just some title; change at a later point.
 
 % The document
 \begin{document}
   \maketitle
+  \begin{abstract}
+    An abstract will appear here\dots
+  \end{abstract}
   % Input the content
   \input{content/index}
+  % Bibliography
+  \printbibliography[heading=bibintoc]
 \end{document}

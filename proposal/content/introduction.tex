@@ -1,6 +1,37 @@
 \section{Introduction}
-Points:
-\begin{itemize}
-  \item Multicore OCaml has handlers but not an effect system
-  \item Monads and monad transformers are powerful, but not really flexible, e.g. monad transformer gymnastics.
-\end{itemize}
+Plotkin and Power's algebraic effects \cite{Plotkin2001} combined with Plotkin and Pretnar's handlers \cite{Plotkin2013} yield a programming model for controlling computational effects. An algebraic effect is a collection of abstract operations without predefined semantics. Handlers interpret algebraic effects by assigning semantics to abstract operations. Thus, the control of computational effects is lifted from the run-time system into the hands of the programmer. Clearly, it shifts additional responsibility onto the programmer, however, in addition it opens up a design space that was previously secluded from the programmer. Now, the programmer may extend the capabilities of the run-time system beyond what the language implementor envisaged.
+
+For example, it is well-known that concurrency primitives can be encoded through algebraic effects \cite{Bauer2015,Dolan2015} as spawning a new thread is an effect. Furthermore, suspending a thread is an effect. Handlers of these effects are schedulers. Hence, the programmer is free to implement a particular scheduling policy tailored for the application. The choice of scheduler can have significant impact on performance as a scheduler's performance goal can be paramount to the overall performance of an application \cite{Berman2003}.
+
+However\dots
+
+\section{Problem definition}
+
+\section{Background}
+\subsection{Handlers implementations}
+\subsubsection{First-class implementations}
+\subsubsection{Library implementations}
+
+\section{Evaluation}
+
+\section{Project feasibility}
+\subsection{Risk analysis}
+\begin{table}[H]
+  \centering
+  \begin{tabular}{| l | l |}
+    \hline
+    \multicolumn{1}{|c|}{Implementation} & \multicolumn{1}{c|}{Developed by} \\
+    \hline
+    Eff & Bauer \& Pretnar \\ 
+    \hline
+    Frank & McLaughlin, Lindley and McBride \\    
+    \hline 
+    Koka & Leijen \\
+    \hline
+    Links & Hillerström and Lindley\\
+    \hline
+    Multicore OCaml & OCamlLabs \\
+    \hline    
+  \end{tabular}\caption{Languages with first-class effect handlers.}\label{tbl:efflang}
+\end{table}
+\subsection{Project plan}
