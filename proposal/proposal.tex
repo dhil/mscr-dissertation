@@ -30,8 +30,80 @@ sorting=nyt
   \begin{abstract}
     An abstract will appear here\dots
   \end{abstract}
+  \raggedbottom
   % Input the content
-  \input{content/index}
+  \section{Introduction}
+  Plotkin and Power's algebraic effects \cite{Plotkin2001} combined with Plotkin and Pretnar's handlers \cite{Plotkin2013} yield a programming model for controlling computational effects. An algebraic effect is a collection of abstract operations without predefined semantics. Handlers interpret algebraic effects by assigning semantics to abstract operations. Thus, the control of computational effects is lifted from the run-time system into the hands of the programmer. Clearly, it shifts additional responsibility onto the programmer, however, in addition it opens up a design space that was previously secluded from the programmer. Now, the programmer may extend the capabilities of the run-time system beyond what the language implementor envisaged.
+
+  For example, it is well-known that concurrency primitives can be encoded through algebraic effects \cite{Bauer2015,Dolan2015} as spawning a new thread is an effect. Furthermore, suspending a thread is an effect. Handlers of these effects are schedulers. Hence, the programmer is free to implement a particular scheduling policy tailored for the application. The choice of scheduler can have significant impact on performance as a scheduler's performance goal can be paramount to the overall performance of an application \cite{Berman2003}.
+
+  However\dots
+
+  \section{Problem definition}
+  Although, handlers for algebraic effects have many practical applications \cite{Kammar2013,Bauer2015,Hillerstrom2015,Dolan2015}, there does not yet exist an efficient implementation of handlers. Multicore OCaml implements linear handlers which only allow the continuation invoked once. This restriction is enforced during run-time. Furthermore, because OCaml lacks an effect system\dots
+
+  \section{Proposed solution}
+
+  \section{Background}
+  \subsection{Links programming language}
+  Links is a strongly, statically typed functional programming language oriented towards web-programming \cite{Cooper2006}. Notably, Links implements effect handlers as first-class citizens \cite{Hillerstrom2015}. Moreover, the implementation support both deep and shallow handlers. However, since Links is an interpreted language the performance of handlers is low.
+
+  \subsection{Optimisation of single-shot continuations}
+
+  \subsection{Handlers implementations}
+  This section briefly surveys existing implementations of effect handlers. Section \ref{sec:first-class} considers languages with first-class handlers, whilst Section \ref{sec:library} discusses embeddings of handlers in the pure functional programming language Haskell.
+  \subsubsection{First-class implementations}\label{sec:first-class}
+  \begin{table}[H]
+    \centering 
+    \begin{tabular}{| l | l | l |}
+      \hline
+      \multicolumn{1}{|c|}{Language} & \multicolumn{1}{c|}{Handlers} & \multicolumn{1}{c|}{Developed by} \\
+      \hline
+      Eff & Deep handlers & Bauer and Pretnar \\ 
+      \hline
+      Frank & Shallow handlers & McLaughlin, Lindley and McBride \\    
+      \hline
+      Links & Shallow and deep handlers & Hillerström and Lindley\\
+      \hline
+      Multicore OCaml & Deep handlers & OCamlLabs \\
+      \hline    
+    \end{tabular}\caption{Languages with first-class effect handlers.}\label{tbl:impls}
+  \end{table}
+  Table \ref{tbl:impls} provide an overview of languages where effect handlers are first-class citizens. 
+
+The Eff language is a OCaml-style language with deep handlers. It support for effect polymorphism through subtyping \cite{Bauer2015}. 
+The functional programming Links implements both deep and shallow handlers \cite{Hillerstrom2015}. Moreover, the implementation supports effect polymorphism through Links' existing row polymorphic effect system.
+    
+  \subsubsection{Library implementations}\label{sec:library}
+
+  \section{Evaluation}
+
+  \section{Project feasibility}
+  \subsection{Risk analysis}
+
+  \subsection{Project plan}
+  \begin{table}[H]
+    \centering
+    \begin{tabular}{ | l | c | c | c | c | c | }
+      \hline
+      \multicolumn{1}{|c|}{Activity / Weeks} & 2-4 & 5-9 & 10-17 & 18-21 & 22-33 \\
+      \hline
+      Prototyping    & X & X & & & \\
+      \hline
+      Implementation & X & X & X & X & X \\
+      \hline
+      Testing        & X & X & X & X & X \\
+      \hline
+      Evaluation     &   &   & X & X & X \\
+      \hline
+      Related work   &   & X & X &   & X \\
+      \hline
+      Exam period    &   &   &   & X &   \\
+      \hline
+      Write up       & X & X & X & X & X  \\
+      \hline
+    \end{tabular}\caption{Activity overview.}
+  \end{table}
   % Bibliography
   \printbibliography[heading=bibintoc]
 \end{document}
