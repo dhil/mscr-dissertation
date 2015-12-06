@@ -1,4 +1,5 @@
-\documentclass[a4paper,11pt,twoside]{article}
+%\documentclass[a4paper,11pt,twoside]{article}
+\documentclass[preprint,numbers]{sigplanconf}
 \usepackage[utf8]{inputenc}          % UTF-8 Encoding
 \usepackage{hyperref}                % Interactive PDF
 \usepackage{float}                   % Float control
@@ -8,24 +9,30 @@
 \usepackage{amsthm}                  % Provides \newtheorem, \theoremstyle, etc.
 \usepackage[T1]{fontenc}             % Fixes font issues
 \usepackage{lmodern}
-\usepackage[
-backend=bibtex,
-style=numeric,
-sorting=nyt
-]{biblatex}                   % Bibliography
-\addbibresource{references.bib}
+%\usepackage[
+%backend=bibtex,
+%style=numeric,
+%sorting=nyt
+%]{biblatex}                   % Bibliography
+%\addbibresource{references.bib}
 
 
 % Convenient macros
 \newcommand{\defas}[0]{\mathrel{\overset{\makebox[0pt]{\mbox{\normalfont\tiny\sffamily def}}}{=}}} % "defined-as-equal"
 
 %% Meta-stuff like authors, title, etc.
-\author{Daniel Hillerström\\\small{CDT in Pervasive Parallelism}\\\small{\href{mailto:daniel.hillerstrom@ed.ac.uk}{daniel.hillerstrom@ed.ac.uk}}}
-\date{\today}
-\title{Proposal: Efficient Effect Handlers in Links} % Just some title; change at a later point.
+%\author{Daniel Hillerström\\\small{CDT in Pervasive Parallelism}\\\small{\href{mailto:daniel.hillerstrom@ed.ac.uk}{daniel.hillerstrom@ed.ac.uk}}}
+%\date{\today}
+%\title{Proposal: Effective Concurrency in Links} % Just some title; change at a later point.
 
 % The document
 \begin{document}
+\title{Effective Concurrency in Links}
+%\subtitle{via handlers}
+
+\authorinfo{Daniel Hillerström}
+           {CDT Pervasive Parallelism}
+           {\href{mailto:daniel.hillerstrom@ed.ac.uk}{daniel.hillerstrom@ed.ac.uk}}
   \maketitle
   \begin{abstract}
     An abstract will appear here\dots
@@ -33,14 +40,23 @@ sorting=nyt
   \raggedbottom
   % Input the content
   \section{Introduction}
-  Plotkin and Power's algebraic effects \cite{Plotkin2001} combined with Plotkin and Pretnar's handlers \cite{Plotkin2013} yield a programming model for controlling computational effects. An algebraic effect is a collection of abstract operations without predefined semantics. Handlers interpret algebraic effects by assigning semantics to abstract operations. Thus, the control of computational effects is lifted from the run-time system into the hands of the programmer. Clearly, it shifts additional responsibility onto the programmer, however, in addition it opens up a design space that was previously secluded from the programmer. Now, the programmer may extend the capabilities of the run-time system beyond what the language implementor envisaged.
+Run-time scheduling is a domain-specific problem as the performance goal of a scheduler can be paramount to the overall performance of a program. Consequently, schedulers employ different metrics to measure performance. For example, \emph{high-throughput} schedulers seek to optimise the throughput of jobs \cite{Berman2003}, hence performance might be measured by the number of jobs processed by the system. Criteria such as fairness or utilisation might be used to measure the performance of \emph{resource} schedulers as they seek to coordinate accesses to shared resources \cite{Berman2003}. Furthermore, \emph{high-performance} schedulers seek to minimise execution time for a single program. For example, grid-based computations may benefit from neighbouring points being scheduled together. In this case performance is measured by the raw execution speed.
 
-  For example, it is well-known that concurrency primitives can be encoded through algebraic effects \cite{Bauer2015,Dolan2015} as spawning a new thread is an effect. Furthermore, suspending a thread is an effect. Handlers of these effects are schedulers. Hence, the programmer is free to implement a particular scheduling policy tailored for the application. The choice of scheduler can have significant impact on performance as a scheduler's performance goal can be paramount to the overall performance of an application \cite{Berman2003}.
+Thus scheduling is important. However, scheduling is often the responsibility of the compiler writer, but the concern of the application programmer. Yet the latter has little or no say about scheduling as schedulers typically are baked into the run-time system \cite{Dolan2015}. 
 
-  However\dots
+We propose to rectify this mismatch by transferring the responsibility for scheduling to the application programmer. Concretely, we propose to abstract over the choice of scheduling by adapting the approach taken by Multicore OCaml to use Plotkin and Pretnar's \emph{handlers for algebraic effects} \cite{Plotkin2013} to encode concurrency primitives.
+
+  % Plotkin and Power's algebraic effects \cite{Plotkin2001} combined with Plotkin and Pretnar's handlers \cite{Plotkin2013} yield a programming model for controlling computational effects. An algebraic effect is a collection of abstract operations without predefined semantics. Handlers interpret algebraic effects by assigning semantics to abstract operations. Thus, the control of computational effects is lifted from the run-time system into the hands of the programmer. Clearly, it shifts additional responsibility onto the programmer, however, in addition it opens up a design space that was previously secluded from the programmer. Now, the programmer may extend the capabilities of the run-time system beyond what the language implementor envisaged.
+
+  % For example, it is well-known that concurrency primitives can be encoded through algebraic effects \cite{Bauer2015,Dolan2015} as spawning a new thread is an effect. Furthermore, suspending a thread is an effect. Handlers of these effects are schedulers. Hence, the programmer is free to implement a particular scheduling policy tailored for the application. The choice of scheduler can have significant impact on performance as a scheduler's performance goal can be paramount to the overall performance of an application \cite{Berman2003}.
+
+  % However\dots
 
   \section{Problem definition}
-  Although, handlers for algebraic effects have many practical applications \cite{Kammar2013,Bauer2015,Hillerstrom2015,Dolan2015}, there does not yet exist an efficient implementation of handlers. Multicore OCaml implements linear handlers which only allow the continuation invoked once. This restriction is enforced during run-time. Furthermore, because OCaml lacks an effect system\dots
+%  Although, handlers for algebraic effects have many practical applications \cite{Kammar2013,Bauer2015,Hillerstrom2015,Dolan2015}, there does not yet exist an efficient implementation of handlers. Multicore OCaml implements linear handlers which only allow the continuation invoked once. This restriction is enforced during run-time. Furthermore, because OCaml lacks an effect system\dots
+Run-time scheduling is recognised as an important problem for performance \cite{Augonnet2011,Augonnet2012,Agullo2015}. In particular in the field of high-performance computing where scheduling is concerned about distributing computations across many heterogeneous, computational devices. There already exists many approaches that attempt to solve this problem, e.g. CellSs \cite{Bellens2009}, StarSS \cite{Planas2009}, StarPU \cite{Augonnet2011}, QUARK \cite{YarKhan2011}, PaRSEC \cite{Bosilca2013} to mention a few.
+
+The key observation is, that, they share a common flaw: They provide weak abstractions.
 
   \section{Proposed solution}
 
@@ -105,5 +121,8 @@ The functional programming Links implements both deep and shallow handlers \cite
     \end{tabular}\caption{Activity overview.}
   \end{table}
   % Bibliography
-  \printbibliography[heading=bibintoc]
+\bibliographystyle{abbrvnat}
+\softraggedright
+\bibliography{references}
+%  \printbibliography[heading=bibintoc]
 \end{document}
