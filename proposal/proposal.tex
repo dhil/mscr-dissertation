@@ -1,5 +1,5 @@
 %\documentclass[a4paper,11pt,twoside]{article}
-\documentclass[preprint,numbers]{sigplanconf}
+\documentclass[preprint,10pt,numbers]{sigplanconf}
 \usepackage[utf8]{inputenc}          % UTF-8 Encoding
 \usepackage{hyperref}                % Interactive PDF
 \usepackage{float}                   % Float control
@@ -54,9 +54,17 @@ We propose to rectify this mismatch by transferring the responsibility for sched
 
   \section{Problem definition}
 %  Although, handlers for algebraic effects have many practical applications \cite{Kammar2013,Bauer2015,Hillerstrom2015,Dolan2015}, there does not yet exist an efficient implementation of handlers. Multicore OCaml implements linear handlers which only allow the continuation invoked once. This restriction is enforced during run-time. Furthermore, because OCaml lacks an effect system\dots
-Run-time scheduling is recognised as an important problem for performance \cite{Augonnet2011,Augonnet2012,Agullo2015}. In particular in the field of high-performance computing where scheduling is concerned about distributing computations across many heterogeneous, computational devices. There already exists many approaches that attempt to solve this problem, e.g. CellSs \cite{Bellens2009}, StarSS \cite{Planas2009}, StarPU \cite{Augonnet2011}, QUARK \cite{YarKhan2011}, PaRSEC \cite{Bosilca2013} to mention a few.
+Run-time scheduling is recognised as an important problem for performance \cite{Augonnet2011,Augonnet2012,Agullo2015}. In particular in the field of high-performance computing where scheduling is concerned about exploiting heterogeneity to accelerate computations. There already exists many tools that attempt to solve this problem, e.g. CellSs \cite{Bellens2009}, StarSS \cite{Planas2009}, StarPU \cite{Augonnet2011}, QUARK \cite{YarKhan2011}, PaRSEC \cite{Bosilca2013} to mention a few.
 
-The key observation is, that, they share a common flaw: They provide weak abstractions.
+These tools take a common approach to scheduling: Given a task-graph-based description of a program, they will attempt to map individual tasks onto computational devices. Most of the tools seek to do this mapping automatically.
+
+However, the key observation is, that, the aforementioned tools provide weak abstractions that makes scheduling non-modular. Support for schedulers is added by resorting to compile-time meta programming in a foreign language such as \texttt{pragmas}. Hence, schedulers become tightly coupled with computations. Consequently, it is nontrivial to reuse a particular scheduler or change scheduler.
+% Moreover, the programmer still has a limited say.
+
+Ideally, we would want schedulers to be first-class citizens in the host language. Therefore, we ask the following question:
+\begin{center}
+  \emph{How may we reify schedulers as an integrated host language construct?}
+\end{center}
 
   \section{Proposed solution}
 
@@ -93,6 +101,11 @@ The functional programming Links implements both deep and shallow handlers \cite
   \subsubsection{Library implementations}\label{sec:library}
 
   \section{Evaluation}
+  The primary metric for evaluation of the proposed solution will be performance. As discussed earlier there are various metrics for measuring performance. We intend to mainly measure performance by raw execution speed. Furthermore, we intend to compare our performance results against results for similar programs written in C since it is considered a ``performant'' language. 
+
+Additionally, we will consider the safety of our solution, i.e. which static guarantees, if any, can we exhibit. In order to evaluate safety we intend to give a formal proof of the said properties.
+
+Furthermore, we would like to qualitatively assess the ease of use, that is, whether the handler abstraction makes concurrent programming easier.
 
   \section{Project feasibility}
   \subsection{Risk analysis}
@@ -123,6 +136,7 @@ The functional programming Links implements both deep and shallow handlers \cite
   % Bibliography
 \bibliographystyle{abbrvnat}
 \softraggedright
+\nocite{*}
 \bibliography{references}
 %  \printbibliography[heading=bibintoc]
 \end{document}
