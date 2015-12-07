@@ -78,7 +78,7 @@
   \begin{abstract}
     An abstract will appear here\dots
   \end{abstract}
-  \raggedbottom
+  %\raggedbottom
   % Input the content
   \section{Introduction}
 Run-time scheduling is a domain-specific problem as the performance goal of a scheduler can be paramount to the overall performance of a program. Consequently, schedulers employ different metrics to measure performance. For example, \emph{high-throughput} schedulers seek to optimise the throughput of jobs \cite{Berman2003}, hence performance might be measured by the number of jobs processed by the system. Criteria such as fairness or utilisation might be used to measure the performance of \emph{resource} schedulers as they seek to coordinate accesses to shared resources \cite{Berman2003}. Furthermore, \emph{high-performance} schedulers seek to minimise execution time for a single program. In this case performance is measured by the raw execution speed.
@@ -116,7 +116,7 @@ We propose to an approach along the lines of Multicore OCaml to use algebraic ef
 
 The key observation is that concurrency primitives are encodable as algebraic effects \cite{Bauer2015,Dolan2015}. 
 
-\subsection{Example: Cooperative multitasking}
+\subsection{Encoding cooperative multitasking}
 It is straightforward to encode \emph{cooperative multitasking} using the following two operations:
 \begin{itemize}
   \item $\text{fork} : (() \to a) \to F a$
@@ -133,7 +133,9 @@ fun fib(n) {
   }
 }
 \end{lstlisting}
-where \texttt{get} attempts to retrieve the value inside a future. Its implementation is omitted here, but it is simple to implement in terms of yield.\footnote{The full source code is available at \url{https://github.com/dhil/mscr-dissertation/proposal/coroutines.links}} Next, we define a breadth-first scheduler:
+where \texttt{get} attempts to retrieve the value inside a future. Its implementation is omitted here, but it is simple to implement in terms of yield.\footnote{The full source code is available at \url{https://github.com/dhil/mscr-dissertation/proposal/coroutines.links}} 
+\subsection{Scheduling tasks}
+Next, we define a breadth-first scheduler:
 \begin{lstlisting}[style={links},caption={}]
 open handler bfscheduler(m)(f) {
   case Fork(t,k) -> {
@@ -161,7 +163,7 @@ Finally, when a computation finishes the handler puts the return value inside th
 \begin{center}
 \begin{tikzpicture}[level distance=1.5cm,
 level 1/.style={sibling distance=3.5cm},
-level 2/.style={sibling distance=1cm}]
+level 2/.style={sibling distance=2cm}]
 %\tikzstyle{every node}=[circle,draw]
 
 \node (Root) [blue,rectangle] {fib(3)}
@@ -186,13 +188,22 @@ level 2/.style={sibling distance=1cm}]
 \end{center}
 \end{figure}
 
-This scheduler is suboptimal for the Fibonacci-computation on single-core platform, because it materialises it entire computation tree of \texttt{fib}. Figure \ref{fig:bfs} depicts the computation tree for \texttt{fib($3$)}. The labels $f_i$ indicate the order in which tasks are created.
+This scheduler is suboptimal for the Fibonacci-computation on single-core platform, because it unnecessarily materialises the entire computation tree of \texttt{fib($n$)}. Figure \ref{fig:bfs} depicts the computation tree for \texttt{fib($3$)}. The labels $f_i$ indicate tasks, and the subscripts $i$ their respective global id.
 
+The scheduler fails to exploit the fact that a parent task depends on its two children tasks. We can remedy this issue by eagerly execute forked tasks. Visually, this policy to correspond to visiting the computation tree in a depth-first manner. Such a scheduler is similar to the \texttt{bfscheduler}, we only need to change queuing policy in the \texttt{Fork}-case, e.g.
+\begin{lstlisting}[style={links},caption={}]
+case Fork(t,k) -> {
+ var new_f = new_future();
+ enqueue(fun(_) { k(new_f)(f) });
+ scheduler(t)(Just(new_f))()
+}
+\end{lstlisting}
+Instead of enqueuing the forked task, we enqueue the continuation to run later. Moreover, we eagerly execute the forked task \texttt{t}.
 \begin{figure}
 \begin{center}
 \begin{tikzpicture}[level distance=1.5cm,
 level 1/.style={sibling distance=3.5cm},
-level 2/.style={sibling distance=1cm}]
+level 2/.style={sibling distance=2cm}]
 %\tikzstyle{every node}=[circle,draw]
 
 \node (Root) [blue,rectangle] {fib(3)}
@@ -211,11 +222,15 @@ level 2/.style={sibling distance=1cm}]
     child { node [blue] (q1) {fib(1)}
       child { node[draw=none] (q10) {1}
       }
-      edge from parent node [draw=none,right,xshift=2.0,yshift=2.0] {$f_4$}
+      edge from parent node [draw=none,right,xshift=2.0,yshift=2.0] {$f_2'$}
     };
-\end{tikzpicture}\caption{Computation tree of \texttt{fib(3)} when employing depth-first scheduling.}\label{fig:dfs}
+\end{tikzpicture}\caption{Computation tree of \texttt{fib(3)} when employing depth-first scheduling. Note $f_2$ and $f_2'$ are disjoint tasks.}\label{fig:dfs}
 \end{center}
 \end{figure}
+Figure \ref{fig:dfs} depicts the labelled computation tree for \texttt{fib($3$)} when using this scheduler. Now, the entire computation tree no longer needs to materialised. The space used for tasks in the left subtree can be reused for subsequent tasks in the right subtree. Obviously, we save space, but it has a further subtle impact: The tasks yield fewer times which implies the scheduler is invoked fewer times. Thus, we reduced the overhead incurred by the scheduler. In the case of \texttt{fib($n$)} it means we achieve a small improvement in performance.
+
+Admittedly, the Fibonacci computation is trivial, and we are unlikely to encounter such a trivial computation in any practical application. However, the take away point from this example is, that, we were able change schedulers independently of the computation. We effectively embedded our knowledge about the computational domain and the computation in the same language. Furthermore, our code remains modular.
+
   \section{Background}\label{sec:background}
   \subsection{Scheduling tools}\label{sec:tools}
 There exists numerous tools that attempt to address the problem of scheduling in high-performance computing; a selection of these tools were briefly outlined in Section \ref{sec:problemdefinition}.
