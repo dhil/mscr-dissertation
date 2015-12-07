@@ -9,6 +9,44 @@
 \usepackage{amsthm}                  % Provides \newtheorem, \theoremstyle, etc.
 \usepackage[T1]{fontenc}             % Fixes font issues
 \usepackage{lmodern}
+\usepackage{tikz}                    % Drawing
+\usetikzlibrary{trees}
+\usetikzlibrary{calc}
+\usepackage{xcolor}
+\usepackage{listings}
+
+\lstset{
+ backgroundcolor=\color{white},   % choose the background color; you must add \usepackage{color} or \usepackage{xcolor}
+ basicstyle=\ttfamily\small,        % the size of the fonts that are used for the code
+ commentstyle=\itshape,
+ breakatwhitespace=false,         % sets if automatic breaks should only happen at whitespace
+ breaklines=true,                 % sets automatic line breaking
+ captionpos=b,                    % sets the caption-position to bottom
+ deletekeywords={...},            % if you want to delete keywords from the given language
+ escapeinside={§*}{*§},          % if you want to add LaTeX within your code
+ extendedchars=true,              % lets you use non-ASCII characters; for 8-bits encodings only, does not work with UTF-8
+ frame=none,	                   % adds a frame around the code
+ keepspaces=true,                 % keeps spaces in text, useful for keeping indentation of code (possibly needs columns=flexible)
+ numbers=none,                    % where to put the line-numbers; possible values are (none, left, right)
+ rulecolor=\color{black},         % if not set, the frame-color may be changed on line-breaks within not-black text (e.g. comments (green here))
+ showspaces=false,                % show spaces everywhere adding particular underscores; it overrides 'showstringspaces'
+ showstringspaces=false,          % underline spaces within strings only
+ showtabs=false,                  % show tabs within strings adding particular underscores
+ tabsize=2,	                   % sets default tabsize to 2 spaces
+ title=\lstname,                   % show the filename of files included with \lstinputlisting; also try caption instead of title
+  belowcaptionskip=-1\baselineskip,
+  xleftmargin=\parindent
+}
+% Links style
+\lstdefinestyle{links}{
+  basicstyle=\linespread{1.0}\ttfamily\footnotesize,
+  language=Caml,
+  frame=none,
+  literate= {+}{{$+$}}1 {*}{{$*$}}1
+            {<=}{{$\leq$}}1 {>=}{{$\geq$}}1 
+            {=>}{{$\Rightarrow$}}1
+            {->}{{$\to$}}1 {~>}{{$\rightsquigarrow$}}1
+}
 %\usepackage[
 %backend=bibtex,
 %style=numeric,
@@ -26,6 +64,9 @@
 %\title{Proposal: Effective Concurrency in Links} % Just some title; change at a later point.
 
 % The document
+\makeatletter
+\def\@copyrightspace{\relax}
+\makeatother
 \begin{document}
 \title{Effective Concurrency in Links}
 %\subtitle{via handlers}
@@ -52,23 +93,132 @@ We propose to rectify this mismatch by transferring the responsibility for sched
 
   % However\dots
 
-  \section{Problem definition}
+  \section{Problem definition}\label{sec:problemdefinition}
 %  Although, handlers for algebraic effects have many practical applications \cite{Kammar2013,Bauer2015,Hillerstrom2015,Dolan2015}, there does not yet exist an efficient implementation of handlers. Multicore OCaml implements linear handlers which only allow the continuation invoked once. This restriction is enforced during run-time. Furthermore, because OCaml lacks an effect system\dots
-Run-time scheduling is recognised as an important problem for performance \cite{Augonnet2011,Augonnet2012,Agullo2015}. In particular in the field of high-performance computing where scheduling is concerned about exploiting heterogeneity to accelerate computations. There already exists many tools that attempt to solve this problem, e.g. CellSs \cite{Bellens2009}, StarSS \cite{Planas2009}, StarPU \cite{Augonnet2011}, QUARK \cite{YarKhan2011}, PaRSEC \cite{Bosilca2013} to mention a few.
+Run-time scheduling is recognised as an important problem for performance \cite{Augonnet2011,Augonnet2012,Agullo2015}. In particular in the field of high-performance computing where scheduling is concerned about exploiting heterogeneity to accelerate computations. There already exists many tools that attempt to solve this problem, e.g. CellSs \cite{Bellens2009}, StarSS \cite{Planas2009}, StarPU \cite{Augonnet2011}, QUARK \cite{YarKhan2011}, PaRSEC \cite{Bosilca2013} to mention a few.\footnote{These tools are further discussed in Section \ref{sec:tools}.}
 
 These tools take a common approach to scheduling: Given a task-graph-based description of a program, they will attempt to map individual tasks onto computational devices. Most of the tools seek to do this mapping automatically.
 
 However, the key observation is, that, the aforementioned tools provide weak abstractions that makes scheduling non-modular. Support for schedulers is added by resorting to compile-time meta programming in a foreign language such as \texttt{pragmas}. Hence, schedulers become tightly coupled with computations. Consequently, it is nontrivial to reuse a particular scheduler or change scheduler.
 % Moreover, the programmer still has a limited say.
+% End up with a monolithic tools
 
 Ideally, we would want schedulers to be first-class citizens in the host language. Therefore, we ask the following question:
 \begin{center}
   \emph{How may we reify schedulers as an integrated host language construct?}
 \end{center}
+In Section \ref{sec:proposedsolution} we give propose an answer to the above question.
 
-  \section{Proposed solution}
+  \section{Proposed solution}\label{sec:proposedsolution}
+The main observation is, that, tools often happen to offer poor abstractions which requires the programmer to annotate or describe code in \emph{a foreign language}. As a consequence code becomes non-modular, and thus, it difficult to combine different pieces of code.
 
-  \section{Background}
+We propose to an approach along the lines of Multicore OCaml to use algebraic effect handlers to encode concurrency directly in the host language. Plotkin and Power's algebraic effects \cite{Plotkin2001} are collections of abstract operations without predefined semantics. Plotkin and Pretnar's handlers \cite{Plotkin2013} assign semantics to abstract operations. Thus this programming model provide a clear separation of effects and their interpretations.
+
+The key observation is that concurrency primitives are encodable as algebraic effects \cite{Bauer2015,Dolan2015}. 
+
+\subsection{Example: Cooperative multitasking}
+It is straightforward to encode \emph{cooperative multitasking} using the following two operations:
+\begin{itemize}
+  \item $\text{fork} : (() \to a) \to F a$
+  \item $\text{yield} : ()$
+\end{itemize}
+The first operation \emph{fork} takes a computation as input, and returns a future which eventually will contain the result of the said computation. The second operation \emph{yield} suspends the computation which it is invoked inside. Using these operations we can easily define an asynchronous computation that computes the $n$th Fibonacci number, e.g. 
+\begin{lstlisting}[style={links},caption={}]
+fun fib(n) {
+  if (n <= 1) {n}
+  else {
+    var f1 = fork(fun() { fib(n-1) });
+    var f2 = fork(fun() { fib(n-2) });
+    get(f1) + get(f2)
+  }
+}
+\end{lstlisting}
+where \texttt{get} attempts to retrieve the value inside a future. Its implementation is omitted here, but it is simple to implement in terms of yield.\footnote{The full source code is available at \url{https://github.com/dhil/mscr-dissertation/proposal/coroutines.links}} Next, we define a breadth-first scheduler:
+\begin{lstlisting}[style={links},caption={}]
+open handler bfscheduler(m)(f) {
+  case Fork(t,k) -> {
+   var new_f = new_future();
+   enqueue(fun(_) { scheduler(t)(Just(new_f))() });
+   k(new_f)(f)
+  }
+  case Yield(k)  -> { 
+   enqueue(fun(_) { k(())(f) }); 
+   var t = dequeue(); t(()) 
+  }
+  case Return(x) -> {
+     put(f,x);
+     if (is_empty()) { x }
+     else { var t = dequeue(); t(()) }
+   } 
+}
+\end{lstlisting}
+The handler \texttt{bfscheduler} implements a scheduler by pattern matching on occurrences of operations \texttt{Fork} and \texttt{Yield} in some computation \texttt{m}. The handler is parameterised by a future \texttt{f}. For instance, when \texttt{fork} occurs in \texttt{fib} the \texttt{bfscheduler} first allocates a new future \texttt{new\_f}. Then it recursively schedules the forked computation \texttt{t} to run later. Finally, it resumes the computation in which \texttt{t} was forked by invokng the continuation \texttt{k} with the new future \texttt{new\_f}, the previous future \texttt{f} is saved for the next invocation of the scheduler. Observe, that on a single-core platform this scheduler effectively defers execution of forked computations.
+
+Upon an occurrence of \texttt{yield} in \texttt{m} the handler suspends the computation and schedules it to run later. Thereafter it dequeues and resumes another computation \texttt{t}.
+
+Finally, when a computation finishes the handler puts the return value inside the future \texttt{f}. Furthermore, if the computation queue is nonempty it dequeues and resumes another computation, otherwise it the return value of latest computation is returned.
+\begin{figure}
+\begin{center}
+\begin{tikzpicture}[level distance=1.5cm,
+level 1/.style={sibling distance=3.5cm},
+level 2/.style={sibling distance=1cm}]
+%\tikzstyle{every node}=[circle,draw]
+
+\node (Root) [blue,rectangle] {fib(3)}
+    child { node[blue] (q0) {fib(2)} 
+      child { node[blue] (q00) {fib(1)}
+        child { node[draw=none] {1} }
+        edge from parent node [draw=none,left,xshift=-2.0,yshift=2.0] {$f_3$}
+      }
+      child { node[blue] (q01) {fib(0)} 
+        child { node[draw=none] {0}         
+        }
+        edge from parent node [draw=none,right,xshift=2.0,yshift=2.0] {$f_4$}
+      }
+      edge from parent node [draw=none,left,xshift=-2.0,yshift=2.0] {$f_1$}
+    }
+    child { node [blue] (q1) {fib(1)}
+      child { node[draw=none] (q10) {1}
+      }
+      edge from parent node [draw=none,right,xshift=2.0,yshift=2.0] {$f_2$}
+    };
+\end{tikzpicture}\caption{Computation tree of \texttt{fib(3)} when employing breadth-first scheduling.}\label{fig:bfs}
+\end{center}
+\end{figure}
+
+This scheduler is suboptimal for the Fibonacci-computation on single-core platform, because it materialises it entire computation tree of \texttt{fib}. Figure \ref{fig:bfs} depicts the computation tree for \texttt{fib($3$)}. The labels $f_i$ indicate the order in which tasks are created.
+
+\begin{figure}
+\begin{center}
+\begin{tikzpicture}[level distance=1.5cm,
+level 1/.style={sibling distance=3.5cm},
+level 2/.style={sibling distance=1cm}]
+%\tikzstyle{every node}=[circle,draw]
+
+\node (Root) [blue,rectangle] {fib(3)}
+    child { node[blue] (q0) {fib(2)} 
+      child { node[blue] (q00) {fib(1)}
+        child { node[draw=none] {1} }
+        edge from parent node [draw=none,left,xshift=-2.0,yshift=2.0] {$f_2$}
+      }
+      child { node[blue] (q01) {fib(0)} 
+        child { node[draw=none] {0}         
+        }
+        edge from parent node [draw=none,right,xshift=2.0,yshift=2.0] {$f_3$}
+      }
+      edge from parent node [draw=none,left,xshift=-2.0,yshift=2.0] {$f_1$}
+    }
+    child { node [blue] (q1) {fib(1)}
+      child { node[draw=none] (q10) {1}
+      }
+      edge from parent node [draw=none,right,xshift=2.0,yshift=2.0] {$f_4$}
+    };
+\end{tikzpicture}\caption{Computation tree of \texttt{fib(3)} when employing depth-first scheduling.}\label{fig:dfs}
+\end{center}
+\end{figure}
+  \section{Background}\label{sec:background}
+  \subsection{Scheduling tools}\label{sec:tools}
+There exists numerous tools that attempt to address the problem of scheduling in high-performance computing; a selection of these tools were briefly outlined in Section \ref{sec:problemdefinition}.
   \subsection{Links programming language}
   Links is a strongly, statically typed functional programming language oriented towards web-programming \cite{Cooper2006}. Notably, Links implements effect handlers as first-class citizens \cite{Hillerstrom2015}. Moreover, the implementation support both deep and shallow handlers. However, since Links is an interpreted language the performance of handlers is low.
 
