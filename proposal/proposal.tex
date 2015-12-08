@@ -3,6 +3,8 @@
 \usepackage[utf8]{inputenc}          % UTF-8 Encoding
 \usepackage{hyperref}                % Interactive PDF
 \usepackage{float}                   % Float control
+\usepackage{caption}                 
+\usepackage{subcaption}
 \usepackage{multirow}                % Span multiple rows & columns in a table
 \usepackage{amsmath}                 % Mathematics library
 \usepackage{amssymb}                 % Provides math fonts
@@ -23,7 +25,7 @@
  breaklines=true,                 % sets automatic line breaking
  captionpos=b,                    % sets the caption-position to bottom
  deletekeywords={...},            % if you want to delete keywords from the given language
- escapeinside={§*}{*§},          % if you want to add LaTeX within your code
+ escapeinside={(*}{*)},          % if you want to add LaTeX within your code
  extendedchars=true,              % lets you use non-ASCII characters; for 8-bits encodings only, does not work with UTF-8
  frame=none,	                   % adds a frame around the code
  keepspaces=true,                 % keeps spaces in text, useful for keeping indentation of code (possibly needs columns=flexible)
@@ -68,7 +70,7 @@
 \def\@copyrightspace{\relax}
 \makeatother
 \begin{document}
-\title{Effective Concurrency in Links}
+\title{Proposal: Modular and Effective Concurrency in Links}
 %\subtitle{via handlers}
 
 \authorinfo{Daniel Hillerström}
@@ -76,7 +78,9 @@
            {\href{mailto:daniel.hillerstrom@ed.ac.uk}{daniel.hillerstrom@ed.ac.uk}}
   \maketitle
   \begin{abstract}
-    An abstract will appear here\dots
+The choice of scheduling strategy affects the performance of application. But often the programmer has little or no influence on the matter. There exists many tools that address this mismatch for high-performance computing. However, these tools require the programmer to describe programs in a foreign language which renders code non-modular.
+
+We propose to give a novel, efficient implementation of effect handlers in Links that uses a resource-tracking type system to enable a code generator specialise the run-time implementation of individual handlers. Furthermore, we hypothesise that we can archive ``concurrency for free'' by encoding concurrency primitives via handlers.
   \end{abstract}
   %\raggedbottom
   % Input the content
@@ -95,7 +99,7 @@ We propose to rectify this mismatch by transferring the responsibility for sched
 
   \section{Problem definition}\label{sec:problemdefinition}
 %  Although, handlers for algebraic effects have many practical applications \cite{Kammar2013,Bauer2015,Hillerstrom2015,Dolan2015}, there does not yet exist an efficient implementation of handlers. Multicore OCaml implements linear handlers which only allow the continuation invoked once. This restriction is enforced during run-time. Furthermore, because OCaml lacks an effect system\dots
-Run-time scheduling is recognised as an important problem for performance \cite{Augonnet2011,Augonnet2012,Agullo2015}. In particular in the field of high-performance computing where scheduling is concerned about exploiting heterogeneity to accelerate computations. There already exists many tools that attempt to solve this problem, e.g. CellSs \cite{Bellens2009}, StarSS \cite{Planas2009}, StarPU \cite{Augonnet2011}, QUARK \cite{YarKhan2011}, PaRSEC \cite{Bosilca2013} to mention a few.\footnote{These tools are further discussed in Section \ref{sec:tools}.}
+Run-time scheduling is recognised as an important problem for performance \cite{Augonnet2011,Augonnet2012,Agullo2015,Openmp2013}. In particular in the field of high-performance computing where scheduling is concerned about exploiting heterogeneity to accelerate computations. There already exists many tools that attempt to solve this problem, e.g. CellSs \cite{Bellens2009}, StarSs \cite{Planas2009}, StarPU \cite{Augonnet2011}, OpenMP \cite{Openmp2013} and PaRSEC \cite{Bosilca2013} to mention a few.\footnote{These tools are further discussed in Section \ref{sec:tools}.}
 
 These tools take a common approach to scheduling: Given a task-graph-based description of a program, they will attempt to map individual tasks onto computational devices. Most of the tools seek to do this mapping automatically.
 
@@ -159,8 +163,9 @@ The handler \texttt{bfscheduler} implements a scheduler by pattern matching on o
 Upon an occurrence of \texttt{yield} in \texttt{m} the handler suspends the computation and schedules it to run later. Thereafter it dequeues and resumes another computation \texttt{t}.
 
 Finally, when a computation finishes the handler puts the return value inside the future \texttt{f}. Furthermore, if the computation queue is nonempty it dequeues and resumes another computation, otherwise it the return value of latest computation is returned.
-\begin{figure}
-\begin{center}
+\begin{figure*}[t!]
+\begin{subfigure}[t]{0.5\textwidth}
+\centering
 \begin{tikzpicture}[level distance=1.5cm,
 level 1/.style={sibling distance=3.5cm},
 level 2/.style={sibling distance=2cm}]
@@ -184,23 +189,11 @@ level 2/.style={sibling distance=2cm}]
       }
       edge from parent node [draw=none,right,xshift=2.0,yshift=2.0] {$f_2$}
     };
-\end{tikzpicture}\caption{Computation tree of \texttt{fib(3)} when employing breadth-first scheduling.}\label{fig:bfs}
-\end{center}
-\end{figure}
-
-This scheduler is suboptimal for the Fibonacci-computation on single-core platform, because it unnecessarily materialises the entire computation tree of \texttt{fib($n$)}. Figure \ref{fig:bfs} depicts the computation tree for \texttt{fib($3$)}. The labels $f_i$ indicate tasks, and the subscripts $i$ their respective global id.
-
-The scheduler fails to exploit the fact that a parent task depends on its two children tasks. We can remedy this issue by eagerly execute forked tasks. Visually, this policy to correspond to visiting the computation tree in a depth-first manner. Such a scheduler is similar to the \texttt{bfscheduler}, we only need to change queuing policy in the \texttt{Fork}-case, e.g.
-\begin{lstlisting}[style={links},caption={}]
-case Fork(t,k) -> {
- var new_f = new_future();
- enqueue(fun(_) { k(new_f)(f) });
- scheduler(t)(Just(new_f))()
-}
-\end{lstlisting}
-Instead of enqueuing the forked task, we enqueue the continuation to run later. Moreover, we eagerly execute the forked task \texttt{t}.
-\begin{figure}
-\begin{center}
+\end{tikzpicture}\caption{Breadth-first scheduling.}\label{fig:bfs}
+\end{subfigure}
+~
+\begin{subfigure}[t]{0.5\textwidth}
+\centering
 \begin{tikzpicture}[level distance=1.5cm,
 level 1/.style={sibling distance=3.5cm},
 level 2/.style={sibling distance=2cm}]
@@ -224,46 +217,103 @@ level 2/.style={sibling distance=2cm}]
       }
       edge from parent node [draw=none,right,xshift=2.0,yshift=2.0] {$f_2'$}
     };
-\end{tikzpicture}\caption{Computation tree of \texttt{fib(3)} when employing depth-first scheduling. Note $f_2$ and $f_2'$ are disjoint tasks.}\label{fig:dfs}
-\end{center}
-\end{figure}
+\end{tikzpicture}\caption{Depth-first scheduling. Note $f_2$ and $f_2'$ are disjoint tasks.}\label{fig:dfs}
+\end{subfigure}\caption{Task labelled computation trees for \texttt{fib($3$)}.}
+\end{figure*}
+
+This scheduler is suboptimal for the Fibonacci-computation on single-core platform, because it unnecessarily materialises the entire computation tree of \texttt{fib($n$)}. Figure \ref{fig:bfs} depicts the computation tree for \texttt{fib($3$)}. The labels $f_i$ indicate tasks, and the subscripts $i$ their respective global id.
+
+The scheduler fails to exploit the fact that a parent task depends on its two children tasks. We can remedy this issue by eagerly execute forked tasks. Visually, this policy to correspond to visiting the computation tree in a depth-first manner. Such a scheduler is similar to the \texttt{bfscheduler}, we only need to change queuing policy in the \texttt{Fork}-case, e.g.
+\begin{lstlisting}[style={links},caption={}]
+case Fork(t,k) -> {
+ var new_f = new_future();
+ enqueue(fun(_) { k(new_f)(f) });
+ scheduler(t)(Just(new_f))()
+}
+\end{lstlisting}
+Instead of enqueuing the forked task, we enqueue the continuation to run later. Moreover, we eagerly execute the forked task \texttt{t}.
 Figure \ref{fig:dfs} depicts the labelled computation tree for \texttt{fib($3$)} when using this scheduler. Now, the entire computation tree no longer needs to materialised. The space used for tasks in the left subtree can be reused for subsequent tasks in the right subtree. Obviously, we save space, but it has a further subtle impact: The tasks yield fewer times which implies the scheduler is invoked fewer times. Thus, we reduced the overhead incurred by the scheduler. In the case of \texttt{fib($n$)} it means we achieve a small improvement in performance.
 
 Admittedly, the Fibonacci computation is trivial, and we are unlikely to encounter such a trivial computation in any practical application. However, the take away point from this example is, that, we were able change schedulers independently of the computation. We effectively embedded our knowledge about the computational domain and the computation in the same language. Furthermore, our code remains modular.
 
   \section{Background}\label{sec:background}
-  \subsection{Scheduling tools}\label{sec:tools}
-There exists numerous tools that attempt to address the problem of scheduling in high-performance computing; a selection of these tools were briefly outlined in Section \ref{sec:problemdefinition}.
-  \subsection{Links programming language}
-  Links is a strongly, statically typed functional programming language oriented towards web-programming \cite{Cooper2006}. Notably, Links implements effect handlers as first-class citizens \cite{Hillerstrom2015}. Moreover, the implementation support both deep and shallow handlers. However, since Links is an interpreted language the performance of handlers is low.
+  \subsection{Concurrent and parallel programming models}
+\begin{table*}
+\centering
+\begin{tabular}{| l | l | l |}
+\hline
+ \textbf{Language}             & \textbf{Programming model} & \textbf{Memory model}\\
+\hline
+CellSs, StarSs, StarPU, OpenMP & Annotations via pragmas; API & Shared memory \\
+\hline
+PaRSEC                         & Dataflow programming & Shared Memory \& Distributed memory  \\
+\hline
+MPI & Message-passing          & Distributed memory  \\
+\hline
+Unified Parallel C, Coarray Fortran & Shared variable programming & Partition Global Address Space \\
+\hline
+\end{tabular}
+\caption{Classification of a selection of concurrent and parallel programming models.}\label{tbl:models}
+\end{table*}
+There exists numerous languages/tools that attempt to address the problem of scheduling in high-performance computing; a selection of these tools were briefly outlined in Section \ref{sec:problemdefinition}.
+
+CellSs \cite{Bellens2009} provide a source-to-source compiler that translates annotated C or Fortran code. It attempts to automatically derive opportunities for task-based concurrency. StarSs \cite{Planas2009} and StarPU \cite{Augonnet2011} are influenced by CellSs. The former extends CellSs with hierarchical task scheduling. StarPU provides a unified platform for dynamic scheduling on heterogeneous multicore architectures. All three has influenced the open industry standard OpenMP \cite{Openmp2013}. 
+
+PARSeC \cite{Bosilca2013} is a generic architecture-aware framework for task scheduling in heterogeneous environments. Programmers may implement their own schedulers using the PARSeC API. Schedulers operate on task dependency graphs which the runtime engine
+Thus the runtime engine is aware of both the tasks to be executed and the dataflow which connects them.
+
+  \subsection{Links with effect handlers}
+  Links is a strongly, statically and structural typed functional programming language \cite{Cooper2006}. Notably, Links implements effect handlers as first-class citizens \cite{Hillerstrom2015}. Intuitively, handlers are interpreters that pattern matches on abstract operations occurring in handled computation. This is directly reflected in the syntax for handlers; for example the following handler handles stateful computations that modify program state \texttt{s} via two operations $\texttt{get} : s$ and $\texttt{put} : s \to ()$:
+\begin{lstlisting}[style=links,caption={}]
+sig state : (*$\left(() \xrightarrow{\{Get:s,Put:s\to()\}} a\right) \to (s) \to a$*)
+handler state(m)(s) {
+  case Get(k)    -> k(s)(s)
+  case Put(p,k)  -> k(())(p)
+  case Return(x) -> x
+}
+\end{lstlisting}
+The signature for \texttt{state} conveys that it handles some computation \texttt{m} whose effect signature contains (only) \texttt{Get} and \texttt{Put}, the computation returns a value of type \texttt{a}. The second parameter \texttt{s} is the program state which the computation \texttt{m} may modify.
+The case-statements pattern matches on the operation names in effect signature of \texttt{m}.
+The cases \texttt{Get} and \texttt{Put} matches on user-defined operations, while the \texttt{Return} operation is a special, built-in operation that is invoked implicitly, when the computation \texttt{m} returns.
+
+When an operation is invoked in \texttt{m} the run-time generates a continuation from that point in the program. Then the run-time transfers control to the handler which exposes this continuation is to the programmer via the parameter \texttt{k} in the case-statements. For example, when \texttt{Get} is invoked this particular handler invokes the continuation with the current state \texttt{s}. This effectively resumes the computation \texttt{m} with the state \texttt{s}. Moreover, the same state \texttt{s} is forwarded to the next invocation of the handler. In the case of \texttt{Put}, the handler invokes the continuation with unit, and forwards the new state \texttt{p}.
+
+
+At the time of writing effect handlers are only supported by the Links interpreter. Thus the performance of handlers is low.
+
+\subsubsection{The Links intermediate representation}
+The Links compiler uses A-normal form (ANF) as its intermediate representation for programs. ANF is the functional equivalent to the imperative Static Single Assignment form. All arguments to a function must be let-bound \cite{Flanagan1993}. This restriction makes it easy to build continuations.
+
+\subsection{Multicore OCaml}
+OCaml is a functional language with an industrial strength compiler. The Multicore OCaml project \cite{Dolan2015} attempts to bring multi-core capabilities to the OCaml language by using handlers to encode concurrency. The implementation of handlers is restricted to so-called \emph{linear handlers}, i.e. handlers which only invokes the continuation parameter once. However, this restriction is not enforced statically, thus multiple invocations of a continuation result in a run-time error.
 
   \subsection{Optimisation of single-shot continuations}
 
-  \subsection{Handlers implementations}
-  This section briefly surveys existing implementations of effect handlers. Section \ref{sec:first-class} considers languages with first-class handlers, whilst Section \ref{sec:library} discusses embeddings of handlers in the pure functional programming language Haskell.
-  \subsubsection{First-class implementations}\label{sec:first-class}
-  \begin{table}[H]
-    \centering 
-    \begin{tabular}{| l | l | l |}
-      \hline
-      \multicolumn{1}{|c|}{Language} & \multicolumn{1}{c|}{Handlers} & \multicolumn{1}{c|}{Developed by} \\
-      \hline
-      Eff & Deep handlers & Bauer and Pretnar \\ 
-      \hline
-      Frank & Shallow handlers & McLaughlin, Lindley and McBride \\    
-      \hline
-      Links & Shallow and deep handlers & Hillerström and Lindley\\
-      \hline
-      Multicore OCaml & Deep handlers & OCamlLabs \\
-      \hline    
-    \end{tabular}\caption{Languages with first-class effect handlers.}\label{tbl:impls}
-  \end{table}
-  Table \ref{tbl:impls} provide an overview of languages where effect handlers are first-class citizens. 
+%   \subsection{Handlers implementations}
+%   This section briefly surveys existing implementations of effect handlers. Section \ref{sec:first-class} considers languages with first-class handlers, whilst Section \ref{sec:library} discusses embeddings of handlers in the pure functional programming language Haskell.
+%   \subsubsection{First-class implementations}\label{sec:first-class}
+%   \begin{table}[H]
+%     \centering 
+%     \begin{tabular}{| l | l | l |}
+%       \hline
+%       \multicolumn{1}{|c|}{Language} & \multicolumn{1}{c|}{Handlers} & \multicolumn{1}{c|}{Developed by} \\
+%       \hline
+%       Eff & Deep handlers & Bauer and Pretnar \\ 
+%       \hline
+%       Frank & Shallow handlers & McLaughlin, Lindley and McBride \\    
+%       \hline
+%       Links & Shallow and deep handlers & Hillerström and Lindley\\
+%       \hline
+%       Multicore OCaml & Deep handlers & OCamlLabs \\
+%       \hline    
+%     \end{tabular}\caption{Languages with first-class effect handlers.}\label{tbl:impls}
+%   \end{table}
+%   Table \ref{tbl:impls} provide an overview of languages where effect handlers are first-class citizens. 
 
-The Eff language is a OCaml-style language with deep handlers. It support for effect polymorphism through subtyping \cite{Bauer2015}. 
-The functional programming Links implements both deep and shallow handlers \cite{Hillerstrom2015}. Moreover, the implementation supports effect polymorphism through Links' existing row polymorphic effect system.
+% The Eff language is a OCaml-style language with deep handlers. It support for effect polymorphism through subtyping \cite{Bauer2015}. 
+% The functional programming Links implements both deep and shallow handlers \cite{Hillerstrom2015}. Moreover, the implementation supports effect polymorphism through Links' existing row polymorphic effect system.
     
-  \subsubsection{Library implementations}\label{sec:library}
+%   \subsubsection{Library implementations}\label{sec:library}
 
   \section{Evaluation}
   The primary metric for evaluation of the proposed solution will be performance. As discussed earlier there are various metrics for measuring performance. We intend to mainly measure performance by raw execution speed. Furthermore, we intend to compare our performance results against results for similar programs written in C since it is considered a ``performant'' language. 
@@ -299,9 +349,9 @@ Furthermore, we would like to qualitatively assess the ease of use, that is, whe
     \end{tabular}\caption{Activity overview.}
   \end{table}
   % Bibliography
-\bibliographystyle{abbrvnat}
+\bibliographystyle{abbrv}
 \softraggedright
-\nocite{*}
+%\nocite{*}
 \bibliography{references}
 %  \printbibliography[heading=bibintoc]
 \end{document}
