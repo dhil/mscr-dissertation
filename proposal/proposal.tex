@@ -78,24 +78,30 @@
            {\href{mailto:daniel.hillerstrom@ed.ac.uk}{daniel.hillerstrom@ed.ac.uk}}
   \maketitle
   \begin{abstract}
-Efficient task scheduling is important in order to achieve performance. Yet the programmer's influence on scheduling is limited, because existing programming models often provide weak abstractions which lack modularity. 
-%The choice of scheduling strategy affects the performance of application. But often the programmer has little or no influence on the matter. There exists many tools that address this mismatch for high-performance computing. However, these tools require the programmer to describe programs in a foreign language which renders code non-modular.
+Modular and efficient task scheduling is important in order to achieve performance by picking the most suitable scheduling strategy in a given situation. However, existing programming models require the programmer to annotate blocks of code with inflexible and non-modular compiler directives. Scheduling decisions are made by a generic run-time without exploiting domain knowledge.
 
-We propose a novel, efficient implementation of effect handlers in Links that uses a resource-tracking type system to enable a code generator specialise the run-time implementation of individual handlers. Furthermore, we hypothesise that we can achieve ``concurrency for free'' by encoding concurrency primitives via handlers.
+If scheduling strategies and tasks were expressible in the same programming language, then programmers could choose the best scheduling strategy for an application. We believe algebraic effect handlers provide a solution to this problem. Therefore, we propose a novel, efficient implementation of algebraic effect handlers in Links for implementing modular and effective scheduling.
+%The choice of scheduling strategy affects the performance of application. But often the programmer has little or no influence on the matter. There exists many tools that address this mismatch for high-performance computing. However, these tools require the programmer to describe programs in a foreign language which renders code non-modular.
+%We propose a novel, efficient implementation of effect handlers in Links that uses a resource-tracking type system to enable a code generator specialise the run-time implementation of individual handlers. Furthermore, we hypothesise that we can achieve ``concurrency for free'' by encoding concurrency primitives via handlers.
   \end{abstract}
   %\raggedbottom
   % Input the content
   \section{Introduction}
-Run-time scheduling is a domain-specific problem as the performance goal of a scheduler can be paramount to the overall performance of a program. For example, system schedulers seek to optimise the job throughput. Resource schedulers attempt to ensure fairness by coordinating accesses to shared resources. Task schedulers seek to reduce execution time by considering factors such as dependencies among tasks. In addition, task schedulers may also seek to exploit special-purpose accelerators in the environment in order to speed up task execution.
+Scheduling is at the heart of concurrent programming as it is concern with when computations are executed or suspended. 
+Run-time scheduling is an important problem as the performance goal of a scheduler can be paramount to the overall performance of a program. For example, system schedulers seek to optimise the job throughput. Resource schedulers attempt to ensure fairness by coordinating accesses to shared resources. Task schedulers seek to reduce execution time by considering factors such as dependencies among tasks. In addition, task schedulers may also seek to exploit special-purpose accelerators in the environment in order to speed up task execution.
 
+Clearly, the performance goals of different schedulers may conflict with each other. Furthermore, a scheduler may employ different \emph{scheduling strategies} to achieve its performance goal. The choice of scheduling strategy depends on the problem domain.
+For instance, stencil computations may benefit from neighbouring points being scheduled together.
+However, in most programming models the programmer has little or no say regarding scheduling. The programmer's involvement is often limited to annotating blocks of code with compiler directives. But this approach is not modular, because computations and scheduling strategies are hard-wired together. Consequently, it is nontrivial to change or reuse a particular scheduling strategy. In addition, the compiler is free to ignore the programmer's annotation.
 % Many different domains, we want modularity
 
 %Consequently, schedulers employ different metrics to measure performance. For example, \emph{high-throughput} schedulers seek to optimise the throughput of jobs \cite{Berman2003}, hence performance might be measured by the number of jobs processed by the system. Criteria such as fairness or utilisation might be used to measure the performance of \emph{resource} schedulers as they seek to coordinate accesses to shared resources \cite{Berman2003}. Furthermore, \emph{high-performance} schedulers seek to minimise execution time for a single program. In this case performance is measured by the raw execution speed.
 
-In most programming models the programmer has little or no say regarding scheduling. Unfortunately, the schedulers are often tightly coupled with a generic run-time system. Thus, scheduling is responsibility of the run-time implementor, but the concern of the application programmer \cite{Dolan2015}. 
 %For example, the application programmer's knowledge of the problem domain may accelerate program execution grid-based computations may benefit from neighbouring points being scheduled together. Yet the programmer has little or no say about the matter as schedulers typically are baked into the run-time system \cite{Dolan2015}. 
 
-We propose to rectify this mismatch by transferring the responsibility for scheduling to the application programmer. Concretely, we propose to abstract over the choice of scheduling by adapting the approach taken by Multicore OCaml \cite{Dolan2015} to use Plotkin and Pretnar's \emph{handlers for algebraic effects} \cite{Plotkin2013} to encode scheduling primitives. Specifically, we plan implement a backend for the functional programming language Links \cite{Cooper2006}, and take advantage of its existing implementation of algebraic effect handlers \cite{Hillerstrom2015} to encode Links' concurrency primitives.
+%We advocate a modular approach which enables the programmer propose to rectify this mismatch by transferring the responsibility for scheduling to the application programmer. 
+We advocate an approach that decouples the implementation of tasks from scheduling strategies.
+Concretely, we propose to abstract over the choice of scheduling strategy by adapting the approach taken by Multicore OCaml \cite{Dolan2015} to use Plotkin and Pretnar's \emph{handlers for algebraic effects} \cite{Plotkin2013} to encode scheduling primitives. Specifically, we plan implement a backend for the functional programming language Links \cite{Cooper2006}, and take advantage of its existing implementation of algebraic effect handlers \cite{Hillerstrom2015} to encode Links' concurrency primitives.
 
   % Plotkin and Power's algebraic effects \cite{Plotkin2001} combined with Plotkin and Pretnar's handlers \cite{Plotkin2013} yield a programming model for controlling computational effects. An algebraic effect is a collection of abstract operations without predefined semantics. Handlers interpret algebraic effects by assigning semantics to abstract operations. Thus, the control of computational effects is lifted from the run-time system into the hands of the programmer. Clearly, it shifts additional responsibility onto the programmer, however, in addition it opens up a design space that was previously secluded from the programmer. Now, the programmer may extend the capabilities of the run-time system beyond what the language implementor envisaged.
 
@@ -106,74 +112,73 @@ We propose to rectify this mismatch by transferring the responsibility for sched
   \section{Problem definition}\label{sec:problemdefinition}
 %  Although, handlers for algebraic effects have many practical applications \cite{Kammar2013,Bauer2015,Hillerstrom2015,Dolan2015}, there does not yet exist an efficient implementation of handlers. Multicore OCaml implements linear handlers which only allow the continuation invoked once. This restriction is enforced during run-time. Furthermore, because OCaml lacks an effect system\dots
 %Run-time scheduling is recognised as an important problem for performance \cite{Augonnet2011,Augonnet2012,Agullo2015,Openmp2013}. 
-There exists many concurrent and parallel programming models that attempt to involve programmer participation in scheduling, e.g. CellSs \cite{Bellens2009}, StarSs \cite{Planas2009}, StarPU \cite{Augonnet2011}, OpenMP \cite{Openmp2013} and PaRSEC \cite{Bosilca2013} to mention a few.\footnote{These tools are further discussed in Section \ref{sec:relatedwork}.}
+There exists many concurrent and parallel programming models that attempt to involve programmer participation in scheduling, e.g. CellSs \cite{Bellens2009}, StarSs \cite{Planas2009}, StarPU \cite{Augonnet2011}, OpenMP \cite{Openmp2013} and PaRSEC \cite{Bosilca2013} to mention a few established ones.\footnote{These programming models are further discussed in Section \ref{sec:relatedwork}.}
+These programming models operate on task graph based descriptions of programs. They map individual tasks onto computational devices automatically.
 
-These models operate on task graph based descriptions of programs. They will try to map individual tasks onto computational devices automatically.
-
-However, the key observation is, that, the aforementioned tools provide weak abstractions that makes scheduling non-modular. Support for schedulers is added by resorting to compile-time meta programming in a foreign language such as \texttt{\#pragmas}. As a consequence scheduling strategies and tasks become tightly coupled. In addition, it becomes nontrivial to swap scheduling strategies.
+However, the disadvantage is, that they provide weak abstractions making scheduling non-modular. The programmer has to resort to compile-time meta programming in a foreign language such as \texttt{\#pragmas} to influence scheduling. As a consequence the implementation of scheduling strategies and tasks become tightly coupled. In addition, it becomes nontrivial to swap scheduling strategies. Moreover, if one combines these programming models; what are the semantics of the resulting programming model then?
 % Moreover, the programmer still has a limited say.
 % End up with a monolithic tools
 
-Ideally, we would want schedulers to be first-class citizens in the host language. Therefore, we ask the following question:
+If we were able to express scheduling strategies and tasks independently of each other, but in the same programming language, then we would be able to give precise semantics. In particular, we would achieve modularity naturally. Therefore, we ask the following question:
 \begin{center}
-  \emph{How may we reify schedulers as an integrated host language construct?}
+  \emph{How may we reify scheduling strategies as an integrated construct in the host language?}
 \end{center}
 In Section \ref{sec:proposedsolution} we propose an answer to the above question.
 
 \section{Background}\label{sec:background}
-In Section \ref{sec:effects-and-handlers} introduces algebraic effects and handlers, while Section \ref{sec:effect-links} introduces an implementation of them in the functional programming language Links.
+In Section \ref{sec:effects-and-handlers} we introduce algebraic effects and handlers, while in Section \ref{sec:effect-links} we introduce an implementation of them in the functional programming language Links.
 
 \subsection{Algebraic effects and their handlers}\label{sec:effects-and-handlers}
 Plotkin and Power introduced algebraic effects \cite{Plotkin2001} for modelling the semantics of effectful computations \cite{Lindley2014}. An algebraic effect is a collection of abstract operations. For example, we might define an algebraic effect for state: $State(s) \defas \{Get:s,Put:s \to ()\}$. State is an effect with two operations: Get and Put which retrieves and modify some state $s$, respectively. The State effect and its operations do not have predefined semantics.
 
-\begin{figure*}[t!]
-\begin{subfigure}[b]{0.5\textwidth}
-\centering
-\begin{lstlisting}[caption={},style=links]
-sig withdraw : (*$(\texttt{Int}) \xrightarrow{\texttt{\{Get:Int},\texttt{Put:(Int)} \to ()|\varepsilon\}} \texttt{Int}$*)
-fun withdraw(amount) {
-  var balance = get();
-  if (balance - amount > 0) {
-    put(balance - amount); amount
-  } else {
-    0
-  }
-}
-\end{lstlisting}
-\caption{Computation tree for \dots}\label{fig:effecttree}
-\end{subfigure}
-~
-\begin{subfigure}[b]{0.5\textwidth}
-\centering
-\begin{tikzpicture}[level distance=1.5cm,
-level 1/.style={sibling distance=3.5cm},
-level 2/.style={sibling distance=2cm}]
-%\tikzstyle{every node}=[circle,draw]
+% \begin{figure*}[t!]
+% \begin{subfigure}[b]{0.5\textwidth}
+% \centering
+% \begin{lstlisting}[caption={},style=links]
+% sig withdraw : (*$(\texttt{Int}) \xrightarrow{\texttt{\{Get:Int},\texttt{Put:(Int)} \to ()|\varepsilon\}} \texttt{Int}$*)
+% fun withdraw(amount) {
+%   var balance = get();
+%   if (balance - amount > 0) {
+%     put(balance - amount); amount
+%   } else {
+%     0
+%   }
+% }
+% \end{lstlisting}
+% \caption{Computation tree for \dots}\label{fig:effecttree}
+% \end{subfigure}
+% ~
+% \begin{subfigure}[b]{0.5\textwidth}
+% \centering
+% \begin{tikzpicture}[level distance=1.5cm,
+% level 1/.style={sibling distance=3.5cm},
+% level 2/.style={sibling distance=2cm}]
+% %\tikzstyle{every node}=[circle,draw]
 
-\node (Root) [blue,rectangle] {Get}
-    child { node[blue] (q0) {Put} 
-      child { node[draw=none] (q00) {\texttt{amount}}
-        edge from parent node [draw=none,left,xshift=-2.0,yshift=2.0] {()}
-      }      
-      edge from parent node [draw=none,left,xshift=-2.0,yshift=2.0] {\texttt{balance}}
-    }
-    child { node [draw=none] (q1) {0}
-      edge from parent node [draw=none,right,xshift=2.0,yshift=2.0] {\texttt{balance}}
-    };
-\end{tikzpicture}
-\caption{Computation tree for \dots}\label{fig:effecttree}
-\end{subfigure}
-\caption{Computation and its computation tree.}
-\end{figure*}
+% \node (Root) [blue,rectangle] {Get}
+%     child { node[blue] (q0) {Put} 
+%       child { node[draw=none] (q00) {\texttt{amount}}
+%         edge from parent node [draw=none,left,xshift=-2.0,yshift=2.0] {()}
+%       }      
+%       edge from parent node [draw=none,left,xshift=-2.0,yshift=2.0] {\texttt{balance}}
+%     }
+%     child { node [draw=none] (q1) {0}
+%       edge from parent node [draw=none,right,xshift=2.0,yshift=2.0] {\texttt{balance}}
+%     };
+% \end{tikzpicture}
+% \caption{Computation tree for \dots}\label{fig:effecttree}
+% \end{subfigure}
+% \caption{Computation and its computation tree.}
+% \end{figure*}
 
-Handlers assign semantics to effects. Essentially, handlers interpret invocations of abstract operations in computations. Handlers may be either closed or open. A closed handler handles a fixed set of effects, whilst an open handler handles a subset of effects. Open handlers can be composed together to handle a larger set of effects. In addition, handlers comes in two different flavours: \emph{deep} or \emph{shallow}.
+Handlers assign semantics to effects. Essentially, handlers interpret invocations of abstract operations in computations. Handlers may be either closed or open. A closed handler handles a fixed set of effects, whilst an open handler handles a subset of effects. Open handlers can be composed together to handle a larger set of effects. In addition, handlers comes in two different flavours: \emph{deep} or \emph{shallow}. Deep handlers interpret operations uniformly, e.g. every occurrence of Get is interpreted by the same handler. Conversely, shallow handlers interpret operations non-uniformly as operations are not necessarily interpreted by the same handler every time. Both types of handlers have practical applications \cite{Kammar2013}.
 
 % Intuitively handlers fold computation trees
 
 %\subsection{Continuations}\label{sec:continuations}
 
   \subsection{Links with effect handlers}\label{sec:effect-links}
-  Links is a strongly, statically and structural typed functional programming language \cite{Cooper2006}. Notably, Links implements effect handlers as first-class citizens \cite{Hillerstrom2015}. Intuitively, handlers are interpreters that pattern matches on abstract operations occurring in handled computation. This is directly reflected in the syntax for handlers; for example the following handler handles stateful computations that modify program state \texttt{s} via two operations $\texttt{get} : s$ and $\texttt{put} : s \to ()$:
+  Links is a strongly, statically and structural typed functional programming language \cite{Cooper2006}. Notably, Links implements both deep and shallow effect handlers as first-class citizens \cite{Hillerstrom2015}. Intuitively, handlers are interpreters that pattern matches on abstract operations occurring in handled computation. This is directly reflected in the syntax for handlers. For example the following handler interprets the State effect introduced in the previous section:
 \begin{lstlisting}[style=links,caption={}]
 sig state : (*$\left(() \xrightarrow{\{Get:s,Put:s\to()\}} a\right) \to (s) \to a$*)
 handler state(m)(s) {
@@ -193,9 +198,10 @@ At the time of writing effect handlers are only supported by the Links interpret
 
   \section{Proposed solution}\label{sec:proposedsolution}
 %The main observation is, that, tools often happen to offer poor abstractions which requires the programmer to annotate or describe code in \emph{a foreign language}. As a consequence code becomes non-modular, and thus, it difficult to combine different pieces of code.
-We advocate an approach along the lines of Multicore OCaml to use algebraic effect handlers to encode concurrency directly in the host language. Plotkin and Power's algebraic effects \cite{Plotkin2001} are collections of abstract operations without predefined semantics. Plotkin and Pretnar's handlers \cite{Plotkin2013} assign semantics to abstract operations. Thus this programming model provide a clear separation of computational effects and their interpretations.
+We advocate an approach along the lines of Multicore OCaml to use algebraic effect handlers to encode concurrency directly in the host language. 
+%Algebraic effects combined with handlers yield a programming model which provide a clear separation of computational effects and their interpretations.
 
-The key observation is that concurrent and parallel concepts such as task forking, kernel launch and data-sharing are effects \cite{Bauer2015,Dolan2015}. Hence, concurrency is encodable through algebraic effects \cite{Bauer2015,Dolan2015}. Handlers (interpretations) for these effects implement scheduling strategies. Sections \ref{sec:eff} and \ref{sec:sched} give a concrete example of a possible encoding of asynchronous task, and two possible task schedulers.
+The key observation is that concurrent and parallel concepts such as task forking, kernel launch and data-sharing can be thought of as effectful computations \cite{Bauer2015,Dolan2015}. concurrency is encodable through algebraic effects \cite{Bauer2015,Dolan2015}. Handlers will used to implement scheduling strategies. In Sections \ref{sec:eff} and \ref{sec:sched} we give a concrete example of a possible encoding of asynchronous task, and two possible task schedulers.
 
 \subsection{Encoding cooperative multitasking}\label{sec:eff}
 We may encode \emph{cooperative multitasking} using the following two operations:
@@ -210,14 +216,15 @@ fun fib(n) {
   else {
     var f1 = fork(fun() { fib(n-1) });
     var f2 = fork(fun() { fib(n-2) });
-    get(f1) + get(f2)
+    getf(f1) + getf(f2)
   }
 }
 \end{lstlisting}
-where \texttt{get} attempts to retrieve the value inside a future. Its implementation is omitted here, but it is simple to implement in terms of yield.\footnote{The full source code is available at \url{https://github.com/dhil/mscr-dissertation/proposal/coroutines.links}} 
+where \texttt{getf} attempts to retrieve the value inside a future. Its implementation is omitted here, but it is simple to implement in terms of yield.\footnote{The full source code is available at \url{https://github.com/dhil/mscr-dissertation/proposal/coroutines.links}} 
 
 \subsection{Scheduling tasks}\label{sec:sched}
-Next, we define a scheduler:
+Next, we are going to implement two schedulers, for the Fibonacci computation, as handlers.
+The first scheduler is good on multicore platform, while the second is good for on single-core.
 \begin{lstlisting}[style={links},caption={}]
 open handler sched(m)(f) {
   case Fork(t,k) -> {
@@ -230,13 +237,13 @@ open handler sched(m)(f) {
    var t = dequeue(); t(()) 
   }
   case Return(x) -> {
-     put(f,x);
+     putf(f,x);
      if (is_empty()) { x }
      else { var t = dequeue(); t(()) }
    } 
 }
 \end{lstlisting}
-The handler \texttt{bfscheduler} implements a scheduler by pattern matching on occurrences of operations \texttt{Fork} and \texttt{Yield} in some computation \texttt{m}. The handler is parameterised by a future \texttt{f}. For instance, when \texttt{fork} occurs in \texttt{fib} the \texttt{bfscheduler} first allocates a new future \texttt{new\_f}. Then it recursively schedules the forked task \texttt{t} to run later. Finally, it resumes the task in which \texttt{t} was forked by invoking the continuation \texttt{k} with the new future \texttt{new\_f}, the previous future \texttt{f} is saved for the next invocation of the scheduler. Observe, that on a single-core platform this scheduler effectively defers execution of forked tasks.
+The handler \texttt{sched} implements a scheduler with a particular scheduling strategy by pattern matching on occurrences of operations \texttt{Fork} and \texttt{Yield} in some computation \texttt{m}. The handler is parameterised by a future \texttt{f}. For instance, when \texttt{fork} occurs in \texttt{fib} the scheduler first allocates a new future \texttt{new\_f}. Then it recursively schedules the forked task \texttt{t} to run later. Finally, it resumes the task in which \texttt{t} was forked by invoking the continuation \texttt{k} with the new future \texttt{new\_f}, the previous future \texttt{f} is saved for the next invocation of the scheduler. Observe, that on a single-core platform this scheduling strategy effectively defers execution of forked tasks.
 
 Upon an occurrence of \texttt{yield} in \texttt{m} the handler suspends the task and schedules it to run later. Thereafter it dequeues and resumes another task \texttt{t}.
 
@@ -299,14 +306,14 @@ level 2/.style={sibling distance=2cm}]
 \end{subfigure}\caption{Task labelled computation trees for \texttt{fib($3$)}.}
 \end{figure*}
 
-This scheduler is suboptimal for the Fibonacci-computation on single-core platform, because it unnecessarily materialises the entire computation tree of \texttt{fib($n$)}. Figure \ref{fig:bfs} depicts the computation tree for \texttt{fib($3$)}. The labels $f_i$ indicate tasks, and the subscripts $i$ their respective global id.
+This scheduling strategy is suboptimal for the Fibonacci-computation on single-core platform, because it unnecessarily materialises the entire computation tree of \texttt{fib($n$)}. Figure \ref{fig:bfs} depicts the computation tree for \texttt{fib($3$)}. The labels $f_i$ indicate tasks, and the subscripts $i$ their respective global id.
 
-The scheduler fails to exploit the fact that a parent task depends on its two children tasks. We can remedy this issue by eagerly execute forked tasks. Visually, this policy to correspond to visiting the computation tree in a depth-first manner. Such a scheduler is similar to the \texttt{bfscheduler}, we only need to change queuing policy in the \texttt{Fork}-case, e.g.
+The scheduler fails to exploit the fact that a parent task depends on its two children tasks. We can remedy this issue by eagerly execute forked tasks. Visually, this policy to correspond to visiting the computation tree in a depth-first manner. Such a scheduler is similar to the \texttt{sched}, we only need to change queuing policy in the \texttt{Fork}-case, e.g.
 \begin{lstlisting}[style={links},caption={}]
 case Fork(t,k) -> {
  var new_f = new_future();
  enqueue(fun(_) { k(new_f)(f) });
- scheduler(t)(Just(new_f))()
+ sched(t)(Just(new_f))()
 }
 \end{lstlisting}
 Instead of enqueuing the forked task, we enqueue the continuation to run later. Moreover, we eagerly execute the forked task \texttt{t}.
@@ -314,21 +321,32 @@ Figure \ref{fig:dfs} depicts the labelled computation tree for \texttt{fib($3$)}
 
 Admittedly, the Fibonacci computation is trivial, and we are unlikely to encounter such a trivial computation in any practical application. However, the take away point from this example is, that, we were able change schedulers independently of the computation.
 
-Essentially, we derived the sequential schedule for the naïve Fibonacci implementation. If we were to execute the computation on multicore platform, then the breadth-first scheduler would be a better choice. Fortunately, with this programming abstraction it is easy to change schedulers as computations and schedulers are expressed in the same language. In other words: We gain modularity.
+Essentially, we derived the sequential schedule for the naïve Fibonacci implementation. If we were to execute the computation on multicore platform, then the breadth-first scheduler would be a better choice. Fortunately, with this programming abstraction it is easy to change schedulers as computations and schedulers are expressed in the same language. In other words: We gain modularity. But this simple exercise is nontrivial in established programming models.
 
 \subsection{Proposal}
-We propose to give an efficient implementation of effect handlers in the functional programming language Links.
+We propose to give an efficient implementation of effect handlers in the functional programming language Links. In addition, we hypothesise that the handler abstraction is strong enough for us to achieve modular concurrency. By modular concurrency, we mean that we can change the actual scheduling strategy for processes or threads. Furthermore, we believe that we can encode Links' message-passing concurrency model using handlers. 
+%Provided that the implementation of handlers is efficient, then this should give us ``concurrency for free''.
 
 \subsection{Project outcomes}
+There will be at least two outcomes from this project:
 \begin{itemize}
-  \item Efficient handlers.
+  \item An efficient implementation of effect handlers.
   \item An account of concurrent programming with effect encoded concurrency.  
 \end{itemize}
 
 \section{Methodology}
+The power of handlers comes from the continuation. At the same time, it is the greatest performance killer, since a continuation is a copy of current stack state.
+%A continuation captures the remainder of a computation. On run-time this means a continuation is a copy of the current stack state, and to invoke a continuation is to return a copy of the stack. In general, handlers allow continuations to be invoked multiple times, thus the run-time has to maintain multiple copies of different stack states. This is expensive.
+However, one can observe that in many cases continuations are only invoked once, these are called single-shot continuations. A single-shot continuation can be implemented efficiently \cite{Bruggeman1996}. But if we restrict all continuations to be single-shot, then the programming model loses a lot of power. Instead we can classify handlers according to how many times they invoke continuations: 
+\begin{description}
+  \item[0 times] \emph{Exception handlers}; no need for continuations.
+  \item[1 time] \emph{Linear handlers}; can be implemented efficiently.
+  \item[More than 1 time] \emph{Multi-handlers}; no known general efficient implementation.
+\end{description}
+We can take advantage of Links' type system to track this information, then in the code generation phase we may use this information to specialise implementations of particular handlers\footnote{This idea originated in a discussion with Sam Lindley.}.
 
   \section{Related work}\label{sec:relatedwork}
-This section briefly summarises related work.
+In section we briefly summarise related work.
 
   \subsection{Concurrent and parallel programming models}
 \begin{table*}
@@ -339,29 +357,37 @@ This section briefly summarises related work.
 \hline
 CellSs, StarSs, StarPU, OpenMP & Annotations via pragmas; API & Shared memory \\
 \hline
-PaRSEC                         & Dataflow programming & Shared Memory \& Distributed memory  \\
+OpenACC                        & Annotations via pragmas; Data parallel & Shared memory \\
+\hline
+PaRSEC                         & Dataflow programming & Shared memory \& Distributed memory  \\
 \hline
 MPI & Message-passing          & Distributed memory  \\
 \hline
-Unified Parallel C, Coarray Fortran & Shared variable programming & Partition Global Address Space \\
+Unified Parallel C, Coarray Fortran & Shared variable programming & Partitioned Global Address Space \\
 \hline
 \end{tabular}
 \caption{Classification of a selection of concurrent and parallel programming models.}\label{tbl:models}
 \end{table*}
-There exists numerous languages/tools that attempt to address the problem of scheduling in high-performance computing; a selection of these tools were briefly outlined in Section \ref{sec:problemdefinition}.
+There exists numerous languages/tools that attempt to address the problem of scheduling in high-performance computing. A selection of these programming models are listed in Table \ref{tbl:models}.
 
 CellSs \cite{Bellens2009} provide a source-to-source compiler that translates annotated C or Fortran code. It attempts to automatically derive opportunities for task-based concurrency. StarSs \cite{Planas2009} and StarPU \cite{Augonnet2011} are influenced by CellSs. The former extends CellSs with hierarchical task scheduling. StarPU provides a unified platform for dynamic scheduling on heterogeneous multicore architectures. All three has influenced the open industry standard OpenMP \cite{Openmp2013}. 
 
 PARSeC \cite{Bosilca2013} is a generic architecture-aware framework for task scheduling in heterogeneous environments. Programmers may implement their own schedulers using the PARSeC API. Schedulers operate on task dependency graphs which the runtime engine
 Thus the runtime engine is aware of both the tasks to be executed and the dataflow which connects them.
 
+OpenACC \cite{Openacc2013} is an open standard for accelerator programming. It uses a combination of programmer annotations via \texttt{\#pragmas} and APIs in much the same fashion as OpenMP. However, OpenACC focuses exclusively on data parallelism, whereas OpenMP is much broader in its focus.
+
+MPI is a message-passing model for distributed programming \cite{Mpi2012}. Programs in MPI are written in Single Program, Multiple Data (SPMD) style. That means all processes execute the same program, but each process may follow designated parts of the program. Data sharing among processes happens via message passing. Communication is two-sided as processes must actively participate in the data-sharing either by sending or receiving.
+
+Coarray Fortran and Unified Parallel C are so-called Partitioned Global Address Space (PGAS) languages \cite{Reid2005,Upc2013}. This programming model provide a shared memory programming interface to distributed programming. All communication between processes are single-sided, i.e. a process can directly manipulate the memory of some remote process.
+
 \subsection{Multicore OCaml}
-OCaml is a functional language with an industrial strength compiler. The Multicore OCaml project \cite{Dolan2015} attempts to bring multi-core capabilities to the OCaml language by using handlers to encode concurrency. The implementation of handlers is restricted to so-called \emph{linear handlers}, i.e. handlers which only invokes the continuation parameter once. However, this restriction is not enforced statically, therefore multiple invocations of a continuation result in a run-time error. Moreover, OCaml does not have an effect system.
+OCaml is a functional language with an industrial strength compiler. The Multicore OCaml project \cite{Dolan2015} attempts to bring multi-core capabilities to the OCaml language by using deep handlers to encode concurrency. The implementation of handlers is restricted to so-called \emph{linear handlers}, i.e. handlers which only invokes the continuation parameter once. However, this restriction is not enforced statically, therefore multiple invocations of a continuation result in a run-time error. Moreover, OCaml does not have an effect system.
 
-\subsection{The Links intermediate representation}
-The Links compiler uses A-normal form (ANF) as its intermediate representation for programs. ANF is the functional equivalent to the imperative Static Single Assignment form. All arguments to a function must be let-bound \cite{Flanagan1993}. This restriction makes it easy to build continuations.
+%\subsection{The Links intermediate representation}
+%The Links compiler uses A-normal form (ANF) as its intermediate representation for programs. ANF is the functional equivalent to the imperative Static Single Assignment form. All arguments to a function must be let-bound \cite{Flanagan1993}. This restriction makes it easy to build continuations.
 
-  \subsection{Optimisation of single-shot continuations}
+%  \subsection{Optimisation of single-shot continuations}
 
 %   \subsection{Handlers implementations}
 %   This section briefly surveys existing implementations of effect handlers. Section \ref{sec:first-class} considers languages with first-class handlers, whilst Section \ref{sec:library} discusses embeddings of handlers in the pure functional programming language Haskell.
@@ -390,7 +416,7 @@ The Links compiler uses A-normal form (ANF) as its intermediate representation f
 %   \subsubsection{Library implementations}\label{sec:library}
 
   \section{Evaluation}
-  The primary metric for evaluation of the proposed solution will be performance. As discussed earlier there are various metrics for measuring performance. We intend to mainly measure performance by raw execution speed. Furthermore, we intend to compare our performance results against results for similar programs written in C since it is considered a ``performant'' language. 
+  The primary metric for evaluation of the proposed solution will be performance. We intend to mainly measure performance by raw execution speed. Furthermore, we intend to compare our performance results against results for similar programs written in C since it is considered a ``performant'' language. 
 
 Additionally, we will consider the safety of our solution, i.e. which static guarantees, if any, can we exhibit. In order to evaluate safety we intend to give a formal proof of the said properties.
 
@@ -401,24 +427,33 @@ Furthermore, we would like to qualitatively assess the ease of use, that is, whe
     \centering
     \begin{tabular}{ | l | c | c | c | c | c | }
       \hline
-      \multicolumn{1}{|c|}{Activity / Weeks} & 2-4 & 5-9 & 10-17 & 18-21 & 22-33 \\
+      \multicolumn{1}{|c|}{Activity / Weeks} & 2-4 & 5-9 & 10-18 & 19-21 & 22-33 \\
       \hline
       Prototyping    & X & X & & & \\
       \hline
-      Implementation & X & X & X & X & X \\
+      Implementation &  & X & X &  & X \\
       \hline
-      Testing        & X & X & X & X & X \\
+      Testing        &  & X & X &  & X \\
       \hline
-      Evaluation     &   &   & X & X & X \\
+      Evaluation     &   &   & X &  & X \\
       \hline
       Related work   &   & X & X &   & X \\
       \hline
       Exam period    &   &   &   & X &   \\
       \hline
-      Write up       & X & X & X & X & X  \\
+      Holiday        &   &   &   & X &   \\
       \hline
-    \end{tabular}\caption{Activity overview.}
+      Write up       & X & X & X &   & X  \\
+      \hline
+    \end{tabular}\caption{Coarse-grained activity overview.}\label{tbl:activities}
   \end{table}
+Table \ref{tbl:activities} provide a high-level overview for the activities during this project. Implementation is going to be the main activity which is reflected in the table. The activities implementation and testing could arguably have been combined into one activity, however, here we have separated them to emphasise the importance of both activities. The idea is to adopt an agile development approach by decomposing the implementation activity into many small tasks. The duration of a single task should be at most one week. Furthermore, we will have automated regression testing that tests the correctness of the implementation. This ought to ensure that sensible progress is made (at least up to the test coverage).
+
+Evaluation will become a natural extension of the testing activity. In during the evaluation activity we shift the focus from correctness to fulfilment of our goals. The implementation will be evaluated weekly with regard to the performance goals. Possibly, this will be automated to a certain extent. Evaluation of safety and ease of use will be done manually. The former is a pencil and paper exercise, while the latter requires a subjective comparison of code examples.
+
+The dissertation write up is supposed to be a continuous activity. The aim is to produce a work sheet per week that reflects the work done in the other activities. They will act as a sort of worklog. Moreover, the worksheets are not necessarily meant to become part of the dissertation. But as we approach the hand-in deadline, we will shift more focus onto writing up the actual dissertation. Hopefully, the worksheets can provide the foundation for the dissertation.
+
+
   % Bibliography
 \bibliographystyle{abbrv}
 \softraggedright
