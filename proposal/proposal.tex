@@ -64,8 +64,6 @@
 \newcommand{\specialcell}[2][c]{%
   \begin{tabular}[#1]{@{}c@{}}#2\end{tabular}}
 
-\newcommand{\tabitem}{~~\llap{\textbullet}~~}
-
 %% Meta-stuff like authors, title, etc.
 %\author{Daniel Hillerström\\\small{CDT in Pervasive Parallelism}\\\small{\href{mailto:daniel.hillerstrom@ed.ac.uk}{daniel.hillerstrom@ed.ac.uk}}}
 %\date{\today}
@@ -76,7 +74,7 @@
 \def\@copyrightspace{\relax}
 \makeatother
 \begin{document}
-\title{Proposal: Modular and Effective Concurrency}
+\title{Modular and Effective Concurrency in Functional Programming}
 %\subtitle{via handlers}
 
 \authorinfo{Daniel Hillerström}
@@ -84,9 +82,11 @@
            {\href{mailto:daniel.hillerstrom@ed.ac.uk}{daniel.hillerstrom@ed.ac.uk}}
   \maketitle
   \begin{abstract}
+Parallel and concurrent programming is challenging. However, it is important, as parallel architectures have become ubiquitous. If we are to harness the computational power of parallel architectures, then we need structured and modular programming models.
+
 Modular and efficient task scheduling is important in order to achieve performance by picking the most suitable scheduling strategy in a given situation. However, existing programming models require the programmer to annotate blocks of code with inflexible and non-modular compiler directives. Scheduling decisions are made by a generic run-time without exploiting domain knowledge.
 
-If scheduling strategies and tasks were expressible in the same programming language, then programmers could choose the best scheduling strategy for an application. We believe algebraic effect handlers provide a solution to this problem. Therefore, we propose a novel, efficient implementation of algebraic effect handlers in Links for implementing modular and effective scheduling.
+If scheduling strategies and tasks were expressible in the same programming language, then programmers could choose the best scheduling strategy for an application. We believe algebraic effect handlers provide a solution to this problem. Therefore, we propose to implement a compiler for Links that generates efficient run-time implementations of algebraic effect handlers. Then we will use handlers to implement modular and effective scheduling.
 %The choice of scheduling strategy affects the performance of application. But often the programmer has little or no influence on the matter. There exists many tools that address this mismatch for high-performance computing. However, these tools require the programmer to describe programs in a foreign language which renders code non-modular.
 %We propose a novel, efficient implementation of effect handlers in Links that uses a resource-tracking type system to enable a code generator specialise the run-time implementation of individual handlers. Furthermore, we hypothesise that we can achieve ``concurrency for free'' by encoding concurrency primitives via handlers.
   \end{abstract}
@@ -94,7 +94,8 @@ If scheduling strategies and tasks were expressible in the same programming lang
   % Input the content
   \section{Introduction}
 %Parallel and concurrent programming is about writing programs that are to be executed concurrently.
-Scheduling is at the heart of concurrent programming as it is concerned with when computations are executed or suspended. 
+During the past decade parallel architectures have become pervasive, especially due to the recent emergence of multicore smartphones. It is difficult to utilise multiple homogeneous processing cores effectively, and the problem is no easier when we consider heterogeneous processing cores. 
+Scheduling is at the heart of parallel and concurrent programming as it is concerned with when computations are executed or suspended. 
 Run-time scheduling is an important problem as the performance goal of a scheduler can be paramount to the overall performance of a program. For example, system schedulers seek to optimise the job throughput. Resource schedulers attempt to ensure fairness by coordinating accesses to shared resources. Task schedulers seek to reduce execution time by considering factors such as dependencies among tasks. In addition, task schedulers may also seek to exploit special-purpose accelerators in the environment in order to speed up task execution.
 
 Clearly, the performance goals of different schedulers may conflict with each other. Furthermore, a scheduler may employ different \emph{scheduling strategies} to achieve its performance goal. The choice of scheduling strategy depends on the problem domain.
@@ -130,13 +131,13 @@ If we were able to express scheduling strategies and tasks independently of each
 \begin{center}
   \emph{How may we reify scheduling strategies as an integrated construct in the host language?}
 \end{center}
-In Section \ref{sec:proposedsolution} we propose an answer to the above question.
+In Section \ref{sec:proposedsolution} we propose an answer to the question.
 
 \section{Background}\label{sec:background}
 In Section \ref{sec:effects-and-handlers} we introduce algebraic effects and handlers, while in Section \ref{sec:effect-links} we introduce an implementation of them in the functional language Links.
 
 \subsection{Algebraic effects and their handlers}\label{sec:effects-and-handlers}
-Plotkin and Power introduced algebraic effects \cite{Plotkin2001} for modelling the semantics of effectful computations \cite{Lindley2014}. An algebraic effect is a collection of abstract operations. For example, we might define an algebraic effect for state: $State(s) \defas \{Get:s,Put:s \to ()\}$. State is an effect with two operations: Get and Put which retrieves and modify some state $s$, respectively. The State effect and its operations do not have predefined semantics.
+Plotkin and Power introduced algebraic effects \cite{Plotkin2001} for modelling the semantics of effectful computations \cite{Lindley2014}. An algebraic effect is a collection of abstract operations. For example, we might define an algebraic effect for state: $State(s) \defas \{Get:s,Put:s \to ()\}$. State is an effect with two operations: Get and Put which retrieve and modify some state $s$, respectively. The State effect and its operations do not have predefined semantics.
 
 % \begin{figure*}[t!]
 % \begin{subfigure}[b]{0.5\textwidth}
@@ -185,7 +186,7 @@ Handlers assign semantics to effects. Essentially, handlers interpret invocation
 %\subsection{Continuations}\label{sec:continuations}
 
   \subsection{Links with effect handlers}\label{sec:effect-links}
-  Links is a strongly, statically and structural typed functional programming language \cite{Cooper2006}. Notably, Links implements both deep and shallow effect handlers as first-class citizens \cite{Hillerstrom2015}. Intuitively, handlers are interpreters that pattern matches on abstract operations occurring in some handled computation. This is directly reflected in the syntax for handlers. For example the following handler interprets the State effect introduced in the previous section:
+Links is functional programming language \cite{Cooper2006} with a strong type and effect system. Notably, Links implements both deep and shallow effect handlers as first-class citizens \cite{Hillerstrom2015}. Intuitively, handlers are interpreters that pattern matches on abstract operations occurring in some handled computation. This is directly reflected in the syntax for handlers. As an example consider the following handler which interprets the State effect introduced in the previous section:
 \begin{lstlisting}[style=links,caption={}]
 sig state : (*$\left(() \xrightarrow{\{Get:s,Put:s\to()\}} a\right) \to (s) \to a$*)
 handler state(m)(s) {
@@ -434,27 +435,35 @@ Furthermore, we would like to qualitatively assess the ease of use, that is, whe
       \hline
       \multicolumn{1}{|c|}{Activity / Weeks} & 2-4 & 5-9 & 10-18 & 19-21 & 22-33 \\
       \hline
+      Finding examples & X & X & & & \\
+      \hline      
+      Related work   & X  & X &  &   & X \\
+      \hline
+      Benchmarks     & X & X & X & & \\
+      \hline
       Prototyping    & X & X & & & \\
       \hline
-      Finding examples & X & X & & & \\
-      \hline
-      Implementation &  & X & X &  & X \\
+      Implementation &  & X & X & X  & X \\
       \hline
       Testing        &  & X & X &  & X \\
       \hline
-      Evaluation     &   &   & X &  & X \\
+    Single-core eval. &   &  & X &  &  \\
       \hline
-      Related work   &   & X & X &   & X \\
+    Multi-core eval. &   &  &    & X  & X \\
       \hline
-      Exam period    &   &   &   & X &   \\
+      Safety eval. &   &   &  &  & X \\
       \hline
-      Write up       & X & X & X &   & X  \\
+      Write up       & X & X & X & X  & X  \\
       \hline
     \end{tabular}\caption{Coarse-grained activity overview.}\label{tbl:activities}
   \end{table}
-Table \ref{tbl:activities} provide a high-level overview for the activities during this project. Implementation is going to be the main activity which is reflected in the table. The activities implementation and testing could arguably have been combined into one activity, however, here we have separated them to emphasise the importance of both activities. The idea is to adopt an agile development approach by decomposing the implementation activity into many small tasks. The duration of a single task should be at most one week. Furthermore, we will have automated regression testing that tests the correctness of the implementation. This ought to ensure that sensible progress is made (at least up to the test coverage).
+Table \ref{tbl:activities} provide a high-level overview for the activities during this project. The first three activities are connected. The idea is to survey related and background material to find examples and applications that we can use to build a benchmark suite. Furthermore, we intend to revisit the related work activity during later phases of the project in order to potentially include and discuss the latest work in the dissertation.
 
-Evaluation will become a natural extension of the testing activity. In during the evaluation activity we shift the focus from correctness to fulfilment of our goals. The implementation will be evaluated weekly with regard to the performance goals. Possibly, this will be automated to a certain extent. Evaluation of safety and ease of use will be done manually. The former is a pencil and paper exercise, while the latter requires a subjective comparison of code examples.
+The prototyping and implementation activities are connected aswell. We are going to create some prototype implementations based on the examples and applications that we found. These prototypes will possibly be use-case specific, however, the idea is to use them as a starting point for the implementation of the general solution.
+The implementation activity is going to be the main activity which is reflected in the table. The activities implementation and testing could arguably have been combined into one activity, however, here we have separated them to emphasise the importance of both activities. The idea is to adopt an agile development approach by decomposing the implementation activity into many small tasks. The duration of a single task should be at most one week. Furthermore, we will have automated regression testing that tests the correctness of the implementation. This ought to ensure that sensible progress is made (at least up to the test coverage).
+
+Evaluation will become a natural extension of the testing activity. We split evaluation into three activities: Single-core, multi-core and safety. First we will evaluate the performance of programs that use a single core. Test programs will include both concurrent and sequential programs. Later, this activity will be subsumed by the multi-core activity in which we will consider parallel execution of programs.
+During the evaluation activities we shift the focus from correctness to fulfilment of our goals. The implementation will be evaluated weekly with regard to the performance goals. Possibly, this will be automated to a certain extent. Evaluation of safety and ease of use will be done manually. The former is a pencil and paper exercise, while the latter requires a subjective comparison of code examples.
 
 The dissertation write up is supposed to be a continuous activity. The aim is to produce a work sheet per week that reflects the work done in the other activities. They will act as a sort of worklog. Moreover, the worksheets are not necessarily meant to become part of the dissertation. But as we approach the hand-in deadline, we will shift more focus onto writing up the actual dissertation. Hopefully, the worksheets can provide the foundation for the dissertation.
 
