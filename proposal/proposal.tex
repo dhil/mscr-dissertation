@@ -207,8 +207,7 @@ At the time of writing effect handlers are only supported by the Links interpret
 %The main observation is, that, tools often happen to offer poor abstractions which requires the programmer to annotate or describe code in \emph{a foreign language}. As a consequence code becomes non-modular, and thus, it difficult to combine different pieces of code.
 We advocate an approach along the lines of Multicore OCaml to use algebraic effect handlers to encode concurrency directly in the host language. 
 %Algebraic effects combined with handlers yield a programming model which provide a clear separation of computational effects and their interpretations.
-
-The key observation is that concurrent and parallel concepts such as task forking, kernel launch and data-sharing can be thought of as effectful computations. Concurrency is encodable through algebraic effects \cite{Bauer2015,Dolan2015}. Handlers will be used to implement scheduling strategies. In Sections \ref{sec:eff} and \ref{sec:sched} we give a concrete example of a possible encoding of asynchronous tasks, and two possible task schedulers.
+The key observation is that concurrent and parallel concepts such as task forking, kernel launch and data-sharing can be thought of as effectful computations. Thus concurrency is encodable through algebraic effects \cite{Bauer2015,Dolan2015}. Handlers will be used to implement scheduling strategies. In Sections \ref{sec:eff} and \ref{sec:sched} we give a concrete example of how to encode asynchronous tasks using algebraic effects.
 
 \subsection{Encoding cooperative multitasking}\label{sec:eff}
 We may encode \emph{cooperative multitasking} using the following two operations:
