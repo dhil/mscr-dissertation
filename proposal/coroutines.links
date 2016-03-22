@@ -58,9 +58,10 @@ fun stringOfFuture(f) {
     }
 }
 
-sig future : (Comp({Get:(F(a)) {}-> Maybe(a),New:(F(a)),Put:(F(a),a) {}-> ()|e}, b)) -> ([(Int,Maybe(a))]) ->
-              Comp({Get{_},New{_},Put{_}                      |e}, b)
-open handler future(m)(s) {
+sig future : ([(Int,Maybe(a))]) ->
+             (Comp({Get:(F(a)) {}-> Maybe(a),New:(F(a)),Put:(F(a),a) {}-> ()|e}, b)) -> 
+              Comp({Get{_},New{_},Put{_}                                    |e}, b)
+open handler future(s) {
   case Get(Future(i),k) -> {
     switch(lookup(i, s)) {
       case Just(x) -> k(x)(s)
@@ -80,7 +81,7 @@ open handler future(m)(s) {
   case Return(x)        -> x
 }
 
-open handler stack(m)(s) {
+open handler stack(s) {
   case Get(Future(_),k) -> {
     switch(s) {
       case r :: s -> k(r)(s)
@@ -115,9 +116,10 @@ sig size : Comp({Size:Int|_},Int)
 fun size() {do Size}
 
 # Fair queue implementation
-sig fair_queuer : (Comp({Dequeue:a ,Enqueue:(a) {}-> (),IsEmpty:Bool,Size:Int|e}, b)) -> (Queue(a)) ->
-                   Comp({Dequeue{_},Enqueue{_}         ,IsEmpty{_},Size{_}  |e}, b)
-open handler fair_queuer(m)(q) {
+sig fair_queuer : (Queue(a)) ->
+                  (Comp({Dequeue:a ,Enqueue:(a) {}-> (),IsEmpty:Bool,Size:Int|e}, b)) -> 
+                   Comp({Dequeue{_},Enqueue{_}         ,IsEmpty{_},Size{_}   |e}, b)
+open handler fair_queuer(q) {
   case Enqueue(e,k) -> k(())(q ++ [e])
   case Dequeue(k)   -> { var e = hd(q); k(e)(tl(q)) }
   case IsEmpty(k)   -> switch (q) {
@@ -139,11 +141,11 @@ fun fput(f,v) {
 
 # Cooperative routines scheduler
 # Depth first scheduling: Eagerly execute the forked computation.
-open handler dfscheduler(m)(f) {
+open handler dfscheduler(f) {
   case Fork(t,k) -> {
      var new_f = new();
      enqueue(fun(_) { k(new_f)(f) });
-     scheduler(t)(Just(new_f))()
+     dfscheduler(Just(new_f))(t)()
   }
   case Yield(k)  -> { enqueue(fun(_) { k(())(f) }); var t = dequeue(); t(()) }
   case Return(x) -> {
@@ -154,10 +156,10 @@ open handler dfscheduler(m)(f) {
 }
 
 # Breadth first: Delay execution of the forked computation
-open handler bfscheduler(m)(f) {
+open handler bfscheduler(f) {
   case Fork(t,k) -> {
      var new_f = new();
-     enqueue(fun(_) { scheduler(t)(Just(new_f))() });
+     enqueue(fun(_) { bfscheduler(Just(new_f))(t)() });
      k(new_f)(f)
   }
   case Yield(k)  -> { enqueue(fun(_) { k(())(f) }); var t = dequeue(); t(()) }
