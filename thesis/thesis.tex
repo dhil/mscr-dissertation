@@ -25,12 +25,13 @@
 \usetikzlibrary{shapes}
 
 % Bibliography
-\usepackage[
-backend=bibtex,
-style=numeric,
-sorting=nyt
-]{biblatex}  
-\addbibresource{references.bib}
+\usepackage{natbib}
+% \usepackage[
+% backend=bibtex,
+% style=numeric,
+% sorting=nyt
+% ]{biblatex}  
+% \addbibresource{references.bib}
 
 % Source code listings
 \usepackage{xcolor}
@@ -58,6 +59,19 @@ sorting=nyt
   belowcaptionskip=-1\baselineskip,
   xleftmargin=\parindent
 }
+
+% Define Links as a lst-language
+\lstdefinelanguage{Links}{% 
+  morekeywords={typename, fun, op, var, if, this, true, false, else, case, switch, handle, handler, shallowhandler, open, do, sig},%
+  sensitive=t, % 
+  keywordstyle=\color{red},
+  emph={Comp,Player,Bool,Int,GTree,Cheat,Zero,Choose,Rand,Move,Winner,Take,Return,Get,Put,GameState,Alice,Bob},
+  emphstyle={\color{blue}},
+  comment=[l]{\#},% 
+  escapeinside={(*}{*)},%
+  morestring=[d]{"}%
+ }
+
 % Haskell style
 \lstdefinestyle{haskell}{
   language=Haskell,
@@ -76,15 +90,26 @@ sorting=nyt
             {==}{{$\equiv$}}1 {=>}{{$\Rightarrow$}}1
             {->}{{$\to$}}1
 }
+
+\newcommand{\textapprox}{{\fontfamily{ptm}\selectfont\texttildelow}}
+\newcommand{\wildarrow}{\linksify{\textapprox{}>}}
 % Links style
 \lstdefinestyle{links}{
   basicstyle=\linespread{1.0}\ttfamily\footnotesize,
-  language=Caml,
-  literate= {+}{{$+$}}1 {*}{{$*$}}1
-            {<=}{{$\leq$}}1 {>=}{{$\geq$}}1 
-            {=>}{{$\Rightarrow$}}1
-            {->}{{$\to$}}1 {~>}{{$\rightsquigarrow$}}1
+  language=Links,
+  literate= {~>}{{\wildarrow}}1
 }
+
+\lstset{style={links}}
+
+
+
+% Theorem environments
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{proposition}[theorem]{Proposition}
+\newtheorem{corollary}[theorem]{Corollary}
+\newtheorem{definition}[theorem]{Definition}
 
 % Example environment
 \makeatletter  
@@ -93,16 +118,110 @@ sorting=nyt
 \theoremstyle{definition}
 \newtheorem{example}{Example}[chapter]
 
+%% Utilities
+% TODOs
+\newcommand{\todo}[1]{{\par\noindent\small\color{red} \framebox{\parbox{\dimexpr\linewidth-2\fboxsep-2\fboxrule}{\textbf{TODO:} #1}}}}
+
 % Convenient macros
-\newcommand{\record}[1]{\ensuremath{\left\{ #1 \right\}}} %{\langle #1 \rangle}}
-\newcommand{\typename}[1]{\texttt{#1}}
-\newcommand{\type}[1]{\typename{#1}}
-\newcommand{\code}[1]{\texttt{#1}}
-\newcommand{\eto}[1]{\ensuremath{\xrightarrow{\left\{#1 \right\}\;}}}
-\newcommand{\thunktype}[2]{\ensuremath{() \eto{#1} #2}}
-\newcommand{\chntype}[2]{\ensuremath{(#1) \to #2}}
+\newcommand{\linksify}[1]{\texttt{#1}}
 \newcommand{\defas}[0]{\mathrel{\overset{\makebox[0pt]{\mbox{\normalfont\tiny\sffamily def}}}{=}}} % "defined-as-equal"
 \newcommand{\rulesep}{\unskip\ \vrule\ } % Inserts a vertical line
+
+% Formalisation
+%\newcommand{\Calc}{\ensuremath{\lambda_{\text{effrow}}}\xspace}
+\newcommand{\Calc}{\ensuremath{\lambda_{\text{eff}}^\rho}\xspace}
+
+\newcommand{\slab}[1]{\textrm{#1}}
+\newcommand{\semlab}[1]{\text{\scshape{S-#1}}}
+\newcommand{\tylab}[1]{\text{\scshape{T-#1}}}
+\newcommand{\mlab}[1]{\text{\scshape{M-#1}}}
+\newcommand{\klab}[1]{#1}
+\newcommand{\revto}{\ensuremath{\leftarrow}}
+
+\newcommand{\keyw}[1]{\textbf{#1}}
+\newcommand{\Handle}{\keyw{handle}}
+\newcommand{\With}{\keyw{with}}
+\newcommand{\Let}{\keyw{let}}
+\newcommand{\In}{\keyw{in}}
+\newcommand{\Do}{\keyw{do}}
+\newcommand{\Return}{\keyw{return}}
+\newcommand{\Case}{\keyw{case}}
+\newcommand{\Absurd}{\keyw{absurd}}
+\newcommand{\Record}[1]{\ensuremath{\langle #1 \rangle}}
+
+\newcommand{\Pre}[1]{\mathsf{Pre}(#1)}
+\newcommand{\Abs}{\mathsf{Abs}}
+\newcommand{\Presence}{\mathsf{Presence}}
+\newcommand{\Row}{\mathsf{Row}}
+\newcommand{\Type}{\mathsf{Type}}
+
+\newcommand{\Int}{\mathsf{Int}}
+\newcommand{\Bool}{\mathsf{Bool}}
+
+\newcommand{\True}{\mathsf{true}}
+\newcommand{\False}{\mathsf{false}}
+
+\newcommand{\cek}[1]{\ensuremath{\langle #1 \rangle}}
+
+% typing
+\newcommand{\eff}{\mathbin{!}}
+\newcommand{\typ}[3]{#1 \vdash #2 \eff #3}
+
+\newcommand{\harrow}[2]{\ensuremath{\mathbin{~^{#1}\!\!\Rightarrow^{#2}}}}
+%\newcommand{\Harrow}[4]{#1 \harrow{#2}{#4} #3}
+\newcommand{\Harrow}[4]{#1!#2 \Rightarrow #3!#4}
+
+% stacks
+\newcommand{\nil}{\ensuremath{[\,]}}
+\newcommand{\cons}{\ensuremath{::}}
+
+% These operators are taken from Conor's Agda course:
+%   * fish appends a cons list onto a snoc list by reversing the cons list
+%     (yielding a snoc list)
+%   * chips appends a cons list onto a snoc list by reversing the snoc list
+%     (yielding a cons list)
+%   * chips is revapp (assuming we represent snoc lists as cons lists)
+\newcommand{\fish}{\ensuremath{\mathbin{<\!>\!\!<}}}
+\newcommand{\chips}{\ensuremath{\mathbin{<\!>\!\!>}}}
+
+%\newcommand{\revapp}{\ensuremath{\mathbin{<\!\!\!+\!\!+}}}
+\newcommand{\revapp}{\chips}
+
+\newcommand{\concat}{\mathbin{+\!\!+}}
+
+
+%% Effects on the turnstyle
+%\newcommand{\typ}[3]{#1 \vdash_{#3} #2}
+
+
+% environments
+\newcommand{\env}{\gamma}
+
+\newcommand{\reducesto}[0]{\ensuremath{\leadsto}}
+\newcommand{\stepsto}[0]{\ensuremath{\longrightarrow}}
+\newcommand{\Stepsto}{\Longrightarrow}
+
+% array stuff
+\newcommand{\ba}{\begin{array}}
+\newcommand{\ea}{\end{array}}
+
+\newcommand{\bl}{\ba[t]{@{}l@{}}}
+\newcommand{\el}{\ea}
+
+% Syntax environment
+\newenvironment{syntax}{\[\ba{@{}l@{\quad}r@{~}c@{~}l@{}}}{\ea\]\ignorespacesafterend}
+\newenvironment{reductions}{\[\ba{@{}l@{\qquad}@{}r@{~~}c@{~~}l@{}}}{\ea\]\ignorespacesafterend}
+
+\newenvironment{eqs}{\ba{@{}r@{~}c@{~}l@{}}}{\ea}
+\newenvironment{equations}{\[\ba{@{}r@{~}c@{~}l@{}}}{\ea\]\ignorespacesafterend}
+
+
+% translations
+\newcommand{\val}[2]{\llbracket #1 \rrbracket #2}
+\newcommand{\inv}[1]{\llparenthesis #1 \rrparenthesis}
+
+% restrict an environment
+\newcommand{\res}{\backslash}
 
 %% Information about the title, etc.
 \title{(Dissertation title here)}
@@ -111,9 +230,6 @@ sorting=nyt
 %% If the year of submission is not the current year, uncomment this line and 
 %% specify it here:
 \submityear{2016}
-
-%% Optionally, specify the graduation month and year:
-% \graduationdate{February 1786}
 
 %% Specify the abstract here.
 \abstract{%
@@ -132,6 +248,12 @@ An abstract will appear here\dots
 %% Acknowledgements
 \begin{acknowledgements}
 Acknowledgements will appear here\dots
+
+Thanks Christophe\dots
+
+Thanks Sam\dots
+
+Thanks everyone\dots
 \end{acknowledgements}
 
 %% Next we need to have the declaration.
@@ -147,7 +269,7 @@ A preface will possibly appear here\dots
 
 %% Create the table of contents
 \setcounter{secnumdepth}{2} % Numbering on sections and subsections
-\setcounter{tocdepth}{2} % Show chapters, sections and subsections in TOC
+\setcounter{tocdepth}{3} % Show chapters, sections and subsections in TOC
 %\singlespace
 \tableofcontents
 %\doublespace
@@ -157,6 +279,688 @@ A preface will possibly appear here\dots
 % \listoftables
 \end{preliminary}
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%          Main content         %%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%%
+%% Introduction
+%%
+\chapter{Introduction}
+\section{Problem analysis}
+\section{Problem statement}
+\section{Aims and objectives}
+\section{Thesis outline}
+
+%%
+%% Background
+%%
+\chapter{Background}
+\section{The Links programming language}
+\subsection{Notable features}
+\subsection{Concurrency model}
+\subsection{Programming with handlers}
+
+\section{Algebraic effects and handlers}
+\subsection{Algebraic effects}
+\subsection{Effect handlers}
+
+\section{Related work}
+\subsection{Implementations of effect handlers}
+\subsection{Pragma directives}
+
+
+%%
+%% Concurrent programming with handlers
+%%
+\chapter{Concurrent programming with handlers}
+
+%%
+%% Compiling handlers
+%%
+\chapter{Compiling handlers}
+
+%%
+%% Formalisation
+%%
+\chapter{Formalisation}
+In this chapter, we present a type and effect system and a small-step
+operational semantics for \Calc (pronounced ``lambda-eff-row''), a
+Church-style row-polymorphic call-by-value calculus for effect
+handlers.
+%
+We prove that the operational semantics is sound with respect to the
+type and effect system.
+
+A key advantage of row polymorphism is that it integrates rather
+smoothly with Hindley-Milner type inference. We concern ourselves only
+with the explicitly-typed core language, as the treatment of type
+inference is quite standard.
+
+The design of \Calc is inspired by the $\lambda$-calculi of
+\citet{Kammar2013}, \citet{Pretnar2015}, and \citet{Lindley2012}.
+%
+As in the work of \citet{Kammar2013}, each handler can have its own
+effect signature. As in the work of \citet{Pretnar2015}, the
+underlying formalism is fine-grained call-by-value~\cite{LevyPT03},
+which names each intermediate computation like in A-normal
+form~\cite{Flanagan1993}, but unlike A-normal form is closed under
+$\beta$-reduction. As in the work of \citet{Lindley2012}, the effect
+system is based on row polymorphism.
+
+\section{Types}
+The grammars of types, effects, kinds, and type and kind environments
+are given in Figure \ref{fig:types-syntax}.
+
+\begin{figure}
+Types
+\begin{syntax}
+\slab{Ordinary types} &A,B,C  &::= & %\Bool \mid \Int
+                                      A \xrightarrow{E} B
+                               \mid  \forall \alpha^K .\, A \\
+                             &&\mid& \Record{R} \mid [R]
+                               \mid  \Harrow{A}{E}{B}{E'} \mid \alpha \\
+\slab{Effect types}   &E    &::= & \{R\}\\
+\slab{Row types}      &R    &::= & \ell : P;R \mid \rho \mid \cdot \\
+\slab{Presence types} &P    &::= & \Pre{A} \mid \Abs \mid \theta\\
+%\slab{Labels}         &\ell &    &                \\
+\slab{Kinds}          &K    &::= & \Type \mid \Row_\mathcal{L} \mid \Presence\\
+\slab{Label sets}     &\mathcal{L} &::=& \emptyset \mid \{\ell\} \uplus \mathcal{L}\\
+%\slab{Type variables} &\alpha, \rho, \theta& \\
+\slab{Type environments} &\Gamma &::=& \cdot \mid \Gamma, x:A \\
+\slab{Kind environments} &\Delta &::=& \cdot \mid \Delta, \alpha:K \\
+\end{syntax}
+\caption{Types, effects, kinds, and environments}
+\label{fig:types-syntax}
+\end{figure}
+
+\paragraph{Ordinary Types}
+%The base types are integers and booleans.
+The function type $A \xrightarrow{E} B$ takes an argument of type $A$,
+returns a value of type $B$, and has effect signature $E$. The effect
+signature enumerates the operations that the function may perform
+during evaluation. The polymorphic type $\forall \alpha^K .\, A$ is
+parameterised by a type variable $\alpha$ of kind $K$. The record type
+$\Record{R}$ represents records with fields given by labels of row
+$R$. Dually, the variant type $[R]$ represents a sum of fields tagged
+by the labels of row $R$. The handler type $\Harrow{A}{E}{B}{E'}$
+transforms a computation with return type $A$, that has effect
+signature $E$, into another computation with return type $B$ and
+effect signature $E'$.
+
+\paragraph{Row Types}
+Effect signatures, records and variants are defined in terms of rows.
+A row type embodies a collection of distinct labels, each of which is
+annotated with a presence type. A presence type indicates whether a
+label is \emph{present} with some type $A$ ($\Pre{A}$), \emph{absent}
+($\Abs$) or \emph{polymorphic} in its presence ($\theta$).
+
+Row types are either \emph{closed} or \emph{open}. A closed row type
+ends in $\cdot$, whilst an open row type ends with a \emph{row
+  variable} $\rho$. Furthermore, a closed row term can have only the
+labels explicitly mentioned in its type. Conversely, the row variable
+in an open row can be instantiated with additional labels. We identify
+rows up to reordering of labels, for instance, we consider the
+following two rows equivalent:
+\[ \ell_1 : P_1; \cdots; \ell_n : P_n \equiv \ell_n : P_n; \cdots ; \ell_1 : P_1. \]
+The unit and empty type are definable in terms of row types. We define
+the unit type as the empty, closed record, that is,
+$\Record{\cdot}$. Similarly, we define the empty type as the empty,
+closed variant $[\cdot]$. Usually, we usually omit the $\cdot$ for
+closed rows.
+
+\paragraph{Kinds}
+We have three kinds: $Type$, $\emph{Row}_\mathcal{L}$ and $Presence$
+which classify ordinary types, row types and presence types,
+respectively. Row kinds are annotated with a set of labels
+$\mathcal{L}$. The kind of a complete row is
+$Row_{\mathcal{\emptyset}}$. More generally, the kind
+$Row_{\mathcal{L}}$ denotes a partial row which cannot mention the
+labels in $\mathcal{L}$.
+%
+
+\paragraph{Type Variables}
+We let $\alpha$, $\rho$ and $\theta$ range over type variables. By
+convention we use $\alpha$ for ordinary type variables or for type
+variables of unspecified kind, $\rho$ for type variables of row kind,
+and $\theta$ for type variables of presence kind.
+
+\paragraph{Type and Kind Environments}
+Type environments map term variables to their types and kind
+environments map type variables to their kinds.
+
+\section{Terms}
+\begin{figure}
+\begin{syntax}
+                             % SL: no need for constants in the core calculus
+%\slab{Constants}     &c    &::= & n \mid \True \mid \False \\
+\slab{Values}        &V,W  &::= & x
+                             %\mid c
+                             \mid \lambda x^A .\, M \mid \Lambda \alpha^K .\, M  \\
+                     &     &\mid& \Record{} \mid \Record{\ell = V;W} \mid (\ell\, V)^R \\
+                     &     &    &\\
+\slab{Computations}  &M,N  &::= & V\,W \mid V\,A\\
+                     &     &\mid& \Let\; \Record{\ell=x;y} \revto V \; \In \; N\\
+                     &     &\mid& \Case\; V \{\ell\; x \mapsto M; y \mapsto N\} \mid \Absurd^A V\\
+                     &     &\mid& \Return\; V \\
+                     &     &\mid& \Let \; x \revto M \; \In \; N\\
+                     &     &\mid& (\Do \; \ell \; V)^E \\
+                     &     &\mid& \Handle \; M \; \With \; H\\
+                     &     &    &\\
+\slab{Handlers}      &H    &::= & \{ \Return \; x \mapsto M \} \\
+                     &     &\mid& \{ \ell \; x \; k \mapsto M \} \uplus H \\
+%% \slab{Integers}      &n    &      \\
+%% \slab{Variables}     &x,y,z,k &    & \\
+\end{syntax}
+
+\caption{Term Syntax}
+\label{fig:term-syntax}
+\end{figure}
+The terms are given in Figure \ref{fig:term-syntax}. We let $x,y,z,k$
+range over term variables. By convention, we use $k$ to denote names
+of continuations. %We let $n$ range over integer constants.
+
+The syntax partitions terms into values, computations and
+handlers. 
+%
+Value terms comprise variables ($x$), %constants ($c$),
+lambda abstraction ($\lambda x^A . \, M$), type abstraction ($\Lambda
+\alpha^K . \, M$), and the introduction forms for records and
+variants. Records are introduced using the empty record $\Record{}$
+and record extension $\Record{\ell = V; W}$, whilst variants are
+introduced using injection $(\ell\, V)^R$ which injects a field with
+label $\ell$ and value $V$ into a row whose type is $R$. We include
+the row type annotation in order to support bottom-up type
+reconstruction.
+
+All elimination forms are computation terms. Abstraction and type
+abstraction are eliminated using application ($V\,W$) and type
+application ($V\,A$) respectively.
+%
+The record eliminator $(\Let \; \Record{\ell=x;y} \revto V \; \In \;
+N)$ splits a record $V$ into $x$, the value associated with $\ell$,
+and $y$, the rest of the record. Non-empty variants are eliminated
+using the case construct ($\Case\; V\; \{\ell\; x \mapsto M; y \mapsto
+N\}$), which evaluates the computation $M$ if the tag of $V$ matches
+$\ell$, otherwise it falls through to $y$ and evaluates $N$.  The
+elimination form for empty variants is ($\Absurd^A V$). A trivial
+computation $(\Return\;V)$ returns value $V$. The expression $(\Let \;
+x \revto M \; \In \; N)$ evaluates $M$ and binds the result value to
+$x$ in $N$.
+
+The construct $(\Do \; \ell \; V)^E$ invokes an operation $\ell$ with
+value argument $V$. The handle construct $(\Handle \; M \; \With \;
+H)$ runs a computation $M$ with handler definition $H$. A handler
+definition $H$ consists of a return clause $\Return \; x \mapsto M$
+and a possibly empty set of operation clauses $\{\ell_i \; x_i \; k_i
+\mapsto M_i\}_i$. The return clause defines how to handle the final
+return value of the handled computation, which is bound to $x$ in $M$.
+%
+The $i$-th operation clause binds the operation parameter to $x_i$ and
+a the continuation $k_i$ in $M_i$.
+
+We write $H(\Return)$ for the return clause of $H$ and $H(\ell)$ for
+the set of either zero or one operation clauses in $H$ that handle the
+operation $\ell$. We write $dom(H)$ for the set of operations handled
+by $H$.
+%
+We annotate various subterms with their types in order to aid type
+reconstruction (injection, operations, empty cases, and handlers); we
+sometimes omit these annotations.
+
+%% SL: possibly a bit draconian, but I think we can do without the
+%% detail here.
+
+%% The terms of \Calc are written in a style reminiscent of
+%% \emph{A-normal form} (ANF). ANF is a direct style intermediate
+%% language in which every intermediate computation is let-bound
+%% \cite{Flanagan1993}. As a consequence application consist of a value
+%% applied to another value. For example, consider the Links expression
+%% \lstinline$f(g(42))$, we must let bind the argument of \lstinline$f$
+%% in order to bring the expression into ANF; we do not need to let bind
+%% the argument of \lstinline$g$, since it is already a value, thus we
+%% obtain the following ANF expression:
+%% \[
+%% \Let\; x \revto g\,42\; \In \; f\, x.
+%% \]
+%% However, ANF is not closed under $\beta$-reduction
+%% \cite{Sabry1996,Kennedy2007}, since function application can lead to
+%% nested \Let{}s. Consider the following example, which is adapted from
+%% \citet{Sabry1996}:
+%% \[ 
+%%   \Let\; x \revto (\lambda y . \, \Let\; z \revto f \, a \;\In \; M) \, b \; \In\; N
+%% \]
+%% which $\beta$-reduces to 
+%% \[
+%%   \Let\; x \revto (\Let\; z \revto f \, a \;\In \; M) \; \In\; N
+%% \]
+%% which is not in ANF, because $x$ is bound to a computation rather than
+%% a value. ANF can be recovered by adding a normalisation step
+%% \cite{Sabry1996}.  We simplify our presentation by permitting nested
+%% let-bindings and handlers to be applied directly to computations. The
+%% resulting calculus is closer to fine-grained
+%% call-by-value~\cite{LevyPT03}.
+
+%% ,
+%% therefore we say that \Calc-terms are in \emph{relaxed A-normal
+%%   form} (RANF).
+
+% As an example consider the translation of the Links expression \linksify{f(g(42),\{ var y = 1; h(y) \})} into its ANF. For clarity, we highlight the reducible term with a box:
+% \begin{align*}
+%             &  \fbox{\linksify{f(g(42),\{ var y = true; h(y) \})}}\\
+% \Rightarrow &\quad\Let \; x_1 \revto g \; 42 \; \In\\
+%             &\quad\quad\fbox{\linksify{f($x_1$,\{ var y = true; h(y) \})}}\\
+% \Rightarrow &\quad\Let \; x_1 \revto g \; 42 \; \In\\
+%             &\quad\quad\Let \; y \revto \Return \; \True \; \In\\
+%             &\quad\quad\quad\fbox{\linksify{f($x_1$,h($y$))}}\\
+% \Rightarrow &\quad\Let \; x_1 \revto g \; 42 \; \In\\
+%             &\quad\quad\Let \; y \revto \Return \; \True \; \In\\
+%             &\quad\quad\quad\Let \; x_2 \revto h \; y \; \In\\
+%             &\quad\quad\quad\quad(f \; x_1)\; x_2
+% \end{align*}
+% Accordingly, the function \linksify{f} is applied only to value terms. Every subexpression gets decomposed into a single value gradually. As a consequence every subexpression has been explicitly named, thus in this respect, ANF is similar to the predominant imperative Static Single Assignment form.
+
+\section{Static Semantics}
+\label{sec:typing}
+The kinding rules are given in Figure \ref{fig:kinding} and the typing
+rules are given in Figure \ref{fig:typing}.
+
+The kinding judgement $\Delta \vdash \alpha : K$ asserts that the type
+variable $\alpha$ has kind $K$ in kind environment $\Delta$. The
+typing judgement $\typ{\Delta;\Gamma}{M : A}{E}$ states that the term
+$M$ has type $A$ and effects $E$ under kind environment $\Delta$ and
+type environment $\Gamma$. In typing judgements, we implicitly assume
+that $\Gamma$, $E$ and $A$ are well-kinded with respect to
+$\Delta$. We define the functions $FTV(\Gamma)$ and $FTV(E)$ to be the
+set of free type variables in $\Gamma$ and $E$, respectively. We write
+$FTV(\Gamma,E)$ as shorthand for $FTV(\Gamma) \cup FTV(E)$.
+
+The kind and typing rules are mostly straightforward. The interesting
+typing rules are \tylab{Handle} and the two handler rules. The
+\tylab{Handle} rule states that $\Handle\; M\; \With\; H$ produces a
+computation of type $B$ given that the computation $M$ is typeable
+under effect context $E$, and that $H$ is a handler which transforms a
+computation of type $A$ with effect signature $E$ into another
+computation of type $B$ with effect signature $E'$.
+
+The \tylab{Handler} rule is crucial. The input effect $E$ and the
+output effect $E'$ must share the same suffix $E_f$. This means that
+$E''$ must explicitly mention each of the operations $\ell_i$, whether
+that be to say that an $\ell_i$ is present with a given type
+signature, absent, or polymorphic in its presence. The $f$ in $E_f$
+stands for ``forward'', as in the effects that are forwarded by the
+handler. The effect $E_f$ may include a row-variable, in which case an
+arbitrary number of effects may be forwarded by the handler.
+%
+The typing of the return clause is straightforward. In the typing of
+each operation clause, the continuation is annotated with the output
+effect $E'$. Thus, we are here defining \emph{deep}
+handlers~\cite{Kammar2013} in which the handler is implicitly wrapped
+around the continuation, such that any subsequent operations are
+handled uniformly by the same handler.
+%
+The Links implementation also supports \emph{shallow}
+handlers~\cite{Kammar2013}, in which the continuation is instead
+annotated with the input effect and one has to explicitly reinvoke the
+handler after applying the continuation inside an operation clause.
+
+%% \todo{Insert a forward reference to discussion of shallow handlers
+%%   elsewhere.}
+
+%% The \tylab{Deep} and \tylab{Shallow} rules for handlers describe how
+%% to type deep and shallow handlers, respectively. The two rules are
+%% similar, but differ crucially in their typing of the continuation
+%% parameter $k$. The different typing is due to their different
+%% behaviour. A deep handler wraps itself around continuations such that
+%% any subsequent operations are handled uniformly. Therefore the return
+%% type of a continuation type must match the input type of the
+%% \Return{} case, and in particular, its effect signature must be the
+%% same as the handler's output effect signature $E'$. Conversely, in a
+%% shallow handler the continuation is annotated with the input effect
+%% signature $E$ rather than the output effect signature. Moreover, the
+%% return type $A$ is the same as return type of the handled
+%% computation. Shallow handlers do not wrap themselves around the
+%% continuation, therefore the continuation must be applied explicitly to
+%% handler which has to handle the next operation
+%% invocation. Consequently, operations may be handled non-uniformly.
+
+%% For both handler types the input effect signature is a disjoint union
+%% of operation signatures, that the handler directly interprets, and
+%% some set $E_f$. The metavariable $E_f$ can be instantiated with a row
+%% variable to include operations that are not explicitly mentioned by
+%% the handler.
+
+\begin{figure}
+\begin{mathpar}
+% alpha : K
+  \inferrule*[Lab=\klab{TyVar}]
+    { }
+    {\Delta, \alpha : K \vdash \alpha : K}
+
+% forall alpha : K . A : Type
+  \inferrule*[Lab=\klab{Forall}]
+    { \Delta, \alpha : K \vdash A : \Type }
+    {\Delta \vdash (\forall \alpha^K . \, A) : \Type}
+%%
+%% % Int : Type
+%%   \inferrule*[Lab=\klab{Int}]
+%%     { }
+%%     {\Delta \vdash \Int : \Type}
+%%
+%% % Bool : Type
+%%   \inferrule*[Lab=\klab{Bool}]
+%%     { }
+%%     {\Delta \vdash \Bool : \Type}
+
+% A -E-> B, A : Type, E : Row, B : Type
+  \inferrule*[Lab=\klab{Fun}]
+    { \Delta \vdash A : \Type \\
+      \Delta \vdash E : \Row_\emptyset  \\
+      \Delta \vdash B : \Type
+    }
+    {\Delta \vdash A \xrightarrow{E} B : \Type}
+
+% Record
+  \inferrule*[Lab=\klab{Record}]
+    { \Delta \vdash R : \Row_\emptyset}
+    {\Delta \vdash \Record{R} : \Type}
+
+% Variant
+  \inferrule*[Lab=\klab{Variant}]
+    { \Delta \vdash R : \Row_\emptyset}
+    {\Delta \vdash [R] : \Type}
+
+% Present
+  \inferrule*[Lab=\klab{Present}]
+    {\Delta \vdash A : \Type}
+    {\Delta \vdash \Pre{A} : \Presence}
+
+% Absent
+  \inferrule*[Lab=\klab{Absent}]
+    { }
+    {\Delta \vdash \Abs : \Presence}
+
+% Empty row
+  \inferrule*[Lab=\klab{EmptyRow}]
+    { }
+    {\Delta \vdash \cdot : \Row_\mathcal{L}}
+
+% Extend row
+  \inferrule*[Lab=\klab{ExtendRow}]
+    { \Delta, P : \Presence \\
+      \Delta, R : \Row_{\mathcal{L} \uplus \{\ell\}}
+    }
+    {\Delta \vdash \Record{\ell : P;R} : \Row_\mathcal{L}}
+\end{mathpar}
+
+\caption{Kinding Rules}
+\label{fig:kinding}
+\end{figure}
+
+\begin{figure*}
+Values
+\begin{mathpar}
+% Variable
+  \inferrule*[Lab=\tylab{Var}]
+    {x : A \in \Gamma}
+    {\typ{\Delta;\Gamma}{x : A}{E}}
+%%
+%% % true : Bool
+%%   \inferrule*[Lab=\tylab{True}]
+%%     { }
+%%     {\typ{\Delta;\Gamma}{\True : \Bool}{E}}
+%%
+%% % false : Bool
+%%   \inferrule*[Lab=\tylab{False}]
+%%     { }
+%%     {\typ{\Delta;\Gamma}{\False : \Bool}{E}}
+%%
+%% % n : Int
+%%   \inferrule*[Lab=\tylab{Int}]
+%%     { n \in \mathbb{N} }
+%%     {\typ{\Delta;\Gamma}{n : \Int}{E}}
+
+% Abstraction
+  \inferrule*[Lab=\tylab{Lam}]
+    {\typ{\Delta;\Gamma, x : A}{M : B}{E}}
+    {\typ{\Delta;\Gamma}{\lambda x^A .\, M : A \xrightarrow{E} B}{E}}
+
+% Polymorphic abstraction
+  \inferrule*[Lab=\tylab{PolyLam}]
+    {\typ{\Delta,\alpha : K;\Gamma}{M : A}{E}  \\
+     \alpha \notin FTV(\Gamma, E)
+    }
+    {\typ{\Delta;\Gamma}{\Lambda \alpha^K .\, M : \forall \alpha^K . \,A}{E}}
+\\
+% unit : ()
+  \inferrule*[Lab=\tylab{Unit}]
+    { }
+    {\typ{\Delta;\Gamma}{\Record{} : \Record{}}{E}}
+
+% Extension
+  \inferrule*[Lab=\tylab{Extend}]
+    { \typ{\Delta;\Gamma}{V : A}{E} \\ 
+      \typ{\Delta;\Gamma}{W : \Record{\ell:\Abs;R}}{E}
+    }
+    {\typ{\Delta;\Gamma}{\Record{\ell =V;W} : \Record{\ell:\Pre{A};R}}{E}}
+
+% Inject
+  \inferrule*[Lab=\tylab{Inject}]
+    {\typ{\Delta;\Gamma}{V : A}{E}}
+    {\typ{\Delta;\Gamma}{(\ell\,V)^R : [\ell : \Pre{A}; R]}{E}}
+\end{mathpar}
+Computations
+\begin{mathpar}
+% Application
+  \inferrule*[Lab=\tylab{App}]
+    {\typ{\Delta;\Gamma}{V : A \xrightarrow{E}{E}} B \\
+     \typ{\Delta;\Gamma}{W : B}{E}
+    }
+    {\typ{\Delta;\Gamma}{V\,W : B}{E}}
+
+% Polymorphic application
+  \inferrule*[Lab=\tylab{PolyApp}]
+    {\typ{\Delta;\Gamma}{V : \forall \alpha^K . \, A}{E} \\
+     \typ{\Delta;\Gamma}{\Delta \vdash B : K}{E} \\
+     \alpha \notin FTV(E)
+    }
+    {\typ{\Delta;\Gamma}{V\,B : A[B/\alpha]}{E}}
+
+% Split
+  \inferrule*[Lab=\tylab{Split}]
+    {\typ{\Delta;\Gamma}{V : \Record{\ell : \Pre{A};R}}{E} \\\\
+     \typ{\Delta;\Gamma, x : A, y : \Record{\ell : \Abs; R}}{N : B}{E}
+    }
+    {\typ{\Delta;\Gamma}{\Let \; \Record{\ell =x;y} \revto V\; \In \; N : B}{E}} 
+
+% Case
+  \inferrule*[Lab=\tylab{Case}]
+    { \typ{\Delta;\Gamma}{V : [\ell : \Pre{A};R]}{E}  \\\\
+      \typ{\Delta;\Gamma,x:A}{M : B}{E} \\\\
+      \typ{\Delta;\Gamma,y:[\ell : \Abs;R]}{N : B}{E}
+    }
+    {\typ{\Delta;\Gamma}{\Case \; V \{\ell\; x \mapsto M;y \mapsto N \} : B}{E}}
+
+% Absurd
+  \inferrule*[Lab=\tylab{Absurd}]
+    {\typ{\Delta;\Gamma}{V : []}{E}}
+    {\typ{\Delta;\Gamma}{\Absurd^A \; V : A}{E}}
+
+% Return
+  \inferrule*[Lab=\tylab{Return}]
+    {\typ{\Delta;\Gamma}{V : A}{E}}
+    {\typ{\Delta;\Gamma}{\Return \; V : A}{E}} 
+
+% Let 
+  \inferrule*[Lab=\tylab{Let}]
+    {\typ{\Delta;\Gamma}{M : A}{E} \\
+     \typ{\Delta;\Gamma, x : A}{N : B}{E}
+    }
+    {\typ{\Delta;\Gamma}{\Let \; x \revto M\; \In \; N : B}{E}} 
+\\
+% Do 
+  \inferrule*[Lab=\tylab{Do}]
+    {\typ{\Delta;\Gamma}{V : A}{E} \\
+     E = \{\ell : A \to B; R\}
+    }
+    {\typ{\Delta;\Gamma}{(\Do \; \ell \; V)^E : B}{E}}
+
+% Open Handle
+  \inferrule*[Lab=\tylab{Handle}]
+    {\typ{\Delta;\Gamma}{M : A}{E} \\ 
+     \Delta;\Gamma \vdash H : \Harrow{A}{E}{B}{E'}}
+    {\typ{\Delta;\Gamma}{\Handle \; M \; \With \; H : B}{E'}}
+\end{mathpar}
+
+Handlers
+\begin{mathpar}
+% Closed handler
+% \mprset{flushleft}
+% \inferrule*[Lab=\tylab{Deep-Closed}]
+%     { E = \{\ell_i : A_i \to B_i\}_i \\\\
+%       H = \{\Return \; x \mapsto M\} \uplus \{\ell_i \; y_i \; k_i \mapsto N_i\}_i \\\\
+%       \left[\Delta;\Gamma,y_i : A_i, k_i : B_i \xrightarrow{E'} C \vdash_{E'} N_i : C\right]_i \\\\
+%       \Delta;\Gamma, x : A \vdash_{E'} M : C
+%     }
+%     {\Delta;\Gamma \vdash_{E'} H : (\Record{} \xrightarrow{E} A) \xrightarrow{E'} C}   
+
+% Open handler
+%\mprset{flushleft}
+  \inferrule*[Lab=\tylab{Handler}]
+    {
+      E = \{\ell_i : A_i \to B_i\}_i \uplus E_f \\
+      E' = E'' \uplus E_f \\
+      H = \{\Return \; x \mapsto M\} \uplus \{\ell_i \; y \; k \mapsto N_i\}_i \\\\
+      [\typ{\Delta;\Gamma,y : A_i, k : B_i \xrightarrow{E'} C}{N_i : C}{E'}]_i \\
+       \typ{\Delta;\Gamma, x : A}{M : C}{E'} \\
+    }
+    {{\Delta;\Gamma} \vdash {H : \Harrow{A}{E}{C}{E'}}}
+
+% Shallow closed handler
+% \inferrule*[Lab=\tylab{Shallow-Closed}]
+%     { E = \{\ell_i : A_i \to B_i\}_i \\\\
+%       H = \{\Return \; x \mapsto M\} \uplus \{\ell_i \; y_i \; k_i \mapsto N_i\}_i \\\\
+%       \left[\Delta;\Gamma,y_i : A_i, k_i : B_i \xrightarrow{E} A \vdash_{E'} N_i : C\right]_i \\\\
+%       \Delta;\Gamma, x : A \vdash_{E'} M : C
+%     }
+%     {\Delta;\Gamma \vdash_{E'} H : (\Record{} \xrightarrow{E} A) \xrightarrow{E'} C}   
+
+%% SL: we should mention this rule later
+
+%% % Shallow open handler
+%%   \inferrule*[Lab=\tylab{Shallow}]
+%%     { E = \{\ell_i : A_i \to B_i\}_i \uplus E_f \\\\
+%%       E' = E'' \uplus E_f \\\\
+%%       H = \{\Return \; x \mapsto M\} \uplus \{\ell_i \; y \; k \mapsto N_i\}_i \\\\
+%%       \left[\Delta;\Gamma,y : A_i, k : B_i \xrightarrow{E} A \vdash_{E'} N_i : C\right]_i \\\\
+%%       \Delta;\Gamma, x : A \vdash_{E'} M : C
+%%     }
+%%     {\Delta;\Gamma \vdash_{E'} H : A \harrow{E}{E'} C}
+\end{mathpar}
+
+\caption{Typing Rules}
+\label{fig:typing}
+\end{figure*}
+
+\section{Operational Semantics}
+\label{sec:small-step}
+
+\begin{figure*}
+
+\begin{reductions}
+\semlab{App}   & (\lambda x^A . \, M) V &\reducesto& M[V/x] \\
+\semlab{TyApp} & (\Lambda \alpha^K . \, M) A &\reducesto& M[A/\alpha] \\
+\semlab{Split} & \Let \; \Record{\ell = x;y} \revto \Record{\ell = V;W} \; \In \; N &\reducesto& N[V/x,W/y] \\
+\semlab{Case$_1$} &
+  \Case \; (\ell\, V)^R \{ \ell \; x \mapsto M; y \mapsto N\} &\reducesto& M[V/x] \\
+\semlab{Case$_2$} &
+  \Case \; (\ell\, V)^R \{ \ell' \; x \mapsto M; y \mapsto N\} &\reducesto& N[(\ell\, V)^R/y], \hfill\quad \text{if } \ell \neq \ell' \\
+\semlab{Let} &
+  \Let \; x \revto \Return \; V \; \In \; N &\reducesto& N[V/x] \\
+\semlab{Handle-Ret} &
+  \Handle \; (\Return \; V) \; \With \; H &\reducesto& M[V/x], \hfill\quad \text{where } \{ \Return \; x \mapsto M \} \in H \\
+\semlab{Handle-Op} &
+  \Handle \; \mathcal{E}[\Do \; \ell \; V] \; \With \; H
+    &\reducesto& M[V/x, \lambda y . \, \Handle \; \mathcal{E}[\Return \; y] \; \With \; H/k],\qquad \\
+  \multicolumn{4}{@{}r@{}}
+      {\text{where } \ell \notin BL(\mathcal{E}) \text{ and } \{ \ell \; x \; k \mapsto M \} \in H} \\
+\end{reductions}
+\begin{syntax}
+\slab{Evaluation contexts} &  \mathcal{E} &::=& [\,] \mid \Let \; x \revto \mathcal{E} \; \In \; N \mid \Handle \; \mathcal{E} \; \With \; H
+\end{syntax}
+\[
+% Evaluation context lift
+\inferrule*[Lab=\semlab{Lift}]
+  { M \reducesto N }
+  { \mathcal{E}[M] \reducesto \mathcal{E}[N]}
+\]
+
+\caption{Small-step Operational Semantics}
+\label{fig:small-step}
+\end{figure*}
+We give a small-step operational semantics for \Calc. Figure
+\ref{fig:small-step} displays the operational rules. The reduction
+relation $\reducesto$ is defined on computation terms. The statement $M
+\reducesto M'$ reads: term $M$ reduces to term $M'$ in a single
+step. Most of the rules are standard. We use
+%% \emph{delimited
+%%   computation contexts} and
+\emph{evaluation contexts} to simplify the evaluation rules, by
+allowing us to focus on an active expression. The interesting rules
+are the handler rules.
+
+We write $BL(\mathcal{E})$ for the set of operation labels bound by
+$\mathcal{E}$.
+\begin{equations}
+BL([~])                            &=& \emptyset \\
+BL(\Let\;x=\mathcal{E}\;\In\;N)    &=& BL(\mathcal{E}) \\
+BL(\Handle\;\mathcal{E}\;\With\;H) &=& BL(\mathcal{E}) \cup dom(H) \\
+\end{equations}
+
+The rule \semlab{Handle-Ret} invokes the return clause of a
+handler. The rule \semlab{Handle-op} handles an operation by invoking
+the appropriate operation clause. The constraint $\ell \notin
+BL(\mathcal{E})$ ensures that no inner handler inside the evaluation
+context is able to handle the operation: thus a handler is able to
+reach past any other inner handlers that do not handle $\ell$. In our
+abstract machine semantics we realise this behaviour using explicit
+forwarding operations, but more efficient implementations are
+perfectly feasible.
+
+
+We write $R^+$ for the transitive closure of relation $R$.
+%
+Subject reduction and type soundness for $\Calc$ are standard.
+
+\begin{theorem}[Subject Reduction]
+If $\typ{\Delta;\Gamma}{M : A}{E}$ and $M \reducesto M'$, then
+$\typ{\Delta;\Gamma}{M' : A}{E}$.
+\end{theorem}
+
+There are two ways in which a computation can terminate. It can either
+successfully return a value, or it can get stuck on an unhandled
+operation.
+\begin{definition}
+We say that computation term $N$ is normal with respect to effect $E$,
+if $N$ is either of the form $\Return\;V$, or
+$\mathcal{E}[\Do\;\ell\;W]$, where $\ell \in E$ and $\ell \notin
+BL(\mathcal{E})$.
+\end{definition}
+If $N$ is normal with respect to the empty effect $\{\cdot\}$, then
+$N$ has the form $\Return\;V$.
+
+\begin{theorem}[Type Soundness]
+If $\typ{}{M : A}{E}$, then there exists $\typ{}{N : A}{E}$, such that
+$M \reducesto^+ N \not\reducesto$, and $N$ is normal with respect to
+effect $E$.
+\end{theorem}
+
+%%
+%% Conclusions and future work
+%%
+\chapter{Conclusions and future work}
+\section{Future work}
+
 %%%%%%%%
 %% Include your chapter files here. See the sample chapter file for the basic
 %% format.
@@ -165,8 +969,11 @@ A preface will possibly appear here\dots
 
 %% If you want the bibliography single-spaced (which is allowed), uncomment
 %% the next line.
+\nocite{*}
 \singlespace
-\printbibliography[heading=bibintoc]
+%\printbibliography[heading=bibintoc]
+\bibliographystyle{abbrvnat}
+\bibliography{references}
 
 %% ... that's all, folks!
 \end{document}
