@@ -1,0 +1,73 @@
+# Basic scheduler
+
+# Primitives
+sig fork : (a) {Fork:(a) {}-> b|_}~> b
+fun fork(t) {do Fork(t)}
+
+sig yield : Comp({Yield:()|_}, ())
+fun yield() {do Yield}
+
+# Run handler
+sig run : (Comp({},a)) {}~> a
+handler run { case Return(x) -> x }
+
+#
+# Queue interface
+#
+typename Queue(a::Type) = [a];
+
+sig enqueue : (a) {Enqueue:(a) {}-> ()|_}~> ()
+fun enqueue(e) {do Enqueue(e)}
+
+sig dequeue : Comp({Dequeue:a|_}, a)
+fun dequeue() {do Dequeue}
+
+sig is_empty : Comp({IsEmpty:Bool|_}, Bool)
+fun is_empty() {do IsEmpty}
+
+sig size : Comp({Size:Int|_},Int)
+fun size() {do Size}
+
+# Fair queue implementation
+sig queue : (Queue(a)) ->
+                  (Comp({Dequeue:a ,Enqueue:(a) {}-> (),IsEmpty:Bool,Size:Int|e}, b)) -> 
+                   Comp({Dequeue{_},Enqueue{_}         ,IsEmpty{_},Size{_}   |e}, b)
+open handler queue(q) {
+  case Enqueue(e,k) -> k(())(q ++ [e])
+  case Dequeue(k)   -> { var e = hd(q); k(e)(tl(q)) }
+  case IsEmpty(k)   -> switch (q) {
+                         case []    -> k(true)(q)
+			 case other -> k(false)(q)
+                       }
+  case Size(k)      -> k(length(q))(q)		       
+  case Return(x)    -> x
+}
+
+# Scheduler
+typename Worker = forall e :: Row . () ~e~> ();
+
+sig scheduler : Scheduler(a)
+open handler scheduler {
+  case Fork(t,k) -> enqueue(fun (_) { k(()) }); scheduler(t)()
+  case Yield(k)  -> enqueue(fun (_) { k(()) }); var t = dequeue(); t(())
+  case Return(x) -> if (is_empty()) { x } else { var t = dequeue(); t(()) }
+}
+
+fun repeat(r)(f) {
+  var x = f();
+  if (r > 1) repeat(r-1)(f) else x
+}
+
+# Example
+sig worker : (Int) -> Worker
+fun worker(id)() {
+  print("Hello from worker " ^^ intToString(id));
+  var _ = yield();
+  ()
+}
+  
+fun hello() {
+  var _ = fork(fun() { repeat(5)(worker(1)) });
+  var _ = fork(fun() { repeat(5)(worker(2)) });
+  ()
+}
