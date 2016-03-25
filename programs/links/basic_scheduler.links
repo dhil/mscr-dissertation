@@ -30,27 +30,53 @@ fun size() {do Size}
 
 # Fair queue implementation
 sig queue : (Queue(a)) ->
-                  (Comp({Dequeue:a ,Enqueue:(a) {}-> (),IsEmpty:Bool,Size:Int|e}, b)) -> 
-                   Comp({Dequeue{_},Enqueue{_}         ,IsEmpty{_},Size{_}   |e}, b)
+                  (Comp({Dequeue:Maybe(a) ,Enqueue:(a) {}-> ()|e}, b)) -> 
+                   Comp({Dequeue{_},Enqueue{_}         |e}, b)
 open handler queue(q) {
   case Enqueue(e,k) -> k(())(q ++ [e])
-  case Dequeue(k)   -> { var e = hd(q); k(e)(tl(q)) }
-  case IsEmpty(k)   -> switch (q) {
-                         case []    -> k(true)(q)
-			 case other -> k(false)(q)
-                       }
-  case Size(k)      -> k(length(q))(q)		       
+  case Dequeue(k)   ->
+    if (length(q) == 0) k(Nothing)(q)
+    else k(Just(hd(q)))(tl(q))
   case Return(x)    -> x
 }
 
 # Scheduler
 typename Worker = forall e :: Row . () ~e~> ();
+typename Thread(e::Row,a) = (() {Fork:(Thread(e,a)) {}-> (),Yield|e}~> a);
+#typename Suspended(e::Row,a) = (_) { |e}~> a
 
-sig scheduler : Scheduler(a)
-open handler scheduler {
-  case Fork(t,k) -> enqueue(fun (_) { k(()) }); scheduler(t)()
-  case Yield(k)  -> enqueue(fun (_) { k(()) }); var t = dequeue(); t(())
-  case Return(x) -> if (is_empty()) { x } else { var t = dequeue(); t(()) }
+# (mu t . ((()) {Fork{_},Enqueue:t,Dequeue:a,Yield{_}|e}~> a))
+#sig scheduler : (Comp({Fork:(Thread({  |e1}, a)),Yield
+#                       Enqueue:(mu t . ((()) {Fork{_},Enqueue:t,Dequeue:Maybe(t),Yield{_}|e}~> a)),Dequeue:Maybe(t)|e2}, a) ->
+#                 Comp({Fork{_},Yield{_},
+#                       Enqueue:(mu t . ((()) {Fork{_},Enqueue:t,Dequeue:Maybe(t),Yield{_}|e}~> a)),Dequeue:Maybe(t)|e2}, a)
+#open handler scheduler {
+#  case Fork(t,k) -> enqueue(fun (_) { k(()) }); scheduler(t)()
+#  case Yield(k)  -> enqueue(fun (_) { k(()) }); var t = dequeue(); fromJust(t)(())
+#  case Return(x) ->
+#     var e = dequeue();
+#     switch (e) {
+#       case Just(t) -> t(())
+#       case _       -> x
+#     }
+#}
+#sig simple : (mu a . (() {Enqueue:((b) {Enqueue:((b) { |c}~> d) {}-> ()
+#                                               ,Fork{e}|f}~> d) {}-> ()
+#                         ,Fork:(a) {}-> ()|f}~> d)) ->
+#                      () {Enqueue:((b) {Enqueue:((b) { |c}~> d) {}-> ()
+#                                               ,Fork{e}|f}~> d) {}-> ()
+#                         ,Fork{e}|f}~> d
+#sig simple : (mu a . (Comp({ |a}, b))) { |e2}~> b
+#fun simple(_) { switch (error("")) { } }                         
+#               () {Enqueue:(mu h . ((b) {Enqueue:((b) { |h}~> d) {}-> ()
+#                                         ,Fork{e}|f}~> d)) {}-> ()
+#                  ,Fork{e}|f}~> d
+
+typename Scheduler = (Comp({Fork:(Thread({},())) {}-> ()}, ())) -> ();
+
+open handler simple {
+  case Fork(t,k) -> enqueue(fun (_) { k(()) }); simple(t)()
+  case Return(x) -> x
 }
 
 fun repeat(r)(f) {
@@ -65,7 +91,9 @@ fun worker(id)() {
   var _ = yield();
   ()
 }
-  
+
+#sig hello : Thread({Fork:(() {Yield|_}~> ()) {}-> ()|_}, ())
+sig hello : Thread({ |e2}, ())
 fun hello() {
   var _ = fork(fun() { repeat(5)(worker(1)) });
   var _ = fork(fun() { repeat(5)(worker(2)) });
