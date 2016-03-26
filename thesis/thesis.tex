@@ -235,7 +235,16 @@
 \abstract{%
   \todo{Refine abstract} 
 %
-  Effectful operations, such as raising exceptions, thread forking, writing and reading from files or updating some mutable state, are pervasive in applications.
+  Applications are comprised of \emph{effectful operations}, such as
+  raising exceptions, thread forking, writing and reading from files
+  or updating mutable state.  Often effectful operations have a
+  salient impact on the behaviour of an application. Yet in many
+  programming models such operations subsist as uncontrollable
+  side-effecting actions, that occur implicitly on ``the side'' during
+  run-time.
+
+%
+Algebraic effects combined with effect handlers provide an interface for controlling effectful operations.
 
 % 
   Many programs comprise effectful operations such as thread forking,
