@@ -233,10 +233,22 @@
 
 %% Specify the abstract here.
 \abstract{%
-\todo{Refine abstract}
-Algebraic effects combined with effect handlers provide a modular abstraction for effectful programming.
+  \todo{Refine abstract} 
+%
+  Effectful operations, such as raising exceptions, thread forking, writing and reading from files or updating some mutable state, are pervasive in applications.
+
+% 
+  Many programs comprise effectful operations such as thread forking,
+  raising exceptions, writing and reading from files or updating some
+  mutable state.  have a salient impact on the behaviour of programs.
+  During run-time programs may perform several side-effecting
+  actions. Effects are a salient part of Programs Algebraic effects
+  combined with effect handlers provide a modular abstraction for
+  effectful programming.
 %
 Concurrency and parallelism 
+%%
+The key insight is to classify handlers according to their linearity.
 %%
 
 We present a core calculus \Calc{} with row-polymorphic effects and affine handlers based on a variation of A-normal form used in our implementation. In addition, we give an operational semantics for the calculus, which we use to prove the soundness of the calculus.
