@@ -1,0 +1,103 @@
+#
+# Development of a small web-service using handlers
+#
+
+# Modelling a http method
+typename Method      = [|Get|Put|Post|Delete|];
+typename Researcher  = (title:String, name:String, dpt:String, pubs:[Publication]);
+typename Publication = String;
+
+# Serve a request
+sig serve : (Method,String) {Serve:(Method,String) {}-> a}~> a
+fun serve(m,r) server {do Serve(m,r)}
+
+sig hello : (Comp({Serve:(Method,String) {}-> String}, a)) ~> a
+fun hello(m) server {
+  handle(m) {
+    case Return(x)  -> x
+    case Serve(Get,_,k) -> k("<string>Hello World</string>")
+    case Serve(_,_,k)  -> k("Unsupported operation.")
+  }
+}
+
+sig handleRequest : () ~> String
+fun handleRequest() server {
+  hello(fun() { serve(getMethod(), "asd") })
+}
+
+# database queries
+sig getAll : () ~> [Researcher]
+fun getAll() {
+  [ mkResearcher("PhD-student", "Daniel Hillerströmm", "CDT Pervasive Parallelism", [])
+  , mkResearcher("Dr",          "Sam Lindley",        "Laboratory for Foundations of Computer Science", [])
+  , mkResearcher("Professor",   "Philip Wadler",      "Laboratory for Foundations of Computer Science", [])
+  , mkResearcher("Associate Professor", "Christophe Dubach", "Institute for Computing Systems and Architecture", [])
+  ]
+}
+
+# Main page
+sig main : () ~> Page
+fun main() client {
+  page
+   <html>
+    <head>
+      <title>Small web-service example</title>
+    </head>
+    <body>
+        {stringToXml(handleRequest())}     
+        {stringToXml(jsonifyL(getAll())(jsonifyR))}
+      <fieldset>
+       <legend>Debug info</legend>
+       <ul>
+        <li>Environment size: {intToXml(length(environment()))}</li>
+       </ul>
+      </fieldset>
+    </body>
+    </html>
+}
+
+# Server-side auxiliary functions
+# Retrieves the value associated with a given url parameter name
+sig getParam : (String) ~> Maybe(String)
+fun getParam(p) server { lookup(p, environment()) }
+
+sig getMethod : () ~> Method
+fun getMethod() server {
+  switch (getParam("method")) {
+    case Just(m) ->
+       switch (implode(map(toLower, explode(m)))) {
+         case "post"   -> Post
+         case "put"    -> Put
+         case "delete" -> Delete
+         case "get"    -> Get
+         case _        -> Get
+       }
+    case _ -> Get
+  }
+}
+
+fun mkResearcher(title, name, department, publications) {
+  (title=title, name=name,dpt=department,pubs=publications)
+}
+
+sig jsonifyL : ([a]) -> ((a) ~e~> String) ~e~> String
+fun jsonifyL(xs)(formatter) {
+  var xs = map(formatter,xs);
+  "[" ^^ (if (length(xs) > 0)
+           fold_left(fun(acc, x) { acc ^^ "," ^^ x }, hd(xs), tl(xs))
+         else "")
+   ^^ "]"
+    
+}
+
+sig jsonifyR : (Researcher) ~> String
+fun jsonifyR(r) {
+  "{\"title\": \"" ^^ r.title ^^"\"" ^^
+  ",\"name\": \"" ^^ r.name ^^ "\""  ^^
+  ",\"dpt\": \"" ^^ r.dpt ^^ "\"" ^^
+  ",\"pubs\": " ^^ jsonifyL([])(fun(_) { "" }) ^^ "}"
+}
+
+
+# Run example
+main()
