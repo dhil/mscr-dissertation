@@ -1,11 +1,27 @@
 #
 # Development of a small web-service using handlers
 #
+# Messaging service API? Name: jibber-jabber? Chitter (Cheep)?
 
 # Modelling a http method
 typename Method      = [|Get|Put|Post|Delete|];
+typename Resource    = (name:String,member:String,params:[(String,String)]);
 typename Researcher  = (title:String, name:String, dpt:String, pubs:[Publication]);
 typename Publication = String;
+
+# Basic operations
+sig get : (r) {Get:(r) {}-> s|_}~> s
+fun get(r) server {do Get(r)}
+
+sig put : (r) {Put:(r) {}-> ()|_}~> ()
+fun put(r) server {do Put(r)}
+
+sig post : (r) {Post:(r) {}-> ()|_}~> ()
+fun post(r) server {do Post(r)}
+
+sig remove : (r) {Delete:(r) {}-> ()|_}~> ()
+fun remove(r) server {do Delete(r)}
+
 
 # Serve a request
 sig serve : (Method,String) {Serve:(Method,String) {}-> a}~> a
@@ -20,15 +36,53 @@ fun hello(m) server {
   }
 }
 
+# Failure handler
+sig fail : () {Fail:Zero|_}~> _
+fun fail() server {switch (do Fail) { }}
+
+sig maybe : (Comp({Fail:_|e},a)) -> Comp({Fail{_}|e}, Maybe(a))
+fun maybe(m)() server {
+  open handle(m) {
+    case Fail(_)   -> Nothing
+    case Return(x) -> Just(x)
+  }
+}
+
+# Handle get
+sig getter : (Comp({Get:(Maybe(String)) {}-> String|e}, a)) ->
+              Comp({Get{_}                         |e}, a)
+fun getter(m)() server {
+  open handle(m) {
+    case Return(x)      -> x
+    case Get(Just(r),k) -> k(r)
+    case Get(_,k)       -> k("No resource")
+  }
+}
+
+sig run : (Comp({}, a)) ~> a
+fun run(m) server {
+  handle(m) { case Return(x) -> x }
+}
+
 sig handleRequest : () ~> String
 fun handleRequest() server {
-  hello(fun() { serve(getMethod(), "asd") })
+  #hello(fun() { serve(getMethod(), "asd") })
+  var response = run -<- maybe -<- getter -< fun () {
+    switch (getMethod()) {
+      case Get -> get(getParam("resource"))
+      case _   -> "Unsupported method"
+    }
+  };
+  switch (response) {
+    case Just(r) -> r
+    case _       -> "500 Internal Error"
+  }
 }
 
 # database queries
 sig getAll : () ~> [Researcher]
 fun getAll() {
-  [ mkResearcher("PhD-student", "Daniel Hillerströmm", "CDT Pervasive Parallelism", [])
+  [ mkResearcher("PhD-student", "Daniel Hillerström", "CDT Pervasive Parallelism", [])
   , mkResearcher("Dr",          "Sam Lindley",        "Laboratory for Foundations of Computer Science", [])
   , mkResearcher("Professor",   "Philip Wadler",      "Laboratory for Foundations of Computer Science", [])
   , mkResearcher("Associate Professor", "Christophe Dubach", "Institute for Computing Systems and Architecture", [])
@@ -36,6 +90,7 @@ fun getAll() {
 }
 
 # Main page
+#         {stringToXml(jsonifyL(getAll())(jsonifyR))}
 sig main : () ~> Page
 fun main() client {
   page
@@ -45,7 +100,7 @@ fun main() client {
     </head>
     <body>
         {stringToXml(handleRequest())}     
-        {stringToXml(jsonifyL(getAll())(jsonifyR))}
+
       <fieldset>
        <legend>Debug info</legend>
        <ul>
@@ -74,6 +129,57 @@ fun getMethod() server {
        }
     case _ -> Get
   }
+}
+
+# Weak equality on strings aka. case-insensitive equality testing
+sig ~= : (String,String) ~> Bool
+op p ~= q {
+  fun lower(s) { implode(map(toLower,explode(s))) }
+  lower(p) == lower(q)
+}
+
+# Maybe monad
+sig >>= : (Maybe(a), (a) -e-> Maybe(b)) -e-> Maybe(b)
+op m >>= f {
+  switch (m) {
+    case Just(x) -> f(x)
+    case Nothing -> Nothing
+  }
+}
+
+sig return : (a) -> Maybe(a)
+fun return(x) { Just(x) }
+
+# splits on `sep`
+fun splitOn(sep, xs) {
+  var s = elemIndex(sep, xs) >>=
+            fun(i) { return( (take(i, xs), drop(i, xs)) ) };
+  switch (s) {
+    case Just((xs,ys)) -> xs :: splitOn(sep, ys)
+    case Nothing       -> [xs]
+  }
+}
+
+# Parses a resource string
+sig parseResource : (String, [(String,String)]) ~> Maybe(Resource)
+fun parseResource(r, ps) {
+   if (r =~ /^[a-z]+\/[a-z]+$/) {
+     
+   } else { Nothing }
+}
+
+# Parses the current request
+sig getRequest : () ~> Maybe(Resource)
+fun getRequest() {
+  var ps =
+     filter( fun((k,_) { not(k ~= "method" || k ~= "resource") }
+           , environment()); # filters out "special" parameters
+  var method = getMethod();
+  # Build Resource
+  getParam("resource") >>=
+     fun(r) { return( (name=r) ) } >>=
+        fun (r) {
+  
 }
 
 fun mkResearcher(title, name, department, publications) {
