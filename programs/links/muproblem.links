@@ -26,25 +26,25 @@ fun dequeue() {do Dequeue}
 #
 typename H1(e::Row) = forall a :: Presence, b :: Presence .
                        (Comp({Fork:(() {Fork{a},Enqueue{b}|e}~> ()) {}-> ()
-                             ,Enqueue:((()) {Fork{a},Enqueue{b}|e}~> ()) {}-> ()
+                             ,Enqueue:(() {Fork{a},Enqueue{b}|e}~> ()) {}-> ()
                              |e}
                             ,() ));
 
 sig h1 : (H1({ |e})) -> H1({ |e})
 open handler h1 {
-  case Fork(t,k) -> enqueue(fun (_) { k(()) })
+  case Fork(t,k) -> enqueue(fun () { k(()) })
   case Return(x) -> ()
 }
 
 typename H2(e::Row) = forall a :: Presence, b :: Presence .
                        (Comp({Fork:(() {Fork{a},Enqueue{b}|e}~> ()) {}-> ()
-                                       ,Enqueue:((()) {Fork{a},Enqueue{b}|e}~> ()) {}-> ()
+                                       ,Enqueue:(() {Fork{a},Enqueue{b}|e}~> ()) {}-> ()
                                        |e}
                             ,() ));
 
 sig h2 : (H2({ |e})) -> H2({ |e})
 open handler h2 {
-  case Fork(t,k) -> enqueue(fun (_) { k(()) }); t()
+  case Fork(t,k) -> enqueue(fun () { k(()) }); t()
   case Return(x) -> ()
 }
 
@@ -52,8 +52,17 @@ open handler h2 {
 typename H3(e::Row) = H2({ |e});
 
 #sig h3 : (H3({ |e})) -> H3({ |e})
+#sig h3 : (mu a . (() {Enqueue:(() {Enqueue:(mu e1 . (() { Enqueue:e1,Fork{c}|d}~> ())) {}-> (),Fork{c}|d}~> ()) {}-> (),Fork:(a) {}-> ()|d}~> ())) -> # a = () -e-> ()
+#                  () {Enqueue:(() {Enqueue:(mu e2 . (() { Enqueue:e2,Fork{c}|d}~> ())) {}-> (),Fork{c}|d}~> ()) {}-> (),Fork{c}         |d}~> ()
+#          (mu a . () {Enqueue:(() {|(mu b . Enqueue:(() {|b}~> ())                     {}-> (),Fork{c},wild|d)}~> ()) {}-> (),Fork:(a) {}-> ()|d}~> _) ->
+#	          () {Enqueue:(() {|(mu g . Enqueue:(() {|g}~> ()) {}-> (),Fork{c},wild|d)}~> ()) {}-> (),Fork{c}|d}~> ()
+
+           (mu a . (() {Enqueue:(() {Enqueue:mu b . ((() {Enqueue:b,Fork{c}|d}~> ()) {}-> ()),Fork{c}|d}~> ()) {}-> (),Fork:(a) {}-> ()|d}~> ())) -> # a = () -e-> ()
+                    () {Enqueue:(() {Enqueue:mu b . ((() {Enqueue:b,Fork{c}|d}~> ()) {}-> ()),Fork{c}|d}~> ()) {}-> (),Fork{c}         |d}~> ()
+sig h3 :   (mu a . (() {Enqueue:(() {Enqueue:mu b . ((() {Enqueue:b,Fork{c}|d}~> ()) {}-> ()),Fork{c} |d}~> ()) {}-> (),Fork:(a) {}-> ()  |d}~> _)) ->
+  	            () {Enqueue:(() {Enqueue:mu b . ((() {Enqueue:b,Fork{c}|d}~> ()) {}-> ()),Fork{c} |d}~> ()) {}-> (),Fork{c}           |d}~> ()
 open handler h3 {
-  case Fork(t,k) -> enqueue(fun (_) { k(()) }); h3(t)()
+  case Fork(t,k) -> enqueue(fun () { k(()) }); h3(t)()
   case Return(x) -> ()
 }
 
