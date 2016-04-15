@@ -1,0 +1,59 @@
+# Primitives
+sig fork : (a) {Fork:(a) {}-> b|_}~> b
+fun fork(t) {do Fork(t)}
+
+sig yield : Comp({Yield:()|_}, ())
+fun yield() {do Yield}
+
+# Run handler
+sig run : (Comp({},a)) {}~> a
+handler run { case Return(x) -> x }
+
+#
+# Queue interface
+#
+typename Queue(a::Type) = [a];
+
+sig enqueue : (a) {Enqueue:(a) {}-> ()|_}~> ()
+fun enqueue(e) {do Enqueue(e)}
+
+sig dequeue : Comp({Dequeue:a|_}, a)
+fun dequeue() {do Dequeue}
+
+
+#
+# Handlers with recursive rows
+#
+typename H1(e::Row) = forall a :: Presence, b :: Presence .
+                       (Comp({Fork:(() {Fork{a},Enqueue{b}|e}~> ()) {}-> ()
+                             ,Enqueue:((()) {Fork{a},Enqueue{b}|e}~> ()) {}-> ()
+                             |e}
+                            ,() ));
+
+sig h1 : (H1({ |e})) -> H1({ |e})
+open handler h1 {
+  case Fork(t,k) -> enqueue(fun (_) { k(()) })
+  case Return(x) -> ()
+}
+
+typename H2(e::Row) = forall a :: Presence, b :: Presence .
+                       (Comp({Fork:(() {Fork{a},Enqueue{b}|e}~> ()) {}-> ()
+                                       ,Enqueue:((()) {Fork{a},Enqueue{b}|e}~> ()) {}-> ()
+                                       |e}
+                            ,() ));
+
+sig h2 : (H2({ |e})) -> H2({ |e})
+open handler h2 {
+  case Fork(t,k) -> enqueue(fun (_) { k(()) }); t()
+  case Return(x) -> ()
+}
+
+
+typename H3(e::Row) = H2({ |e});
+
+#sig h3 : (H3({ |e})) -> H3({ |e})
+open handler h3 {
+  case Fork(t,k) -> enqueue(fun (_) { k(()) }); h3(t)()
+  case Return(x) -> ()
+}
+
