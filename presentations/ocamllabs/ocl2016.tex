@@ -137,12 +137,13 @@ Virtually, every program comprise an \alert<1->{effectful} component, e.g.
   \item non-determinism
   \item \dots and so forth 
 \end{itemize}
-In most programming languages effects are non-modular, they are treated implicitly.
-Algebraic effects and handlers provide a modular abstraction to controlling effects.
+In most programming languages effects are dealt with \emph{implicitly}.
+
+Algebraic effects and handlers provide a modular abstraction for modelling and controlling effects \emph{explicitly}.
 \end{frame}
 
 \begin{frame}[fragile]
-  \frametitle{Algebraic effects by example: A coin toss\footnote{Example adopted from \citet{Kammar2013}}}
+  \frametitle{Algebraic effects by example: A coin toss\footnote{The example is adopted from \citet{Kammar2013}}}
   \begin{block}{Algebraic effects}
     An algebraic effect is a collection of abstract operations.    
   \end{block}
@@ -224,8 +225,9 @@ I'm interested in making effect handlers a practical programming model.
   \item[Phase 2] Back-end: compile handlers to efficient, native code.
   \item[Phase 3] Rebuild Links' concurrency model in terms of handlers
 \end{description}
-\uncover<2->{OCaml multicore provides an efficient implementation of \emph{linear} handlers.}
-\uncover<2->{My plan: Translate Links IR to OCaml Lambda IR.}
+Continuations are the main performance bottleneck.
+OCaml multicore\footnote{ref. \citet{Dolan2015}} provides an efficient implementation of \emph{linear} handlers.
+My plan is to translate Links IR to OCaml Lambda IR.
 \end{frame}
 
 % \begin{frame}
