@@ -19,4 +19,3 @@ clean:
 	rm -f *.bbl *.blg *.fls *.xml
 	rm -f *.fdb_latexmk
 	rm -f paper.pdf
-	rm -rf snippets

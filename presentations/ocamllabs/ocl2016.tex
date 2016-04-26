@@ -7,7 +7,9 @@
 \usepackage{multirow}
 \usepackage{amssymb,mathtools}       % For mathematical writing
 \usepackage{tikz}                    % Drawing trees
-\usetikzlibrary{trees}
+\usetikzlibrary{trees,shapes.multipart}
+\usepackage[round]{natbib}
+
 
 %% Use the default theme
 \usetheme{default}
@@ -113,6 +115,18 @@
 \end{frame}
 
 \begin{frame}
+  \frametitle{The Links language}
+The code examples in this talk are written in Links\footnote{ref. \citet{Cooper2006}}:
+\begin{itemize}
+  \item Pure, functional, web-oriented, research programming language.
+  \item Sort of JavaScript syntax with sane semantics.
+  \item Developed at the University of Edinburgh
+  \item Conceived to solve the \emph{impedance mismatch problem} in web-programming.
+  \item Best thing about Links: \uncover<2->{\textbf{It has no users}}
+\end{itemize}
+\end{frame}
+
+\begin{frame}
   \frametitle{Programs are effectful}
 Virtually, every program comprise an \alert<1->{effectful} component, e.g.
 \begin{itemize}
@@ -128,7 +142,7 @@ Algebraic effects and handlers provide a modular abstraction to controlling effe
 \end{frame}
 
 \begin{frame}[fragile]
-  \frametitle{Algebraic effects by example: A coin toss}
+  \frametitle{Algebraic effects by example: A coin toss\footnote{Example adopted from \citet{Kammar2013}}}
   \begin{block}{Algebraic effects}
     An algebraic effect is a collection of abstract operations.    
   \end{block}
@@ -206,35 +220,38 @@ Here \lstinline$k$ is the continuation of \lstinline$do Choose$.
   \frametitle{Project overview}
 I'm interested in making effect handlers a practical programming model.
 \begin{description}
-  \item[Phase 1] Front-end: handlers and row types $\checkmark$
+  \item[Phase 1] Front-end: handlers and row types\footnote{c.f. \citet{Hillerstrom2016}} $\checkmark$
   \item[Phase 2] Back-end: compile handlers to efficient, native code.
   \item[Phase 3] Rebuild Links' concurrency model in terms of handlers
 \end{description}
+\uncover<2->{OCaml multicore provides an efficient implementation of \emph{linear} handlers.}
+\uncover<2->{My plan: Translate Links IR to OCaml Lambda IR.}
 \end{frame}
 
-\begin{frame}
-  \frametitle{Some implementations\footnote{First-class}}
-\begin{itemize}
-  \item Bauer and Pretnar's \emph{Eff} 
-  \item Lindley, McBride and McLaughlin's Frank
-  \item McBride's shonky
-  \item OCaml's effects/multicore implementation
-  \item Hillerström and Lindley's Links
-\end{itemize}
-OCaml provides an efficient implementation of \emph{linear} handlers.
-\end{frame}
+% \begin{frame}
+%   \frametitle{Some implementations\footnote{First-class}}
+% \begin{itemize}
+%   \item Bauer and Pretnar's \emph{Eff} 
+%   \item Lindley, McBride and McLaughlin's Frank
+%   \item McBride's shonky
+%   \item OCaml's effects/multicore implementation
+%   \item Hillerström and Lindley's Links
+% \end{itemize}
+% OCaml provides an efficient implementation of \emph{linear} handlers.
+% \end{frame}
 
 \begin{frame}[fragile]
   \frametitle{Categorising handlers}
   \begin{table}
     \begin{tabular}{l l}
-   \alt<2->{\textbf{Exception}}{Exception} &
+   \alt<2->{\textbf{Exception}}{Exception}\footnote{where $exception = \{{\color{blue}{Fail}} : Void\}$} &
 \begin{lstlisting}
 handler maybeResult {
   case Fail(k)   -> Nothing
   case Return(x) -> Just(x)
 }
-\end{lstlisting} \\
+\end{lstlisting}
+\\
       \hline
       \alt<2->{\textbf{Linear}}{Linear}    & 
 \begin{lstlisting}
@@ -253,14 +270,206 @@ handler allResults {
 \end{lstlisting}
    \end{tabular}
   \end{table}
-\uncover<2->{\textbf{Affine} handlers invoke continuations at most once.}
+\uncover<2->{\textbf{Affine} handlers invoke their continuations at most once.}
+
+\uncover<2->{Idea: Use the type system to track the nature of handlers, and specialise the run-time implementations during code generation.}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Composing handlers by example: Drunk coin toss}
+Consider a drunkard tossing a coin\footnote{Technical detail: \lstinline$switch(do Fail) \{ \}$ required for example to type check.}:
+\begin{lstlisting}
+fun drunkToss() {
+  if (do Choose) toss()
+  else do Fail
+}
+\end{lstlisting}
+We may compose handlers to fully interpret \lstinline$drunkToss$: \lstinline$randomResult(maybeResult(drunkToss))$.
+\vspace{0.5cm}
+
+Possible outcomes: $\{$\lstinline$Just(Heads)$$,$\lstinline$Just(Tails)$$,$\lstinline$Nothing$$\}$.
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Runtime stack of handlers}
+  Composition gives rise to stack of handlers at runtime:
+\vfill
+\begin{columns}
+\begin{column}{0.5\textwidth}
+\lstinline$randomResult(maybeResult(drunkToss))$
+\end{column}
+\begin{column}{0.5\textwidth}
+\begin{tikzpicture}[stack/.style={rectangle split, rectangle split parts=#1,draw, anchor=center}]
+\node[stack=3]  {
+\nodepart{one}maybeResult
+\nodepart{two}randomResult
+\nodepart{three}$\bot$
+};
+\end{tikzpicture}
+\end{column}
+\end{columns}
+\vfill
+Handling \lstinline$Choose$ in \lstinline$drunkToss$ causes the stack to be unwinded.
+\end{frame}
+
+\begin{frame}
+  \frametitle{Optimisations}
+  The stack representation is simple, but inefficient for large compositions.
+  OCaml does not perform optimisations for handlers.
+\vfill
+  Solution: Rediscover classical optimisations in the context of handlers:
+  \begin{itemize}
+    \item Fusion
+    \item Inlining
+    \item Reordering of handlers
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Optimisation: Fusion}
+  \begin{block}{Criterion for handler fusion}
+    If two adjacent handlers handle a disjoint set of operations, then they can be fused.
+  \end{block}
+\vfill
+\begin{columns}
+\begin{column}{0.6\textwidth}
+% Before fusion
+\begin{onlyenv}<1-1>
+\begin{lstlisting}
+handler maybeResult {
+  case Fail(k)   -> Nothing
+  case Return(x) -> Just(x)
+}
+\end{lstlisting}
+
+\begin{lstlisting}
+handler randomResult {
+  case Choose(k) -> k(random() > 0.5)
+  case Return(x) -> x
+}
+\end{lstlisting}
+\end{onlyenv}
+% After fusion
+\begin{onlyenv}<2->
+\begin{lstlisting}
+handler maybeRandomResult {
+  case Fail(k)   -> Nothing
+  case Choose(k) -> k(random() > 0.5)
+  case Return(x) -> var y = Just(x); y
+}
+\end{lstlisting}
+\end{onlyenv}
+\end{column}
+\begin{column}{0.4\textwidth}
+% Before fusion
+\begin{onlyenv}<1-1>
+\begin{tikzpicture}[stack/.style={rectangle split, rectangle split parts=#1,draw, anchor=center}]
+\node[stack=3]  {
+\nodepart{one}maybeResult
+\nodepart{two}randomResult
+\nodepart{three}$\bot$
+};
+\end{tikzpicture}
+\end{onlyenv}
+% After fusion
+\begin{onlyenv}<2->
+\begin{tikzpicture}[stack/.style={rectangle split, rectangle split parts=#1,draw, anchor=center}]
+\node[stack=2]  {
+\nodepart{one}maybeRandomResult
+\nodepart{two}$\bot$
+};
+\end{tikzpicture}
+\end{onlyenv}
+\end{column}
+\end{columns}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Optimisation: Inlining}
+  \begin{block}{Criterion for handler inlining}
+    A linear handlers can be inlined if
+    \begin{itemize}
+      \item It invokes continuations in tail-position\footnote{There are ways to sometimes relax this requirement}
+      \item The handler is the top-element ($\top$)
+    \end{itemize}
+  \end{block}
+\vfill
+\begin{columns}
+\begin{column}{0.52\textwidth}
+\begin{lstlisting}
+handler maybeResult {
+  case Fail(k)   -> Nothing
+  case Return(x) -> Just(x)
+}
+\end{lstlisting}
+
+\begin{onlyenv}<1-5>
+\begin{lstlisting}
+handler randomResult {
+  case Choose(k) -> k(random() > 0.5)
+  case Return(x) -> x
+}
+\end{lstlisting}
+\end{onlyenv}
+\end{column}
+\begin{column}{0.48\textwidth}
+% Before reordering
+\begin{onlyenv}<1-4>
+\begin{lstlisting}
+(*\alert<3-3>{randomResult}*)(
+(*  \alert<2-2>{maybeResult}*)(
+    fun() {
+     if (do Choose) toss()
+     else do Fail
+    }))
+\end{lstlisting}
+\end{onlyenv}
+% After reordering
+\begin{onlyenv}<5-5>
+\begin{lstlisting}
+maybeResult(
+  randomResult(
+    fun() {
+     if (do Choose) toss()
+     else do Fail
+    }))
+\end{lstlisting}
+\end{onlyenv}
+% After inlining
+\begin{onlyenv}<6-6>
+\begin{lstlisting}
+maybeResult(
+ fun() {
+  if (random() > 0.5) 
+   toss()[random()>0.5/do Choose]
+  else do Fail
+ }))
+\end{lstlisting}
+\end{onlyenv}
+\end{column}
+\end{columns}
+\only<2-2>{\alert<2-2>{Cannot inline \lstinline$maybeResult$: it is not linear}}
+
+\only<3-4>{\alert<3-4>{Cannot inline linear \lstinline$randomResult$: it is not $\top$}}
+
+\uncover<3-4>{If we reorder the two handlers, then we can inline \lstinline$randomResult$}
+\end{frame}
+
+\begin{frame}
+  \frametitle{Summary}
+  \begin{itemize}
+    \item Handlers provide a great abstraction for generic programming.
+    \item I get native baseline performance for free from OCaml.
+    \item We need to rethink classical optimisations in the context of handlers
+    \item I have some ideas, that look good on paper, for optimisations.
+  \end{itemize}
 \end{frame}
 
 % Bibliography
-\bibliographystyle{unsrt}
 \begin{frame}
   \frametitle{References}
   \nocite{*}
+  \bibliographystyle{abbrvnat}
   \bibliography{references}
 \end{frame}
 \end{document}
