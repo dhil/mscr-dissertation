@@ -210,11 +210,13 @@ level 2/.style={sibling distance=1cm}]
       child { node[draw=none] { Tails } 
         edge from parent node [draw=none,right,xshift=2.0,yshift=2.0] { false }
       };
-\end{tikzpicture}\\
-$\Longrightarrow$ Heads
+\end{tikzpicture}%\\
+%$\Longrightarrow$ Heads
 \end{column}
 \end{columns}
 Here \lstinline$k$ is the continuation of \lstinline$do Choose$.
+
+The result of \lstinline$alwaysHeads(toss)$ is \lstinline$Heads$.
 \end{frame}
 
 \begin{frame}
@@ -388,10 +390,10 @@ handler maybeRandomResult {
 
 \begin{frame}[fragile]
   \frametitle{Optimisation: Inlining}
-  \begin{block}{Criterion for handler inlining}
-    A linear handlers can be inlined if
+  \begin{block}{Conservative criteria for handler inlining}
+    A linear handlers can be inlined if\footnote{sometimes we can relax these criteria}
     \begin{itemize}
-      \item It invokes continuations in tail-position\footnote{There are ways to sometimes relax this requirement}
+      \item It invokes continuations in tail-position
       \item The handler is the top-element ($\top$)
     \end{itemize}
   \end{block}
@@ -452,9 +454,9 @@ maybeResult(
 \end{columns}
 \only<2-2>{\alert<2-2>{Cannot inline \lstinline$maybeResult$: it is not linear}}
 
-\only<3-4>{\alert<3-4>{Cannot inline linear \lstinline$randomResult$: it is not $\top$}}
+\only<3-4>{\alert<3-3>{Cannot inline linear \lstinline$randomResult$: it is not $\top$}}
 
-\uncover<3-4>{If we reorder the two handlers, then we can inline \lstinline$randomResult$}
+\uncover<4-4>{If we reorder the two handlers, then we can inline \lstinline$randomResult$}
 \end{frame}
 
 \begin{frame}
@@ -462,15 +464,13 @@ maybeResult(
   \begin{itemize}
     \item Handlers provide a great abstraction for generic programming.
     \item I get native baseline performance for free from OCaml.
-    \item We need to rethink classical optimisations in the context of handlers
-    \item I have some ideas, that look good on paper, for optimisations.
+    \item Classical optimisation techniques provide a first good attempt at optimising handlers.
   \end{itemize}
 \end{frame}
 
 % Bibliography
 \begin{frame}
   \frametitle{References}
-  \nocite{*}
   \bibliographystyle{abbrvnat}
   \bibliography{references}
 \end{frame}
