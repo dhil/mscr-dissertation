@@ -1,0 +1,23 @@
+CC=pdflatex
+CFLAGS=-interaction=nonstopmode -halt-on-error -file-line-error
+
+PAPER=review
+
+all: $(PAPER).pdf
+
+$(PAPER).aux: $(PAPER).tex
+	$(CC) $(CFLAGS) $(PAPER)
+
+references.bbl: $(PAPER).aux references.bib
+	$(CC) $(CFLAGS) $(PAPER)
+	bibtex $(PAPER)
+
+$(PAPER).pdf: $(PAPER).aux references.bbl 
+	$(CC) $(CFLAGS) $(PAPER)
+	$(CC) $(CFLAGS) $(PAPER)
+clean:
+	rm -f *.log *.aux *.toc *.out
+	rm -f *.bbl *.blg *.fls *.xml
+	rm -f *.fdb_latexmk
+	rm -f *.nav *.vrb *.snm
+	rm -f $(PAPER).pdf
