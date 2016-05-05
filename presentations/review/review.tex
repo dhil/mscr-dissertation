@@ -9,7 +9,10 @@
 \usepackage{tikz}                    % Drawing trees
 \usetikzlibrary{trees,shapes.multipart}
 \usepackage[round]{natbib}
-
+\usepackage[usenames,dvipsnames]{pstricks}
+%\usepackage{epsfig}
+\usepackage{pst-grad} % For gradients
+\usepackage{pst-plot} % For axes
 
 %% Use the default theme
 \usetheme{default}
@@ -103,7 +106,7 @@
 %% Meta information
 \author[Daniel Hillerström]{Daniel Hillerström\\\footnotesize{\href{mailto:daniel.hillerstrom@ed.ac.uk}{daniel.hillerstrom@ed.ac.uk}}\\\href{http://homepages.inf.ed.ac.uk/s1467124}{http://homepages.inf.ed.ac.uk/s1467124}}
 \title{Compilation of Affine Algebraic Effect Handlers}
-\subtitle{Master by Research intermittent review}
+\subtitle{Master by Research intermediate progress review}
 \institute{The University of Edinburgh}
 \date{\today}
 
@@ -141,6 +144,13 @@ Algebraic effects and handlers provide a modular abstraction for modelling and c
     \item[Phase 4] Message-passing parallelism via handlers
   \end{description}
 \uncover<2->{Adding support for multicore parallelism ought to be ``free''.}
+\end{frame}
+
+\begin{frame}
+  \frametitle{Infrastructure}
+\begin{figure}
+  \includegraphics[scale=0.4]{infrastructure.png}
+\end{figure}
 \end{frame}
 
 \begin{frame}
