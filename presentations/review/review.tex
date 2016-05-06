@@ -129,7 +129,7 @@
     \item[Parallel search] LIFO work stealing
     \item[Data parallel] Gang scheduling
   \end{description}
-  Claim: Effect handlers lets us write schedulers in the host language.
+  Claim: Effect handlers let us describe schedulers in the host language.
 \end{frame}
 
 % \begin{frame}
@@ -153,8 +153,8 @@
   Project overview
   \begin{description}
     \item[Phase 0] Write paper \checkmark
-    \item[Phase 1] Compile effect handlers \checkmark
-    \item[Phase 2] Optimisations
+    \item[Phase 1] Compiler for Links with effect handlers \checkmark
+    \item[Phase 2] Measure and implement optimisations for handlers
     \item[Phase 3] Message-passing concurrency via handlers
     \item[Phase 4] Message-passing parallelism via handlers
   \end{description}
@@ -164,7 +164,8 @@
 \begin{frame}
   \frametitle{Infrastructure}
 \begin{figure}
-  \includegraphics[scale=0.4]{infrastructure.png}
+  \only<1-1>{\includegraphics[scale=0.4]{infrastructure.png}}
+  \only<2->{\includegraphics[scale=0.4]{infrastructure2.png}}
 \end{figure}
 \end{frame}
 
@@ -174,7 +175,7 @@
   \begin{table}
     \begin{tabular}{| l | r | r|}
       \hline
-                  & Run-time (sec) & Relative performance \\
+                  & Run-time (sec) & Speed up \\
       \hline
       Interpreter & 14.184         & 1.00 \\
       \hline
@@ -187,7 +188,7 @@
   \begin{table}
     \begin{tabular}{| l | r | r|}
       \hline
-                  & Run-time (sec) & Relative performance \\
+                  & Run-time (sec) & Speed up \\
       \hline
       Interpreter & 76.884         & 1.00 \\
       \hline
