@@ -118,20 +118,35 @@
 \end{frame}
 
 \begin{frame}
-  \frametitle{Programs are effectful}
-Virtually, every program comprise an \alert<1->{effectful} component, e.g.
-\begin{itemize}
-  \item raise exceptions
-  \item perform input/output
-  \item mutate some state
-  \item fork threads \uncover<2->{\alert<2->{$\Longleftarrow$ particular interested in modelling concurrency}}
-  \item non-determinism
-  \item \dots and so forth 
-\end{itemize}
-In most programming languages effects are dealt with \emph{implicitly}.
-
-Algebraic effects and handlers provide a modular abstraction for modelling and controlling effects \emph{explicitly}.
+  \frametitle{Recap story: Schedulers}
+  Conventional programming languages implementations bake schedulers into the run-time system.
+  
+(c.f. \citet{Planas2009}, \citet{Augonnet2011} \citet{Openacc2013}, \citet{Openmp2013})
+\vfill
+  Best scheduling strategy is domain-specific (c.f. \citet{Dolan2015}):
+  \begin{description}
+    \item[Web-server] FIFO scheduling
+    \item[Parallel search] LIFO work stealing
+    \item[Data parallel] Gang scheduling
+  \end{description}
+  Claim: Effect handlers lets us write schedulers in the host language.
 \end{frame}
+
+% \begin{frame}
+%   \frametitle{Programs are effectful}
+% Virtually, every program comprise an \alert<1->{effectful} component, e.g.
+% \begin{itemize}
+%   \item raise exceptions
+%   \item perform input/output
+%   \item mutate some state
+%   \item fork threads \uncover<2->{\alert<2->{$\Longleftarrow$ particular interested in modelling concurrency}}
+%   \item non-determinism
+%   \item \dots and so forth 
+% \end{itemize}
+% In most programming languages effects are dealt with \emph{implicitly}.
+
+% Algebraic effects and handlers provide a modular abstraction for modelling and controlling effects \emph{explicitly}.
+% \end{frame}
 
 \begin{frame}
   \frametitle{Aims and objectives}
@@ -154,6 +169,36 @@ Algebraic effects and handlers provide a modular abstraction for modelling and c
 \end{frame}
 
 \begin{frame}
+  \frametitle{Sanity checking}
+  Microbenchmark: Pure counting (without handlers)
+  \begin{table}
+    \begin{tabular}{| l | r | r|}
+      \hline
+                  & Run-time (sec) & Relative performance \\
+      \hline
+      Interpreter & 14.184         & 1.00 \\
+      \hline
+      Compiler    & 0.008          & 1773.00 \\
+      \hline
+    \end{tabular}
+  \end{table}
+
+  Microbenchmark: Stateful counting (using handlers)
+  \begin{table}
+    \begin{tabular}{| l | r | r|}
+      \hline
+                  & Run-time (sec) & Relative performance \\
+      \hline
+      Interpreter & 76.884         & 1.00 \\
+      \hline
+      Compiler    & 1.644          & 46.77 \\
+      \hline
+    \end{tabular}
+  \end{table}
+
+\end{frame}
+
+\begin{frame}
   \frametitle{Compiler demonstration}
   \begin{center}
     {\Huge\textbf{Demo}}
@@ -161,22 +206,27 @@ Algebraic effects and handlers provide a modular abstraction for modelling and c
 \end{frame}
 
 \begin{frame}
-  \frametitle{Sanity checking}
-  This slide will contain:
+  \frametitle{Todo}
+  Immediate future
   \begin{itemize}
-    \item Micro-benchmarks for ``compiler vs interpreter'' (to sanity check my (first) implementation)
-    \item Micro-benchmarks for nonlinear vs linear handlers (to test whether it's worth investing time in implementing optimisations at all?)
+    \item Pass exam\dots
+    \item Set-up benchmarks -- fix compiler ``bugs''.
   \end{itemize}
-\end{frame}
-
-\begin{frame}
-  \frametitle{Summary}
+  Near future
+  \begin{itemize}
+    \item Measure and implement optimisations.   
+    \item Rebuild Links' message-passing concurrency model.
+  \end{itemize}
+  July-ish
+  \begin{itemize}
+    \item Begin focused write-up.
+    \item Possibly add multicore support.
+  \end{itemize}
 \end{frame}
 
 % Bibliography
 \begin{frame}
   \frametitle{References}
-  \nocite{*}
   \bibliographystyle{abbrvnat}
   \bibliography{references}
 \end{frame}
