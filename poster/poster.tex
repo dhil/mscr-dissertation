@@ -89,7 +89,7 @@ continuations.
 \section{Concurrency as an effect}
 An algebraic effect is described by a collection of \emph{abstract} operations. For instance, we may describe concurrency by two operations:
 \[
-  \emph{concur} = \{\texttt{\lstinline$Fork : () {}-> ()$}, \texttt{\lstinline$Yield : ()$}\}
+  \emph{concur} = \{\texttt{\lstinline$Fork : (() -> ()) \{\}-> ()$}, \texttt{\lstinline$Yield : ()$}\}
 \]
 
 \section{An abstract concurrent program}
