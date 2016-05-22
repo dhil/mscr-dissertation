@@ -1,22 +1,153 @@
 \documentclass[noback,landscape]{infposter}
 \usepackage[utf8]{inputenc}           % Enables UTF-8 encoding
+\usepackage{lipsum}
+% Source code listings
+\usepackage{listings}
 
+\lstset{
+ backgroundcolor=\color{white},   % choose the background color; you must add \usepackage{color} or \usepackage{xcolor}
+ basicstyle=\ttfamily\footnotesize,        % the size of the fonts that are used for the code
+ keywordstyle=\bfseries,
+ commentstyle=\itshape,
+ % SL: lstinline doesn't work properly if breakatwhitespace is not set to true
+ breakatwhitespace=true,         % sets if automatic breaks should only happen at whitespace
+ breaklines=true,                 % sets automatic line breaking
+ captionpos=b,                    % sets the caption-position to bottom
+ escapeinside={\#*}{*\#},          % if you want to add LaTeX within your code
+ extendedchars=true,              % lets you use non-ASCII characters; for 8-bits encodings only, does not work with UTF-8
+ frame=none,	                   % adds a frame around the code
+ keepspaces=true,                 % keeps spaces in text, useful for keeping indentation of code (possibly needs columns=flexible)
+ numbers=none,                    % where to put the line-numbers; possible values are (none, left, right)
+ rulecolor=\color{black},         % if not set, the frame-color may be changed on line-breaks within not-black text (e.g. comments (green here))
+ showspaces=false,                % show spaces everywhere adding particular underscores; it overrides 'showstringspaces'
+ showstringspaces=false,          % underline spaces within strings only
+ showtabs=false,                  % show tabs within strings adding particular underscores
+ tabsize=1,	                   % sets default tabsize to 2 spaces
+ title=\lstname,                   % show the filename of files included with \lstinputlisting; also try caption instead of title
+ caption={},
+ belowcaptionskip=-1\baselineskip,
+ xleftmargin=0.1\parindent,
+ columns=fullflexible
+}
+
+\definecolor{darkgreen}{rgb}{0.000000,0.392157,0.000000}
+\definecolor{violetred}{rgb}{0.815686,0.125490,0.564706}
+
+% Define Links as a lst-language
+\lstdefinelanguage{Links}{% 
+  morekeywords={typename, fun, op, var, if, this, true, false, else, case, switch, handle, handler, shallowhandler, open, do, sig},%
+  sensitive=t, % 
+  keywordstyle=\color{red},
+  emph={Comp,Player,Bool,Int,GTree,Cheat,Zero,Choose,Rand,Move,Winner,Take,Return,Get,Put,GameState,Alice,Bob,Fork,Yield},
+  emphstyle={\color{blue}},
+  comment=[l]{\#},% 
+  escapeinside={(*}{*)},%
+  morestring=[d]{"}%
+}
+
+\newcommand{\textapprox}{{\fontfamily{ptm}\selectfont\texttildelow}}
+\newcommand{\wildarrow}{\linksify{\textapprox{}>}}
+% Links style
+\lstdefinestyle{links}{
+  basicstyle=\linespread{1.0}\ttfamily,
+  language=Links,
+  literate= {~>}{{\wildarrow}}1
+}
+
+\lstset{style={links}}
 
 \title{Towards Compilation of Affine Algebraic Effect Handlers}
-\subtitle{From theory to practice}
+%\subtitle{From theory to practice}
 \author{Daniel Hillerström}
 \email{daniel.hillerstrom@ed.ac.uk}
 \homepage{http://homepages.inf.ed.ac.uk/s1467124}
 
+\footer{%
+  \resizebox{!}{\footerheight}{\includegraphics{logo_icsa.eps}}%
+  \hfill %
+  \resizebox{!}{\footerheight}{\includegraphics{logo_lfcs.eps}} %
+  \hfill %
+  \resizebox{!}{\footerheight}{\includegraphics{cdt_pervasive_parallelism.eps}} %
+  \hfill %
+  \resizebox{!}{\footerheight}{\includegraphics{school_of_informatics.eps}}%
+}
+
+\abstract{%
+Algebraic effects and effect handlers provide a modular abstraction
+for effectful programming.
+%
+They support user-defined effects, as in Haskell, in conjunction with
+direct-style effectful programming, as in ML.
+%
+They also present a structured interface to programming with delimited
+continuations.
+}
 
 \begin{document}
-
 \makeposter
 
-\section{Introduction}
-Introduction\dots
+\section{Concurrency as an effect}
+An algebraic effect is described by a collection of \emph{abstract} operations. For instance, we may describe concurrency by two operations:
+\[
+  \emph{concur} = \{\texttt{\lstinline$Fork : () {}-> ()$}, \texttt{\lstinline$Yield : ()$}\}
+\]
 
+\section{An abstract concurrent program}
+\begin{lstlisting}
+BLAH BLAH
+\end{lstlisting}
+
+\section{Handling concurrency}
+A handler instantiates \emph{abstract} operations with concrete implementations.
+\begin{lstlisting}[numbers=left]
+fun pspawn(task) {
+  handle(task) {
+    case Return(x)     -> 
+      dequeue()()    # Task finished, run the next task
+    case Fork(child,k) -> 
+      enqueue(k);    # Suspend parent task
+      pspawn(child)  # Recursively handle the child task
+    case Yield(k)      -> 
+      enqueue(k);    # Suspend the current task
+      dequeue()()    # Run the next task
+} }
+\end{lstlisting}
+\begin{description}
+\item[Line 1] gives the type of \lstinline$perfect$: it takes a
+  computation that may invoke the \lstinline$Move$ operation and
+  returns a value of type \lstinline$a$.
+
+\item[Lines 2 and 3] begin the definition. The function
+  \lstinline$perfect$ wraps the actual handler, which is applied to
+  the argument $m$ using the \lstinline$handle$ construct, which
+  specifies how to interpret abstract operations through a sequence of
+  clauses.
+
+\item[Line 4] is a \emph{return clause}. It defines how to handle the
+  final return value of the input computation. In this case, this
+  value is simply returned as is.
+
+\item[Line 5] is an \emph{operation clause}. It expresses how to
+  handle \lstinline$Move$. In general, an operation clause takes the
+  form $Op(p_1,\dots,p_n,k) \to M$, where $p_1,\dots,p_n$ are patterns
+  that bind the operation parameters and $k$ is a pattern that binds
+  the continuation of the computation in $M$. In this case
+  \lstinline$p$ and \lstinline$n$ are bound to the active player and
+  number of sticks in the heap, respectively. The continuation is
+  invoked with the perfect strategy, irrespective of the player.
+\end{description}
+\vfill
+
+\section{Compiler infrastructure}
+
+\section{Preliminary results}
+\lipsum[75]
 \section{Future work}
+
+\begin{itemize}
+  \item Implement handler-oriented optimisations.
+  \item Reconstruct Links' message-passing concurrency model.
+\end{itemize}
 
 \section{Acknowledgements}
 Thanks to OCaml Labs\dots
