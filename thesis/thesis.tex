@@ -1,5 +1,6 @@
 %% Master by Research, ICSA - LFCS, print twosided, new chapters on right page
-\documentclass[mscres,icsa,lfcs,twoside,openright,logo,rightchapter,normalheadings]{infthesis}
+\documentclass[mscres,cdtppar,twoside,openright,logo,rightchapter,normalheadings]{infthesis}
+\shieldtype{0}
 
 %% Packages
 \usepackage[utf8]{inputenc}   % Enable UTF-8 typing
@@ -26,6 +27,7 @@
 
 % Bibliography
 \usepackage{natbib}
+\setcitestyle{authoryear,open={(},close={)}}
 % \usepackage[
 % backend=bibtex,
 % style=numeric,
@@ -163,9 +165,15 @@
 
 \newcommand{\cek}[1]{\ensuremath{\langle #1 \rangle}}
 
+% configurations
+\newcommand{\conf}{\mathcal{C}}
+
 % typing
-\newcommand{\eff}{\mathbin{!}}
-\newcommand{\typ}[3]{#1 \vdash #2 \eff #3}
+%% \newcommand{\eff}{\mathbin{!}}
+\newcommand{\eff}{!}
+\newcommand{\typ}[2]{#1 \vdash #2}
+\newcommand{\typv}[2]{#1 \vdash #2}
+\newcommand{\typc}[3]{#1 \vdash #2 \eff #3}
 
 \newcommand{\harrow}[2]{\ensuremath{\mathbin{~^{#1}\!\!\Rightarrow^{#2}}}}
 %\newcommand{\Harrow}[4]{#1 \harrow{#2}{#4} #3}
@@ -224,7 +232,7 @@
 \newcommand{\res}{\backslash}
 
 %% Information about the title, etc.
-\title{Compilation of Affine Algebraic Effect Handlers}
+\title{Compilation of Effect Handlers and their Applications in Concurrency}
 \author{Daniel Hillerström}
 
 %% If the year of submission is not the current year, uncomment this line and 
@@ -318,6 +326,41 @@ A preface will possibly appear here\dots
 %% Introduction
 %%
 \chapter{Introduction}
+\label{ch:introduction}
+For more than a decade the \emph{free lunch} has been over
+\citep{Sutter2005}. The saying ``free lunch'' refers to the regular
+increase in performance, that software applications and developers
+enjoyed for free for 30 years, due to the regular increase in
+processing power as processor clock frequencies doubled every other
+year.
+
+%
+
+While we continue to enjoy an increase in processing power, we do not
+get to have our free lunch anymore as clock frequencies no longer
+grow. It is mainly due to physical issues such as heat control, power
+consumption and current leakage problems \citep{Sutter2005}. Instead
+of increasing the clock frequency of processors, a single
+computational device now comprise multiple several processing
+cores. Consequently, we are faced with the challenge of \emph{parallel
+  programming}, i.e.  programming multiple computational cores
+simultaneously rather than a single core.
+
+%
+
+With the emergence of multicore and heterogeneous processors in
+consumer-grade hardware, however, parallel programming has become a
+discipline every software developer ought to know and master.
+
+%
+
+In this work, we shall consider \emph{handlers for algebraic effects}
+\citep{Plotkin2001,Plotkin2003,Plotkin2013} as an approach to
+concurrent and parallel programming. Our story is twofold: We study
+novel applications of effect handlers in concurrent and parallel
+programming, but we also present a novel compilation technique for
+effect handlers.
+
 \section{Problem analysis}
 \section{Problem statement}
 \section{Aims and objectives}
@@ -328,7 +371,6 @@ A preface will possibly appear here\dots
 %%
 \chapter{Background}
 \section{The Links programming language}
-\subsection{Notable features}
 \subsection{Concurrency model}
 \subsection{Programming with handlers}
 
@@ -349,16 +391,25 @@ A preface will possibly appear here\dots
 %%
 %% Compiling handlers
 %%
-\chapter{Compiling handlers}
+\chapter{Compiling effect handlers}
+
+%%
+%% Evaluation
+%%
+\chapter{Evaluation}
 
 %%
 %% Formalisation
 %%
-\chapter{Formalisation}
-In this chapter, we present a type and effect system and a small-step
+\chapter{A calculus of handlers and rows}
+\label{sec:lambe-eff-row}
+
+In this section, we present a type and effect system and a small-step
 operational semantics for \Calc (pronounced ``lambda-eff-row''), a
 Church-style row-polymorphic call-by-value calculus for effect
 handlers.
+%
+This core calculus captures the essence of the Links IR.
 %
 We prove that the operational semantics is sound with respect to the
 type and effect system.
@@ -373,7 +424,7 @@ The design of \Calc is inspired by the $\lambda$-calculi of
 %
 As in the work of \citet{Kammar2013}, each handler can have its own
 effect signature. As in the work of \citet{Pretnar2015}, the
-underlying formalism is fine-grained call-by-value~\cite{LevyPT03},
+underlying formalism is fine-grain call-by-value~\cite{LevyPT03},
 which names each intermediate computation like in A-normal
 form~\cite{Flanagan1993}, but unlike A-normal form is closed under
 $\beta$-reduction. As in the work of \citet{Lindley2012}, the effect
@@ -381,16 +432,19 @@ system is based on row polymorphism.
 
 \section{Types}
 The grammars of types, effects, kinds, and type and kind environments
-are given in Figure \ref{fig:types-syntax}.
+are given in Figure~\ref{fig:types-syntax}.
 
 \begin{figure}
 Types
 \begin{syntax}
-\slab{Ordinary types} &A,B,C  &::= & %\Bool \mid \Int
-                                      A \xrightarrow{E} B
-                               \mid  \forall \alpha^K .\, A \\
+\slab{Value types}    &A,B  &::= & %\Bool \mid \Int
+                                      A \to C
+                               \mid  \forall \alpha^K.C \\
                              &&\mid& \Record{R} \mid [R]
-                               \mid  \Harrow{A}{E}{B}{E'} \mid \alpha \\
+                               \mid  C \Rightarrow D \mid \alpha \\
+                               %% \mid  \Harrow{A}{E}{B}{E'} \mid \alpha \\
+\slab{Computation types} 
+                      &C,D  &::= & A \eff E \\
 \slab{Effect types}   &E    &::= & \{R\}\\
 \slab{Row types}      &R    &::= & \ell : P;R \mid \rho \mid \cdot \\
 \slab{Presence types} &P    &::= & \Pre{A} \mid \Abs \mid \theta\\
@@ -405,29 +459,33 @@ Types
 \label{fig:types-syntax}
 \end{figure}
 
-\paragraph{Ordinary Types}
+\paragraph{Value Types}
 %The base types are integers and booleans.
-The function type $A \xrightarrow{E} B$ takes an argument of type $A$,
-returns a value of type $B$, and has effect signature $E$. The effect
-signature enumerates the operations that the function may perform
-during evaluation. The polymorphic type $\forall \alpha^K .\, A$ is
-parameterised by a type variable $\alpha$ of kind $K$. The record type
-$\Record{R}$ represents records with fields given by labels of row
-$R$. Dually, the variant type $[R]$ represents a sum of fields tagged
-by the labels of row $R$. The handler type $\Harrow{A}{E}{B}{E'}$
-transforms a computation with return type $A$, that has effect
-signature $E$, into another computation with return type $B$ and
-effect signature $E'$.
+The function type $A \to C$ takes an argument of type $A$ and returns
+a computation of type $C$.
+%% The effect signature enumerates the
+%% operations that the function may perform during evaluation.
+The polymorphic type $\forall \alpha^K .\, C$ is parameterised by a
+type variable $\alpha$ of kind $K$. The record type $\Record{R}$
+represents records with fields given by labels of row $R$. Dually, the
+variant type $[R]$ represents a sum of fields tagged by the labels of
+row $R$. The handler type $C \Rightarrow D$ transforms a computation
+of type $C$ into a computation of type $D$.
+
+\paragraph{Computation Types}
+A computation type $A \eff E$ is given by a value type $A$ and an
+effect $E$, which specifies the operations that the computation may
+perform.
 
 \paragraph{Row Types}
-Effect signatures, records and variants are defined in terms of rows.
+Effect types, records and variants are defined in terms of rows.
 A row type embodies a collection of distinct labels, each of which is
 annotated with a presence type. A presence type indicates whether a
 label is \emph{present} with some type $A$ ($\Pre{A}$), \emph{absent}
 ($\Abs$) or \emph{polymorphic} in its presence ($\theta$).
 
 Row types are either \emph{closed} or \emph{open}. A closed row type
-ends in $\cdot$, whilst an open row type ends with a \emph{row
+ends in~$\cdot$, whilst an open row type ends with a \emph{row
   variable} $\rho$. Furthermore, a closed row term can have only the
 labels explicitly mentioned in its type. Conversely, the row variable
 in an open row can be instantiated with additional labels. We identify
@@ -442,7 +500,7 @@ closed rows.
 
 \paragraph{Kinds}
 We have three kinds: $Type$, $\emph{Row}_\mathcal{L}$ and $Presence$
-which classify ordinary types, row types and presence types,
+which classify value types, row types and presence types,
 respectively. Row kinds are annotated with a set of labels
 $\mathcal{L}$. The kind of a complete row is
 $Row_{\mathcal{\emptyset}}$. More generally, the kind
@@ -452,7 +510,7 @@ labels in $\mathcal{L}$.
 
 \paragraph{Type Variables}
 We let $\alpha$, $\rho$ and $\theta$ range over type variables. By
-convention we use $\alpha$ for ordinary type variables or for type
+convention we use $\alpha$ for value type variables or for type
 variables of unspecified kind, $\rho$ for type variables of row kind,
 and $\theta$ for type variables of presence kind.
 
@@ -472,7 +530,7 @@ environments map type variables to their kinds.
                      &     &    &\\
 \slab{Computations}  &M,N  &::= & V\,W \mid V\,A\\
                      &     &\mid& \Let\; \Record{\ell=x;y} \revto V \; \In \; N\\
-                     &     &\mid& \Case\; V \{\ell\; x \mapsto M; y \mapsto N\} \mid \Absurd^A V\\
+                     &     &\mid& \Case\; V \{\ell\; x \mapsto M; y \mapsto N\} \mid \Absurd^C V\\
                      &     &\mid& \Return\; V \\
                      &     &\mid& \Let \; x \revto M \; \In \; N\\
                      &     &\mid& (\Do \; \ell \; V)^E \\
@@ -487,9 +545,9 @@ environments map type variables to their kinds.
 \caption{Term Syntax}
 \label{fig:term-syntax}
 \end{figure}
-The terms are given in Figure \ref{fig:term-syntax}. We let $x,y,z,k$
-range over term variables. By convention, we use $k$ to denote names
-of continuations. %We let $n$ range over integer constants.
+The terms are given in Figure~\ref{fig:term-syntax}. We let $x,y,z,k$
+range over term variables. By convention, we use $k$ to denote
+continuation names. %We let $n$ range over integer constants.
 
 The syntax partitions terms into values, computations and
 handlers. 
@@ -514,7 +572,7 @@ and $y$, the rest of the record. Non-empty variants are eliminated
 using the case construct ($\Case\; V\; \{\ell\; x \mapsto M; y \mapsto
 N\}$), which evaluates the computation $M$ if the tag of $V$ matches
 $\ell$, otherwise it falls through to $y$ and evaluates $N$.  The
-elimination form for empty variants is ($\Absurd^A V$). A trivial
+elimination form for empty variants is ($\Absurd^C V$). A trivial
 computation $(\Return\;V)$ returns value $V$. The expression $(\Let \;
 x \revto M \; \In \; N)$ evaluates $M$ and binds the result value to
 $x$ in $N$.
@@ -530,14 +588,18 @@ return value of the handled computation, which is bound to $x$ in $M$.
 The $i$-th operation clause binds the operation parameter to $x_i$ and
 a the continuation $k_i$ in $M_i$.
 
+We write $Id(M)$ for $\Handle \;M\; \With \; \{\Return\;x \mapsto
+x\}$.
+%
 We write $H(\Return)$ for the return clause of $H$ and $H(\ell)$ for
 the set of either zero or one operation clauses in $H$ that handle the
 operation $\ell$. We write $dom(H)$ for the set of operations handled
 by $H$.
 %
-We annotate various subterms with their types in order to aid type
-reconstruction (injection, operations, empty cases, and handlers); we
-sometimes omit these annotations.
+As our calculus is Church-style, we annotate various term forms with
+type or kind information (term abstraction, type abstraction,
+injection, operations, and empty cases); we sometimes omit these
+annotations.
 
 %% SL: possibly a bit draconian, but I think we can do without the
 %% detail here.
@@ -593,18 +655,22 @@ sometimes omit these annotations.
 
 \section{Static Semantics}
 \label{sec:typing}
-The kinding rules are given in Figure \ref{fig:kinding} and the typing
-rules are given in Figure \ref{fig:typing}.
+The kinding rules are given in Figure~\ref{fig:kinding} and the typing
+rules are given in Figure~\ref{fig:typing}.
 
 The kinding judgement $\Delta \vdash \alpha : K$ asserts that the type
-variable $\alpha$ has kind $K$ in kind environment $\Delta$. The
-typing judgement $\typ{\Delta;\Gamma}{M : A}{E}$ states that the term
-$M$ has type $A$ and effects $E$ under kind environment $\Delta$ and
-type environment $\Gamma$. In typing judgements, we implicitly assume
-that $\Gamma$, $E$ and $A$ are well-kinded with respect to
-$\Delta$. We define the functions $FTV(\Gamma)$ and $FTV(E)$ to be the
-set of free type variables in $\Gamma$ and $E$, respectively. We write
-$FTV(\Gamma,E)$ as shorthand for $FTV(\Gamma) \cup FTV(E)$.
+variable $\alpha$ has kind $K$ in kind environment $\Delta$. The value
+typing judgement $\typv{\Delta;\Gamma}{V : A}$ states that value term
+$V$ has type $A$ under kind environment $\Delta$ and type environment
+$\Gamma$. The computation typing judgement $\typc{\Delta;\Gamma}{M :
+  A}{E}$ states that the term $M$ has type $A$ and effects $E$ under
+kind environment $\Delta$ and type environment $\Gamma$. In typing
+judgements, we implicitly assume that $\Gamma$, $E$ and $A$ are
+well-kinded with respect to $\Delta$. We define the functions
+$FTV(\Gamma)$ and $FTV(E)$ to be the set of free type variables in
+$\Gamma$ and $E$, respectively.
+%
+%% We write $FTV(\Gamma,E)$ as shorthand for $FTV(\Gamma) \cup FTV(E)$.
 
 The kind and typing rules are mostly straightforward. The interesting
 typing rules are \tylab{Handle} and the two handler rules. The
@@ -615,17 +681,17 @@ computation of type $A$ with effect signature $E$ into another
 computation of type $B$ with effect signature $E'$.
 
 The \tylab{Handler} rule is crucial. The input effect $E$ and the
-output effect $E'$ must share the same suffix $E_f$. This means that
-$E''$ must explicitly mention each of the operations $\ell_i$, whether
+output effect $E'$ must share the same suffix $R$. This means that
+$E'$ must explicitly mention each of the operations $\ell_i$, whether
 that be to say that an $\ell_i$ is present with a given type
-signature, absent, or polymorphic in its presence. The $f$ in $E_f$
-stands for ``forward'', as in the effects that are forwarded by the
-handler. The effect $E_f$ may include a row-variable, in which case an
-arbitrary number of effects may be forwarded by the handler.
+signature, absent, or polymorphic in its presence. The row $R$
+describes the operations that are forwarded. It may include a
+row-variable, in which case an arbitrary number of effects may be
+forwarded by the handler.
 %
 The typing of the return clause is straightforward. In the typing of
-each operation clause, the continuation is annotated with the output
-effect $E'$. Thus, we are here defining \emph{deep}
+each operation clause, the continuation returns the output computation
+type $D$. Thus, we are here defining \emph{deep}
 handlers~\cite{Kammar2013} in which the handler is implicitly wrapped
 around the continuation, such that any subsequent operations are
 handled uniformly by the same handler.
@@ -670,8 +736,9 @@ handler after applying the continuation inside an operation clause.
 
 % forall alpha : K . A : Type
   \inferrule*[Lab=\klab{Forall}]
-    { \Delta, \alpha : K \vdash A : \Type }
-    {\Delta \vdash (\forall \alpha^K . \, A) : \Type}
+    { \Delta, \alpha : K \vdash A : \Type \\
+      \Delta, \alpha : K \vdash R : \Row_\emptyset}
+    {\Delta \vdash (\forall \alpha^K . \, A \eff \{R\}) : \Type}
 %%
 %% % Int : Type
 %%   \inferrule*[Lab=\klab{Int}]
@@ -686,10 +753,10 @@ handler after applying the continuation inside an operation clause.
 % A -E-> B, A : Type, E : Row, B : Type
   \inferrule*[Lab=\klab{Fun}]
     { \Delta \vdash A : \Type \\
-      \Delta \vdash E : \Row_\emptyset  \\
+      \Delta \vdash R : \Row_\emptyset  \\
       \Delta \vdash B : \Type
     }
-    {\Delta \vdash A \xrightarrow{E} B : \Type}
+    {\Delta \vdash (A \to B \eff \{R\}) : \Type}
 
 % Record
   \inferrule*[Lab=\klab{Record}]
@@ -718,10 +785,10 @@ handler after applying the continuation inside an operation clause.
 
 % Extend row
   \inferrule*[Lab=\klab{ExtendRow}]
-    { \Delta, P : \Presence \\
-      \Delta, R : \Row_{\mathcal{L} \uplus \{\ell\}}
+    { \Delta \vdash P : \Presence \\
+      \Delta \vdash R : \Row_{\mathcal{L} \uplus \{\ell\}}
     }
-    {\Delta \vdash \Record{\ell : P;R} : \Row_\mathcal{L}}
+    {\Delta \vdash \ell : P;R : \Row_\mathcal{L}}
 \end{mathpar}
 
 \caption{Kinding Rules}
@@ -734,113 +801,112 @@ Values
 % Variable
   \inferrule*[Lab=\tylab{Var}]
     {x : A \in \Gamma}
-    {\typ{\Delta;\Gamma}{x : A}{E}}
+    {\typv{\Delta;\Gamma}{x : A}}
 %%
 %% % true : Bool
 %%   \inferrule*[Lab=\tylab{True}]
 %%     { }
-%%     {\typ{\Delta;\Gamma}{\True : \Bool}{E}}
+%%     {\typv{\Delta;\Gamma}{\True : \Bool}}
 %%
 %% % false : Bool
 %%   \inferrule*[Lab=\tylab{False}]
 %%     { }
-%%     {\typ{\Delta;\Gamma}{\False : \Bool}{E}}
+%%     {\typv{\Delta;\Gamma}{\False : \Bool}}
 %%
 %% % n : Int
 %%   \inferrule*[Lab=\tylab{Int}]
 %%     { n \in \mathbb{N} }
-%%     {\typ{\Delta;\Gamma}{n : \Int}{E}}
+%%     {\typv{\Delta;\Gamma}{n : \Int}}
 
 % Abstraction
   \inferrule*[Lab=\tylab{Lam}]
-    {\typ{\Delta;\Gamma, x : A}{M : B}{E}}
-    {\typ{\Delta;\Gamma}{\lambda x^A .\, M : A \xrightarrow{E} B}{E}}
+    {\typ{\Delta;\Gamma, x : A}{M : C}}
+    {\typv{\Delta;\Gamma}{\lambda x^A .\, M : A \to C}}
 
 % Polymorphic abstraction
   \inferrule*[Lab=\tylab{PolyLam}]
-    {\typ{\Delta,\alpha : K;\Gamma}{M : A}{E}  \\
-     \alpha \notin FTV(\Gamma, E)
+    {\typc{\Delta,\alpha : K;\Gamma}{M : A}{E} \\
+     \alpha \notin FTV(\Gamma)
     }
-    {\typ{\Delta;\Gamma}{\Lambda \alpha^K .\, M : \forall \alpha^K . \,A}{E}}
+    {\typv{\Delta;\Gamma}{\Lambda \alpha^K .\, M : \forall \alpha^K . \,A \eff E}}
 \\
 % unit : ()
   \inferrule*[Lab=\tylab{Unit}]
     { }
-    {\typ{\Delta;\Gamma}{\Record{} : \Record{}}{E}}
+    {\typv{\Delta;\Gamma}{\Record{} : \Record{}}}
 
 % Extension
   \inferrule*[Lab=\tylab{Extend}]
-    { \typ{\Delta;\Gamma}{V : A}{E} \\ 
-      \typ{\Delta;\Gamma}{W : \Record{\ell:\Abs;R}}{E}
+    { \typv{\Delta;\Gamma}{V : A} \\
+      \typv{\Delta;\Gamma}{W : \Record{\ell:\Abs;R}}
     }
-    {\typ{\Delta;\Gamma}{\Record{\ell =V;W} : \Record{\ell:\Pre{A};R}}{E}}
+    {\typv{\Delta;\Gamma}{\Record{\ell=V;W} : \Record{\ell:\Pre{A};R}}}
 
 % Inject
   \inferrule*[Lab=\tylab{Inject}]
-    {\typ{\Delta;\Gamma}{V : A}{E}}
-    {\typ{\Delta;\Gamma}{(\ell\,V)^R : [\ell : \Pre{A}; R]}{E}}
+    {\typv{\Delta;\Gamma}{V : A}}
+    {\typv{\Delta;\Gamma}{(\ell\,V)^R : [\ell : \Pre{A}; R]}}
 \end{mathpar}
 Computations
 \begin{mathpar}
 % Application
   \inferrule*[Lab=\tylab{App}]
-    {\typ{\Delta;\Gamma}{V : A \xrightarrow{E}{E}} B \\
-     \typ{\Delta;\Gamma}{W : B}{E}
+    {\typv{\Delta;\Gamma}{V : A \to C} \\
+     \typv{\Delta;\Gamma}{W : B}
     }
-    {\typ{\Delta;\Gamma}{V\,W : B}{E}}
+    {\typ{\Delta;\Gamma}{V\,W : C}}
 
 % Polymorphic application
   \inferrule*[Lab=\tylab{PolyApp}]
-    {\typ{\Delta;\Gamma}{V : \forall \alpha^K . \, A}{E} \\
-     \typ{\Delta;\Gamma}{\Delta \vdash B : K}{E} \\
-     \alpha \notin FTV(E)
+    {\typv{\Delta;\Gamma}{V : \forall \alpha^K . \, C} \\
+     \Delta \vdash A : K
     }
-    {\typ{\Delta;\Gamma}{V\,B : A[B/\alpha]}{E}}
+    {\typ{\Delta;\Gamma}{V\,A : C[A/\alpha]}}
 
 % Split
   \inferrule*[Lab=\tylab{Split}]
-    {\typ{\Delta;\Gamma}{V : \Record{\ell : \Pre{A};R}}{E} \\\\
-     \typ{\Delta;\Gamma, x : A, y : \Record{\ell : \Abs; R}}{N : B}{E}
+    {\typv{\Delta;\Gamma}{V : \Record{\ell : \Pre{A};R}} \\\\
+     \typ{\Delta;\Gamma, x : A, y : \Record{\ell : \Abs; R}}{N : C}
     }
-    {\typ{\Delta;\Gamma}{\Let \; \Record{\ell =x;y} \revto V\; \In \; N : B}{E}} 
+    {\typ{\Delta;\Gamma}{\Let \; \Record{\ell =x;y} \revto V\; \In \; N : C}}
 
 % Case
   \inferrule*[Lab=\tylab{Case}]
-    { \typ{\Delta;\Gamma}{V : [\ell : \Pre{A};R]}{E}  \\\\
-      \typ{\Delta;\Gamma,x:A}{M : B}{E} \\\\
-      \typ{\Delta;\Gamma,y:[\ell : \Abs;R]}{N : B}{E}
+    { \typv{\Delta;\Gamma}{V : [\ell : \Pre{A};R]}  \\\\
+      \typ{\Delta;\Gamma,x:A}{M : C} \\\\
+      \typ{\Delta;\Gamma,y:[\ell : \Abs;R]}{N : C}
     }
-    {\typ{\Delta;\Gamma}{\Case \; V \{\ell\; x \mapsto M;y \mapsto N \} : B}{E}}
+    {\typ{\Delta;\Gamma}{\Case \; V \{\ell\; x \mapsto M;y \mapsto N \} : C}}
 
 % Absurd
   \inferrule*[Lab=\tylab{Absurd}]
-    {\typ{\Delta;\Gamma}{V : []}{E}}
-    {\typ{\Delta;\Gamma}{\Absurd^A \; V : A}{E}}
+    {\typv{\Delta;\Gamma}{V : []}}
+    {\typ{\Delta;\Gamma}{\Absurd^C \; V : C}}
 
 % Return
   \inferrule*[Lab=\tylab{Return}]
-    {\typ{\Delta;\Gamma}{V : A}{E}}
-    {\typ{\Delta;\Gamma}{\Return \; V : A}{E}} 
+    {\typv{\Delta;\Gamma}{V : A}}
+    {\typc{\Delta;\Gamma}{\Return \; V : A}{E}}
 
 % Let 
   \inferrule*[Lab=\tylab{Let}]
-    {\typ{\Delta;\Gamma}{M : A}{E} \\
-     \typ{\Delta;\Gamma, x : A}{N : B}{E}
+    {\typc{\Delta;\Gamma}{M : A}{E} \\
+     \typc{\Delta;\Gamma, x : A}{N : B}{E}
     }
-    {\typ{\Delta;\Gamma}{\Let \; x \revto M\; \In \; N : B}{E}} 
+    {\typc{\Delta;\Gamma}{\Let \; x \revto M\; \In \; N : B}{E}}
 \\
 % Do 
   \inferrule*[Lab=\tylab{Do}]
-    {\typ{\Delta;\Gamma}{V : A}{E} \\
+    {\typv{\Delta;\Gamma}{V : A} \\
      E = \{\ell : A \to B; R\}
     }
-    {\typ{\Delta;\Gamma}{(\Do \; \ell \; V)^E : B}{E}}
+    {\typc{\Delta;\Gamma}{(\Do \; \ell \; V)^E : B}{E}}
 
 % Open Handle
   \inferrule*[Lab=\tylab{Handle}]
-    {\typ{\Delta;\Gamma}{M : A}{E} \\ 
-     \Delta;\Gamma \vdash H : \Harrow{A}{E}{B}{E'}}
-    {\typ{\Delta;\Gamma}{\Handle \; M \; \With \; H : B}{E'}}
+    {\typv{\Delta;\Gamma}{M : C} \\
+     \Delta;\Gamma \vdash H : C \Rightarrow D}
+    {\typv{\Delta;\Gamma}{\Handle \; M \; \With \; H : D}}
 \end{mathpar}
 
 Handlers
@@ -859,13 +925,13 @@ Handlers
 %\mprset{flushleft}
   \inferrule*[Lab=\tylab{Handler}]
     {
-      E = \{\ell_i : A_i \to B_i\}_i \uplus E_f \\
-      E' = E'' \uplus E_f \\
+      C = A \eff \{(\ell_i : A_i \to B_i)_i; R\} \\
+      D = B \eff \{(\ell_i : P_i)_i;         R\} \\
       H = \{\Return \; x \mapsto M\} \uplus \{\ell_i \; y \; k \mapsto N_i\}_i \\\\
-      [\typ{\Delta;\Gamma,y : A_i, k : B_i \xrightarrow{E'} C}{N_i : C}{E'}]_i \\
-       \typ{\Delta;\Gamma, x : A}{M : C}{E'} \\
+      [\typv{\Delta;\Gamma,y : A_i, k : B_i \to D}{N_i : D}]_i \\
+       \typv{\Delta;\Gamma, x : A}{M : D} \\
     }
-    {{\Delta;\Gamma} \vdash {H : \Harrow{A}{E}{C}{E'}}}
+    {{\Delta;\Gamma} \vdash {H : C \Rightarrow D}}
 
 % Shallow closed handler
 % \inferrule*[Lab=\tylab{Shallow-Closed}]
@@ -944,7 +1010,7 @@ We write $BL(\mathcal{E})$ for the set of operation labels bound by
 $\mathcal{E}$.
 \begin{equations}
 BL([~])                            &=& \emptyset \\
-BL(\Let\;x=\mathcal{E}\;\In\;N)    &=& BL(\mathcal{E}) \\
+BL(\Let\;x \revto \mathcal{E}\;\In\;N)    &=& BL(\mathcal{E}) \\
 BL(\Handle\;\mathcal{E}\;\With\;H) &=& BL(\mathcal{E}) \cup dom(H) \\
 \end{equations}
 
@@ -964,8 +1030,8 @@ We write $R^+$ for the transitive closure of relation $R$.
 Subject reduction and type soundness for $\Calc$ are standard.
 
 \begin{theorem}[Subject Reduction]
-If $\typ{\Delta;\Gamma}{M : A}{E}$ and $M \reducesto M'$, then
-$\typ{\Delta;\Gamma}{M' : A}{E}$.
+If $\typc{\Delta;\Gamma}{M : A}{E}$ and $M \reducesto M'$, then
+$\typc{\Delta;\Gamma}{M' : A}{E}$.
 \end{theorem}
 
 There are two ways in which a computation can terminate. It can either
@@ -981,7 +1047,7 @@ If $N$ is normal with respect to the empty effect $\{\cdot\}$, then
 $N$ has the form $\Return\;V$.
 
 \begin{theorem}[Type Soundness]
-If $\typ{}{M : A}{E}$, then there exists $\typ{}{N : A}{E}$, such that
+If $\typc{}{M : A}{E}$, then there exists $\typc{}{N : A}{E}$, such that
 $M \reducesto^+ N \not\reducesto$, and $N$ is normal with respect to
 effect $E$.
 \end{theorem}
@@ -990,7 +1056,9 @@ effect $E$.
 %% Conclusions and future work
 %%
 \chapter{Conclusions and future work}
+\label{ch:conclusions}
 \section{Future work}
+\label{sec:futurework}
 
 %%%%%%%%
 %% Include your chapter files here. See the sample chapter file for the basic
@@ -1005,6 +1073,13 @@ effect $E$.
 %\printbibliography[heading=bibintoc]
 \bibliographystyle{abbrvnat}
 \bibliography{references}
+
+%%
+%% Appendices
+%%
+\appendix
+\chapter{Installing the Links compiler}
+\label{ch:install}
 
 %% ... that's all, folks!
 \end{document}

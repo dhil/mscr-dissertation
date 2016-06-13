@@ -1,29 +1,36 @@
-CC=pdflatex
+TEXC=pdflatex
 CFLAGS=-interaction=nonstopmode -halt-on-error -file-line-error
+BIBC=bibtex
+PAPER=thesis
+BIBLIO=references
+EXAMPLES=coin.links
+LINKS=$(HOME)/projects/links/compiler/links
+LFLAGS=--config=$(HOME)/projects/links/compiler/default.config -c --native
 
-all: thesis.pdf
+all: $(PAPER).pdf
 
-snippets:
-	echo "I will eventually use this rule to generate code snippets" 
-	#mkdir -p snippets
-	#bash mksnippets.sh <source.links> snippets
+snippets: $(EXAMPLES)
+	mkdir -p snippets
+	bash mksnippets.sh $(EXAMPLES) snippets
 
-thesis.aux: thesis.tex
-	$(CC) $(CFLAGS) thesis
+$(PAPER).aux: $(PAPER).tex
+	$(TEXC) $(CFLAGS) $(PAPER)
 
-references.bbl: thesis.aux references.bib
-	$(CC) $(CFLAGS) thesis
-	bibtex thesis
+$(BIBLIO).bbl: $(PAPER).aux $(BIBLIO).bib
+	$(TEXC) $(CFLAGS) $(PAPER)
+	$(BIBC) $(PAPER)
 
-thesis.pdf: snippets thesis.aux references.bbl 
-	$(CC) $(CFLAGS) thesis
-	$(CC) $(CFLAGS) thesis
+$(PAPER).pdf: $(PAPER).aux $(BIBLIO).bbl 
+	$(TEXC) $(CFLAGS) $(PAPER)
+	$(TEXC) $(CFLAGS) $(PAPER)
 
-# Compiles paper and tests all the code
-#camera-ready: nim.links paper.pdf
-#	$(HOME)/projects/links/links --config=$(HOME)/projects/links/default.config nim.links
+camera-ready: all
+	$(LINKS) $(LFLAGS) $(EXAMPLES)
 
 clean:
 	rm -f *.log *.aux *.toc *.out
 	rm -f *.bbl *.blg *.fls *.xml
+	rm -f *.fdb_latexmk
+	rm -f $(PAPER).pdf
+	rm -f *.o *.cmx *.cmo
 	rm -rf snippets
