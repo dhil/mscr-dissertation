@@ -329,28 +329,31 @@ A preface will possibly appear here\dots
 \label{ch:introduction}
 For more than a decade the \emph{free lunch} has been over
 \citep{Sutter2005}. The saying ``free lunch'' refers to the regular
-increase in performance, that software applications and developers
-enjoyed for free for 30 years, due to the regular increase in
+increase in performance, that software developers enjoyed without
+having to rewrite their applications, due to the regular increase in
 processing power as processor clock frequencies doubled every other
 year.
 
 %
 
 While we continue to enjoy an increase in processing power, we do not
-get our lunch for free anymore as clock frequencies no longer grow,
-which is mainly due to physical issues such as excessive heat, power
-consumption, and current leakage problems \citep{Sutter2005}. Instead
-of increasing the clock frequency of processors, a single
-computational device now comprise multiple processing
-cores. Consequently, we are faced with the challenge of \emph{parallel
-  programming}, i.e.  programming multiple computational cores to
-execute simultaneously.
+get have our lunch for free anymore as clock frequencies no longer
+rise, which is mainly due to physical issues such as excessive heat,
+power consumption, and current leakage problems
+\citep{Sutter2005}. Instead a single computational device now comprise
+multiple processing cores. Consequently, we are faced with the
+challenge of \emph{parallel programming}, i.e.  programming multiple
+processing cores to execute simultaneously. Existing programs must be
+rewritten in order to take advantage of multiple cores, and hence,
+performance no longer increases for free.
 
 %
 
-With the emergence of multicore and heterogeneous processors in
-consumer-grade hardware, however, parallel programming has become a
-discipline every software developer ought to know and master.
+With the emergence of multicore processors in consumer-grade hardware,
+however, parallel programming is well-poised to become a dominant
+programming discipline that every software developer ought to know and
+master. But, conventional programming language are ill-suited for the
+challenge poised by parallel programming.
 
 %
 
@@ -361,7 +364,19 @@ novel applications of effect handlers in concurrent and parallel
 programming, but we also present a novel compilation technique for
 effect handlers.
 
-\section{Problem analysis}
+\section{The heart of the problem}
+
+Parallelism is about exploiting multiple computational resources
+simultaneously to maximise efficiency. The aim is speed up a
+computation by delegating different parts of it to different
+processors to execute at the same time \citep{Marlow2013}. In theory,
+parallelism is easy, since running any two sequential programs in
+parallel have the same semantics as running them sequentially. In
+practice, though, parallelism is often hard because we have far more
+computations to delegate than we have available resources, thus we
+must carefully \emph{schedule} computations.
+
+
 \section{Problem statement}
 \section{Aims and objectives}
 \section{Thesis outline}
