@@ -1,4 +1,4 @@
-%% Master by Research, ICSA - LFCS, print twosided, new chapters on right page
+%% Master by Research, CDT PPAR, print twosided, new chapters on right page
 \documentclass[mscres,cdtppar,twoside,openright,logo,rightchapter,normalheadings]{infthesis}
 \shieldtype{0}
 
@@ -17,6 +17,9 @@
 \usepackage{caption,subcaption}  % Sub figures support
 \usepackage[T1]{fontenc}      % Fixes font issues
 \usepackage{lmodern}
+\usepackage{enumerate}        % Customise enumerate-environments
+\usepackage{xcolor}           % Colours
+\usepackage{drawstack}        % Syntactic sugar for using tikz to draw run-time stacks
 
 % Drawing
 \usepackage{tikz}
@@ -62,13 +65,16 @@
   xleftmargin=\parindent
 }
 
+\definecolor{darkgreen}{rgb}{0.000000,0.392157,0.000000}
+\definecolor{violetred}{rgb}{0.915686,0.125490,0.364706}
+
 % Define Links as a lst-language
 \lstdefinelanguage{Links}{% 
-  morekeywords={typename, fun, op, var, if, this, true, false, else, case, switch, handle, handler, shallowhandler, open, do, sig},%
+  morekeywords={typename, fun, op, var, if, this, true, false, else, case, switch, handle, handler, shallowhandler, do, sig},%
   sensitive=t, % 
-  keywordstyle=\color{red},
-  emph={Comp,Player,Bool,Int,GTree,Cheat,Zero,Choose,Rand,Move,Winner,Take,Return,Get,Put,GameState,Alice,Bob},
-  emphstyle={\color{blue}},
+  keywordstyle=\color{violetred},
+  emph={Comp,Player,Bool,Int,GTree,Cheat,Zero,Choose,Rand,Move,Winner,Take,Return,Get,Put,GameState,Alice,Bob,Fail,Nothing,Just,Maybe,Toss,Heads,Tails},
+  emphstyle={\color{darkgreen}},
   comment=[l]{\#},% 
   escapeinside={(*}{*)},%
   morestring=[d]{"}%
@@ -97,6 +103,7 @@
 \newcommand{\wildarrow}{\linksify{\textapprox{}>}}
 % Links style
 \lstdefinestyle{links}{
+  caption={},
   basicstyle=\linespread{1.0}\ttfamily\footnotesize,
   language=Links,
   literate= {~>}{{\wildarrow}}1
@@ -364,38 +371,246 @@ novel applications of effect handlers in concurrent and parallel
 programming, but we also present a novel compilation technique for
 effect handlers.
 
-\section{The heart of the problem}
+\section{Problem analysis}
 
-Parallelism is about exploiting multiple computational resources
+Parallelism is about utilising multiple computational resources
 simultaneously to maximise efficiency. The aim is speed up a
 computation by delegating different parts of it to different
-processors to execute at the same time \citep{Marlow2013}. In theory,
-parallelism is easy, since running any two sequential programs in
-parallel have the same semantics as running them sequentially. In
-practice, though, parallelism is often hard because we have far more
-computations to delegate than we have available resources, thus we
-must carefully \emph{schedule} computations.
+processors to execute at the same time \citep{Marlow2013}. 
+
+By contrast, concurrency is concerned with structuring interactions
+between multiple agents. Conceptually, 
+
+% In theory,
+% parallelism is easy, since running any two sequential programs in
+% parallel have the same semantics as running them sequentially. In
+% practice, though, parallelism is often hard because we have far more
+% computations to delegate than we have available resources, thus we
+% must carefully \emph{schedule} computations.
 
 
 \section{Problem statement}
 \section{Aims and objectives}
+Our main contributions are
+\begin{itemize}
+  \item A compiler for Links with effect handlers, that supports the
+    full abstraction provided by deep handlers making novel use of the
+    existing linear type system of Links to guide the code generator for
+    handlers.
+  \item A reconstruction of the message-passing concurrency model of
+    Links in terms of effect handlers. 
+  \item Novel applications of effect handlers in parallelism.
+\end{itemize}
 \section{Thesis outline}
+
+%%
+%% Related work
+%%
+\chapter{Related work}
+\label{ch:related-work}
+
+\section{Implementations of effect handlers}
+Any signature of abstract operations can be understood as a free
+algebra and represented as a functor. In particular, every such
+functor gives rise to a free monad. Thus, free monads provide a
+natural basis for implementing effect handlers (\citet{Swierstra2008b}
+provide an account of free monads for functional programmers).  Many
+of the library implementations of effect handlers include
+implementations based on free monads~\citep{Kammar2013, Kiselyov2013,
+  Kiselyov2015, Brady2013, Wu2014}.
+
+\citet{Kammar2013} provide an implementation of effect handlers using
+a continuation monad, which completely avoids materialising any data
+constructors. \citet{Wu2015} explain how it works, by taking advantage
+of Haskell's fusion optimisations. This approach does appear to depend
+rather critically on the handlers being deep rather than shallow, and
+in Haskell it relies on them being type classes, and hence not really
+first class.
+
+The Idris effects library by \cite{Brady2013} takes advantage of
+dependent types to provide effect handlers for a form of effects
+corresponding to parameterised monads~\citep{Atkey09}.
+%
+In the effects library, effects are represented as lists of types.
+
+We are aware of three languages that are specifically designed with
+effect handlers in mind.
+%
+\begin{itemize}
+\item The Eff language by \cite{Bauer2015} is a strict language with
+  Hindley-Milner type inference similar in spirit to ML, but extended
+  with effect handlers.
+%
+It includes a novel feature for supporting fresh generation of effects
+in order to support effects such as ML-style higher-order state (which
+has an operation for generating new references).
+%
+The original version of Eff~\citep{Bauer2015} does not include an
+effect type system. However, an effect type system has subsequently
+been experimented with~\citep{BauerP13, Pretnar2014}.
+%
+This effect type system is considerably more complicated than ours. It
+makes essential use of subtyping, includes a region system, and a form
+of effect polymorphism, which one might reasonably cast as a form of
+row polymorphism.
+
+\item Frank by \cite{McBride2014} takes the idea of effect handlers to
+  the extreme, having no primitive notion of function, only
+  handlers. In Frank a function is but a special case of a handler.
+  Frank is built on a bidirectional type system. It includes an effect
+  type system and a novel form of effect polymorphism in which the
+  programmer never needs to read or write any effect
+  variables. Frank's effect system can be viewed as implementing a
+  form of row polymorphism. Unlike Links, but much like
+  Koka by \cite{Leijen14}, Frank allows multiple occurrences of the same
+  label in a row. In contrast rows in Links are based on Remy's design
+  in which duplicates are not allowed, but negative information is.
+
+\item Shonky by \cite{McBride2016} amounts to a dynamically-typed variant
+  of Frank. Though it is not statically typed, handlers must be
+  annotated with the names of the effects that they handle. The
+  implementation of Shonky is quite similar to ours in that it uses a
+  generalisation of the CEK machine. The main differences are that
+  Shonky does not use an ANF representation, so has more forms of
+  continuation to handle, and in contrast to our nested continuation
+  structure, Shonky uses a completely flat structure.
+  % and where our continuations have a nested
+  % structure, Shonky uses a completely flat structure for
+  % continuations.
+\end{itemize}
+
+Although OCaml itself has no support for effect handlers, a
+development branch, Multicore OCaml~\cite{Dolan2015}, does. Multicore
+OCaml does not include an effect type system, and handlers are
+restricted so that continuations are affine, that is, they can be
+invoked at most once. This design admits a particularly efficient
+implementation, as continuations need never be copied, so they can
+simply be stored on the stack.
+
+\section{Parallel programming models}
+\todo{\cite{Marlow2013}}
+
 
 %%
 %% Background
 %%
-\chapter{Background}
-\section{The Links programming language}
-\subsection{Concurrency model}
-\subsection{Programming with handlers}
 
-\section{Algebraic effects and handlers}
-\subsection{Algebraic effects}
-\subsection{Effect handlers}
+\chapter{Effect handlers}
+\label{ch:background}
+This chapter introduces algebraic effects and their
+handlers. Specifically, in Section~\ref{sec:theory-handlers}
+introduces the theory, while Sections~\ref{sec:links-handlers} and
+\ref{sec:ocaml-handlers} give an introduction to programming with
+effect handlers in Links and OCaml, respectively.
 
-\section{Related work}
-\subsection{Implementations of effect handlers}
-\subsection{Pragma directives}
+\section{A theory of algebraic effects and handlers}
+\label{sec:theory-handlers}
+
+\section{Links with effect handlers}
+\label{sec:links-handlers}
+
+\subsection{Structural typing}
+
+\subsection{Affine and multi-shot effect handlers}
+\label{sec:links-affine-multi}
+
+This section provides a short primer to effect handlers in Links. The
+contents of this section are largely based on
+\cite{Hillerstrom2016b}. An algebraic effect is given by a signature
+of \emph{abstract operations}. For example \emph{nondeterminism} is an
+algebraic effect that is given by a nondeterministic choice operation
+called \lstinline$Choose$. In Links, we may use this operation to
+implement a coin toss:
+%
+\lstinputlisting{snippets/toss.links}
+%
+This declares an \emph{abstract computation} \lstinline$toss$, which
+invokes an operation \lstinline$Choose$ using the \lstinline$do$
+primitive.  The \lstinline$sig$ keyword begins a signature, which
+reads: \lstinline$toss$ is a computation with effect signature
+\lstinline${Choose:Bool |e}$ and return value \lstinline$Toss$, whose
+constructors are \lstinline$Heads$ and \lstinline$Tails$.  Links
+employs row typing to support extensible effect signatures, thus
+\lstinline$e$ is an effect variable, which can be instantiated with
+additional operations.
+
+Introduction of another operation causes the effect signature to grow
+accordingly. For example, if we introduce an exception operation
+\lstinline$Fail : Zero$, then we can model a drunk coin toss:
+%
+\lstinputlisting{snippets/drunkToss.links}
+%
+Here \lstinline$Zero$ is the empty type, and thus the
+\lstinline$switch$ pattern matching construct has no clauses.
+
+An effect handler instantiates a subset of the operations of an
+abstract computation. For example, the following handler interprets
+\lstinline$Choose$ randomly:
+%
+\lstinputlisting{snippets/randomResult.links}
+%
+The signature conveys that the handler interprets the operation
+\lstinline$Choose$ and leaves any other operations uninterpreted. The
+notation \lstinline$Choose{_}$ denotes that the operation is
+polymorphic in its presence.  The handler comprises two clauses:
+\begin{enumerate}[1)]
+  \item the \lstinline$Return$-clause specifies how to handle the return
+    value of the computation.
+  \item the \lstinline$Choose$-clause specifies how to handle a
+    \lstinline$Choose$ operation. The parameter \lstinline$k$ is the
+    (delimited) continuation of the operation \lstinline$Choose$ in the
+    computation.
+\end{enumerate}
+We say that \lstinline$randomResult$ is a \emph{linear handler},
+because it invokes every continuation exactly once. One possible
+output of \lstinline$randomResult(toss)$ is
+%
+\lstinputlisting{outputs/randomResult.output}
+%
+Essentially, the handler interprets the computation \lstinline$toss$
+as modelling a \emph{fair} coin, that is the outcomes ought to be
+uniformly distributed.
+
+Alternatively, we may define a handler for \lstinline$Choose$ that
+invokes its continuation twice to enumerate every possible outcome:
+%
+\lstinputlisting{snippets/allResults.links}
+%
+Observe that the return value is lifted into a singleton list. The
+\lstinline$Choose$-clause concatenates the outcomes obtained by
+interpreting the operation as \lstinline$true$ and \lstinline$false$,
+respectively. We say that \lstinline$allResults$ is a \emph{multi-shot
+  handler}. The result obtained by \lstinline$allResults(toss)$ is
+%
+\lstinputlisting{outputs/allResults.output}
+%
+
+Finally, we have handlers that do not invoke continuations. These are
+familiar \emph{exception handlers}. As an example consider the
+following handler, which returns \lstinline$Just$ the result of the
+computation or returns \lstinline$Nothing$ if the operation
+\lstinline$Fail$ is performed:
+%
+\lstinputlisting{snippets/maybeResult.links}
+%
+The type system prevents invocation of the continuation in the
+\lstinline$Fail$-clause, because the type \lstinline$Zero$ has zero
+inhabitants. Linear and exception handlers together constitute
+\emph{affine handlers}.
+
+\section{OCaml with handlers}
+\label{sec:ocaml-handlers}
+
+\subsection{Nominal typing}
+
+% \chapter{Background}
+% \section{The Links programming language}
+% \subsection{Concurrency model}
+% \subsection{Programming with handlers}
+
+% \section{Algebraic effects and handlers}
+% \subsection{Algebraic effects}
+% \subsection{Effect handlers}
 
 
 %%
@@ -407,6 +622,105 @@ must carefully \emph{schedule} computations.
 %% Compiling handlers
 %%
 \chapter{Compiling effect handlers}
+We reuse most of the previous Links infrastructure. The Links frontend
+is type-checked and translated into a small, typed intermediate
+language in \emph{A-normal form} (ANF). The Links interpreter
+implements a generalised CEK machine \cite{Hillerstrom2016}, which
+interprets ANF code.
+
+%
+
+Our compilation strategy is to translate the Links ANF language into the OCaml
+\emph{Lambda} language, which is a small, untyped lambda calculus. The OCaml
+backend exposes a hierarchy of intermediate representations (IRs), where the
+top representation is known as Lambda. As shown in the Figure
+\ref{fig:infra-diagram}, the Lambda IR offers two different compilation
+options: byte code and native code. Therefore by targeting Lambda rather than
+a lower level IR, we achieve maximum flexibility as a translation into byte
+code, in principle, enables us to take advantage of custom backends such as
+\texttt{js\_of\_ocaml} to produce efficient JavaScript.
+
+%
+
+There are several semantic differences between Links and OCaml, e.g. Links
+employs structural typing, whilst OCaml predominantly employs nominal typing.
+In particular, Links employs row typing for effects, records, and variants,
+whereas OCaml only supports row typing for the latter. Exhibiting a faithful
+translation from Links to OCaml amounts to a lot of value boxing. Thus, we
+target Lambda for greater flexibility and control.  We effectively subvert
+OCaml's typechecker by targeting Lambda, however the translation is safe as
+Links programs are already typechecked.
+
+\begin{figure}
+\centering
+\begin{tikzpicture}
+  \drawstruct{(4.5,2)}
+  \structcell{\lstinline$do Choose$}  \coordinate (DoChoose) at (currentcell.west);
+  \structcell{$\cdots$}
+  \structcell{\lstinline$do Fail$} \coordinate (DoFail) at (currentcell.east);
+  \structcell{\lstinline$Return-clause$}
+  \structcell{\lstinline[keywordstyle=\footnotesize]$Exception handler$}
+  \structcell{\lstinline$Choose-clause$} \coordinate (HandleChoose1) at (currentcell.west); \coordinate (HandleChoose2) at (currentcell.east);
+  \structcell{$\cdot$} \coordinate (H1) at (currentcell.west);
+
+  \drawstruct{(0,0)}
+  \structcell{$\cdots$} \coordinate (H2) at (currentcell.east);
+  \structcell{\lstinline$Return-clause$}
+  \structcell{\lstinline[keywordstyle=\footnotesize]$Exception handler$}
+  \structcell{\lstinline$Fail-clause$}
+  \structcell{$\bot$}
+
+%  \draw[<-] (H2) .. controls ([yshift=0cm] H2) and ([xshift=-10cm,yshift=4cm] H1) .. (H1);
+  \draw (H2) edge[out=-20,in=-175,<-] (H1);
+  \draw (DoChoose) edge[out=175,in=-180,->] (HandleChoose1);
+  \draw (DoFail) edge[xshift=0.5cm,out=0,in=-360,->] (HandleChoose2);
+\end{tikzpicture}
+\caption{Runtime representation of the computation \lstinline$maybeResult(randomResult(drunkToss))$.}\label{fig:rtstack}
+\end{figure}
+
+\section{Runtime Representation}
+By using the OCaml backend we naturally inherit the OCaml
+run-time. OCaml implements effect handlers as heap-managed stack data
+structures, and as a consequence composition of handlers gives rise to
+$n$-element stacks at run-time. For example, the composition
+\lstinline[mathescape]!randomResult(maybeResult($\cdot$))! is
+represented as a two-element stack. Thus, an invocation of an abstract
+operation amounts to performing a dynamic lookup for a suitable
+handler in a stack.
+
+Since the primary use of handlers in OCaml is to express concurrency,
+OCaml handlers are affine; continuations can only be resumed at most
+once, and multiple invocations of a continuation causes a run-time
+error. Multi-shot handlers can be simulated by manually cloning
+continuations using \lstinline$Obj.clone_continuation$. The cost of
+cloning is linear in the size of the handler stack. However, cloning
+is a fragile abstraction; if the handler stack contains at least one
+multi-shot handler, then every affine handler in the stack must be
+demoted to a multi-shot handler to be safe, because a multi-shot
+handler may consume a linear continuation more than
+once. Consequently, multi-shot handlers in OCaml break modularity.
+
+In the Links compiler we use the cloning capability under the hood to implement
+multi-shot handlers. For example, our encoding of \lstinline$allResults$
+amounts to the following in plain OCaml:
+% \kc{$Obj.clone$ was too generic and I plan to use $Obj.clone\_continuation$ to
+% be less ambiguous.}
+\begin{lstlisting}[style=ocaml]
+let all_results m = match m () with
+ | x -> [x]
+ | effect Choose k -> 
+   let k' arg = 
+     continue (Obj.clone_continuation k) arg 
+   in k' true @ k' false
+\end{lstlisting}
+OCaml provides a unified syntax for pattern-matching on regular, effect, and
+exception patterns. The keyword \lstinline[style=ocaml]$effect$ begins an
+operation-clause. Essentially, we create a local function \lstinline$k'$, which
+wraps the actual continuation \lstinline$k$. An invocation of \lstinline$k'$
+passes its argument to a fresh copy of the actual continuation. The
+\lstinline$continue$ function is provided by the standard library; given a
+continuation and a value, it invokes the continuation with that particular
+value. By default we implement every handler as a multi-shot handler.
 
 %%
 %% Evaluation
