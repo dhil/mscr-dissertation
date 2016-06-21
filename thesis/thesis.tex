@@ -72,10 +72,11 @@
 \lstdefinelanguage{Links}{% 
   morekeywords={typename, fun, op, var, if, this, true, false, else, case, switch, handle, handler, shallowhandler, do, sig},%
   sensitive=t, % 
-  keywordstyle=\color{violetred},
+  keywordstyle=\color{red},
   emph={Comp,Player,Bool,Int,GTree,Cheat,Zero,Choose,Rand,Move,Winner,Take,Return,Get,Put,GameState,Alice,Bob,Fail,Nothing,Just,Maybe,Toss,Heads,Tails},
-  emphstyle={\color{darkgreen}},
+  emphstyle={\color{blue}},
   comment=[l]{\#},% 
+  commentstyle={\itshape\color{green}},%
   escapeinside={(*}{*)},%
   morestring=[d]{"}%
  }
@@ -92,11 +93,13 @@
 }
 % Ocaml style
 \lstdefinestyle{ocaml}{
-  language=Caml,
-  literate= {+}{{$+$}}1 {*}{{$*$}}1
-            {<=}{{$\leq$}}1 {>=}{{$\geq$}}1 {<>}{{$\neq$}}1 
-            {==}{{$\equiv$}}1 {=>}{{$\Rightarrow$}}1
-            {->}{{$\to$}}1
+  language=Caml,%
+  morekeywords={effect, perform},%
+  emph={Obj,Choose},%
+%  literate= {+}{{$+$}}1 {*}{{$*$}}1
+%            {<=}{{$\leq$}}1 {>=}{{$\geq$}}1 {<>}{{$\neq$}}1 
+%            {==}{{$\equiv$}}1 {=>}{{$\Rightarrow$}}1
+%            {->}{{$\to$}}1
 }
 
 \newcommand{\textapprox}{{\fontfamily{ptm}\selectfont\texttildelow}}
@@ -730,7 +733,7 @@ Links programs are already typechecked.
   \draw (DoChoose) edge[out=175,in=-180,->] (HandleChoose1);
   \draw (DoFail) edge[xshift=0.5cm,out=0,in=-360,->] (HandleChoose2);
 \end{tikzpicture}
-\caption{Runtime representation of the computation \lstinline$maybeResult(randomResult(drunkToss))$.}\label{fig:rtstack}
+\caption{Representation of \lstinline$maybeResult(randomResult(drunkToss))$ at runtime.}\label{fig:rtstack}
 \end{figure}
 
 \section{Runtime Representation}
