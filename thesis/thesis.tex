@@ -239,7 +239,7 @@
 \newcommand{\res}{\backslash}
 
 %% Information about the title, etc.
-\title{Compilation of Effect Handlers and their Applications in Concurrency}
+\title{Compilation of Effect Handlers and their Applications in Parallelism}
 \author{Daniel Hillerström}
 
 %% If the year of submission is not the current year, uncomment this line and 
@@ -295,9 +295,11 @@ Thanks Christophe\dots
 
 Thanks Sam\dots
 
-Thanks everyone\dots
+Thanks Office 1.07\dots
 
 Thanks OCaml Labs and KC\dots
+
+Thanks to Caoimhín Laoide-Kemp\dots
 
 This work was supported in part by the EPSRC Centre for Doctoral Training in Pervasive Parallelism, funded by the UK Engineering and Physical Sciences Research Council (grant EP/L01503X/1) and the University of Edinburgh.
 \end{acknowledgements}
@@ -336,16 +338,13 @@ A preface will possibly appear here\dots
 \label{ch:introduction}
 
 For more than a decade the \emph{free lunch} has been over
-\citep{Sutter2005}. The free lunch is a euphemism for the regular
-improvement in software application performance due to the rapid growth
-of processor clock frequencies. However, the growth seems to have
-stagnated due to physical issues such as excessive heat, power
-consumption, and current leakage \citep{Sutter2005}.
-
+\citep{Sutter2005}. Free lunch is a euphemism for the precursory
+improvement in software application performance due to the rapid
+growth of processor clock frequencies. However, the growth has
+stagnated due to physical limitations \citep{Sutter2005}.
 %
-
-Nowadays, we have \emph{multicore} processors. A multicore processor
-comprises multiple processing cores that execute
+Nowadays we have \emph{multicore} processors. A multicore processor
+comprises multiple computational cores that execute
 simultaneously. Unfortunately, software applications must be designed
 to take advantage of the additional processing power offered by
 multicore processors. As a consequence we no longer get our lunch for
@@ -362,9 +361,21 @@ free.
 
 %
 
-With the emergence of multicore processors, however, parallelism has
-become pervasive. We are now faced with the challenge of
-\emph{parallel programming}. \citep{Steuwer2015a,Steuwer2015b}, \citep{Marlow2013}
+With the emergence of multicore processors parallelism has become
+pervasive. As a result we are faced with the challenge of
+\emph{parallel programming}. The aim of parallel programming is to
+maximise program efficiency by utilising multiple computational cores
+simultaneously.
+%
+An essential component of parallel programming is decomposition of a
+program into tasks that can be run simultaneously on multiple
+cores. Those tasks must then be scheduled across the available
+computational resources.  Thread and process schedulers govern how the
+computational resources of multicore processors are deployed. However,
+compilers for most mainstream programming languages come with a
+definitive scheduler that is hard wired into a complex, monolithic
+runtime system.
+
 
 % parallel programming is well-poised to become a dominant
 % programming discipline that every software developer ought to know and
@@ -386,24 +397,40 @@ become pervasive. We are now faced with the challenge of
 
 %
 
+In this work we adopt an approach akin to Multicore OCaml
+\citep{Dolan2014,Dolan2015} by using \emph{handlers for algebraic
+  effects} \citep{Plotkin2001,Plotkin2003,Plotkin2013} to enable
+programmers to write user-level, modular schedulers along the lines of
+\citet{KC2016}. Our story is twofold: we study novel applications of
+effect handlers in parallelism, as well as presenting a novel
+compilation technique for effect handlers.
 
 %
 
-In this work, we shall consider \emph{handlers for algebraic effects}
-\citep{Plotkin2001,Plotkin2003,Plotkin2013} as an approach to
-concurrent and parallel programming. Our story is twofold: We study
-novel applications of effect handlers in concurrent and parallel
-programming, but we also present a novel compilation technique for
-effect handlers.
+% In this work, we shall consider \emph{handlers for algebraic effects}
+% \citep{Plotkin2001,Plotkin2003,Plotkin2013} as an approach to
+% concurrent and parallel programming. Our story is twofold: We study
+% novel process-oriented applications of effect handlers in concurrent
+% and parallel programming, but we also present a novel compilation
+% technique for effect handlers.
 
 \section{Problem analysis}
 
 \todo{Parallelism is multiplicity of processors simultaneously}
-
+%
+\todo{Unit of concurrency: Fibers} \todo{Unit of parallelism: Domains}
+%
+\todo{Don't conflate concurrency and parallelism; context switching
+  brings death to scaling}
+%
+\todo{Map fibers onto domains ($\#domains \approx \#cores$)}
+Parallelism is simultaneous execution
+%
+of computations. Concurrency is overlapped execution of processes.
 Parallelism is about utilising multiple computational resources
 simultaneously to maximise efficiency. The aim is speed up a
 computation by delegating different parts of it to different
-processors to execute at the same time \citep{Marlow2013}. 
+processors to execute at the same time \citep{Marlow2013}.
 
 By contrast, concurrency is concerned with structuring interactions
 between multiple agents. Conceptually, 
@@ -429,6 +456,7 @@ Our main contributions are
   \item Novel applications of effect handlers in parallelism.
 \end{itemize}
 \section{Thesis outline}
+\section{Typographical conventions}
 
 %%
 %% Related work
@@ -522,7 +550,7 @@ simply be stored on the stack.
 %% Background
 %%
 
-\chapter{Effect handlers}
+\chapter{Links, OCaml, and effect handlers}
 \label{ch:background}
 This chapter introduces algebraic effects and their
 handlers. Specifically, in Section~\ref{sec:theory-handlers}
@@ -752,7 +780,11 @@ value. By default we implement every handler as a multi-shot handler.
 %%
 %% Evaluation
 %%
-\chapter{Evaluation}
+\chapter{Experiments}
+\label{ch:experiments}
+
+\section{Experimental setup}
+\label{sec:exp-setup}
 
 %%
 %% Formalisation
@@ -1416,6 +1448,13 @@ effect $E$.
 \section{Future work}
 \label{sec:futurework}
 
+%%
+%% Appendices
+%%
+\appendix
+\chapter{Installing the Links compiler}
+\label{ch:install}
+
 %%%%%%%%
 %% Include your chapter files here. See the sample chapter file for the basic
 %% format.
@@ -1429,13 +1468,6 @@ effect $E$.
 %\printbibliography[heading=bibintoc]
 \bibliographystyle{abbrvnat}
 \bibliography{references}
-
-%%
-%% Appendices
-%%
-\appendix
-\chapter{Installing the Links compiler}
-\label{ch:install}
 
 %% ... that's all, folks!
 \end{document}
