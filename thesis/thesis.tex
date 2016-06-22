@@ -20,6 +20,10 @@
 \usepackage{enumerate}        % Customise enumerate-environments
 \usepackage{xcolor}           % Colours
 \usepackage{drawstack}        % Syntactic sugar for using tikz to draw run-time stacks
+\usepackage{tikz}
+%\usetikzlibrary{calc,trees,positioning,arrows,chains,shapes.geometric,%
+%    decorations.pathreplacing,decorations.pathmorphing,shapes,%
+%    matrix,shapes.symbols}
 
 % Drawing
 \usepackage{tikz}
@@ -680,10 +684,32 @@ inhabitants. Linear and exception handlers together constitute
 %% Compiling handlers
 %%
 \chapter{Compiling effect handlers}
+
+\begin{figure}
+\tikzset{my rectangle/.style={
+        draw=black,
+        thick, 
+        rectangle, 
+        minimum width={width("OCaml frontend")+2pt}}
+}
+\centering
+\begin{tikzpicture}
+
+% Frontends
+\node [my rectangle] (OCaml frontend) at (0,0) {OCaml frontend};
+\node [my rectangle] (Links frontend) at (6,0) {Links frontend};
+
+% OCaml backend
+\node [my rectangle,minimum width=270pt] (Lambda) at (3,-2) {Lambda};
+%\node[rectangle,draw=black,ultra thick,minimum height=+5.0cm,minimum width=+4.0cm,fit ={(Parser.north) (Typechecker.south)}] (Frontend) {};
+\end{tikzpicture}
+\caption{OCaml backend}\label{fig:infra-diagram}
+\end{figure}
+
 We reuse most of the previous Links infrastructure. The Links frontend
 is type-checked and translated into a small, typed intermediate
 language in \emph{A-normal form} (ANF). The Links interpreter
-implements a generalised CEK machine \cite{Hillerstrom2016}, which
+implements a generalised CEK machine \citep{Hillerstrom2016a}, which
 interprets ANF code.
 
 %
