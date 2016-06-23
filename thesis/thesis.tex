@@ -683,25 +683,26 @@ simply be stored on the stack.
         minimum height=35pt
         },
 }
-\tikzset{my arrow/.style={-latex, thick}}
+\tikzset{my arrow/.style={-latex,thick}}
+\tikzset{sarrow/.style={-latex,ultra thick,dotted}}
 
 \centering
-\begin{tikzpicture}
+\begin{tikzpicture}[decoration=snake]
 
-\node(P0)[my ellipse] {Generator};
+\node(P0)[my ellipse] {$P_0$ (Generator)};
 
-\node(P1)[my ellipse,right=of P0,xshift=30pt] {$P_1^2$};
+\node(P1)[my ellipse,below=of P0,yshift=-20pt] {$P_1^2$};
 \node(P2)[my ellipse,right=of P1,xshift=85pt] {$P_2^3$};
-\node(P3)[my ellipse,below=of P1] {$P_3^5$};
-\node(P4)[my ellipse,right=of P3] {$P_4^7$};
+\node(P3)[my ellipse,below=of P2,yshift=-20pt] {$P_3^5$};
+\node(P4)[my ellipse,left=of P3,xshift=-85pt] {$P_4^7$};
 
-\draw[my arrow] (P0) to node[midway,above,align=center ] { $\{2,\dots,10\}$ } (P1);
-\draw[my arrow] (P1) to node[midway,above,align=center ] { $\{i \mid i \not\equiv 0 \; (\text{mod } 2) \}$ } (P2);
-\draw[my arrow] (P2.east) to node[midway,right,align=center ] {Foobar} (P3.west);
-\draw[my arrow] (P3) to (P4);
+\draw[sarrow] (P0) to node[midway,right,align=center,yshift=2pt ] { $\{2,\dots,10\}$ } (P1);
+\draw[sarrow] (P1) to node[midway,above,align=center,yshift=2pt ] { $\{n \mid n \not\equiv 0 \; (\text{mod } 2) \}$ } (P2);
+\draw[sarrow] (P2) to node[midway,left,align=center ] { $\{n \mid n \not\equiv 0 \; (\text{mod } 3)\}$ } (P3);
+\draw[sarrow] (P3) to node[midway,below,align=center,yshift=-2pt ] { $\{n \mid n \not\equiv 0 \; (\text{mod } 5)\}$ } (P4);
 
 \end{tikzpicture}
-\caption{Sieve of Erathonenes pipeline}\label{fig:sieve}
+\caption{Sieve of Eratosthenes pipeline.}\label{fig:sieve}
 \end{figure}
 
 %%
