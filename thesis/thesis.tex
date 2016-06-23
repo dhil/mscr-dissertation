@@ -690,12 +690,12 @@ simply be stored on the stack.
 
 \node(P0)[my ellipse] {Generator};
 
-\node(P1)[my ellipse,right=of P0,xshift=25pt] {$P_1^2$};
+\node(P1)[my ellipse,right=of P0,xshift=30pt] {$P_1^2$};
 \node(P2)[my ellipse,right=of P1,xshift=85pt] {$P_2^3$};
 \node(P3)[my ellipse,below=of P1] {$P_3^5$};
 \node(P4)[my ellipse,right=of P3] {$P_4^7$};
 
-\draw[my arrow] (P0) to node[midway,above,align=center ] { $\{2,\dots,n\}$ } (P1);
+\draw[my arrow] (P0) to node[midway,above,align=center ] { $\{2,\dots,10\}$ } (P1);
 \draw[my arrow] (P1) to node[midway,above,align=center ] { $\{i \mid i \not\equiv 0 \; (\text{mod } 2) \}$ } (P2);
 \draw[my arrow] (P2.east) to node[midway,right,align=center ] {Foobar} (P3.west);
 \draw[my arrow] (P3) to (P4);
