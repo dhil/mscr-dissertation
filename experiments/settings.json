@@ -1,0 +1,52 @@
+{
+    "source": {
+        "git": {
+            "branch": "effect-handlers-compilation",
+            "url": "https://github.com/links-lang/links.git"
+        }
+    },
+    "compilers": [
+        {
+            "name": "linksc",
+            "comment": "The Links compiler",
+            "exec": "links",
+            "defaultFlags": "-c --native --verbose"
+        },
+        {
+            "name": "linksi",
+            "comment": "The Links interpreter",
+            "exec": "links",
+            "defaultFlags": "--config=$LINKS_SOURCE_DIR/measure.config"
+        },
+        {
+            "name": "ocamlopt",
+            "comment": "The OCaml optimising compiler",
+            "exec": "ocamlopt",
+            "defaultFlags": "-dlambda -dclambda -dcmm"
+        }
+    ],
+    "experiments": [
+        { "directory": "$LINKS_SOURCE_DIR/programs",
+          "programs": [
+              {
+                  "comment": "8 queens program",
+                  "filename": "queens8_minimal.links",
+                  "checksum": "",
+                  "compilers": [
+                      {"id": 0},
+                      {"id": 1}
+                  ]
+              },
+              {
+                  "comment": "20 queens program",
+                  "filename": "queens20_minimal.links",
+                  "checksum": "",
+                  "compilers": [
+                      {"id": 0},
+                      {"id": 1}
+                  ]
+              }
+          ]
+        }
+    ]
+}
