@@ -21,9 +21,9 @@
 \usepackage{xcolor}           % Colours
 \usepackage{drawstack}        % Syntactic sugar for using tikz to draw run-time stacks
 \usepackage{tikz}
-%\usetikzlibrary{calc,trees,positioning,arrows,chains,shapes.geometric,%
-%    decorations.pathreplacing,decorations.pathmorphing,shapes,%
-%    matrix,shapes.symbols}
+\usetikzlibrary{fit,calc,trees,positioning,arrows,chains,shapes.geometric,%
+    decorations.pathreplacing,decorations.pathmorphing,shapes,%
+    matrix,shapes.symbols}
 
 % Drawing
 \usepackage{tikz}
@@ -466,94 +466,6 @@ Our main contributions are
 \section{Typographical conventions}
 
 %%
-%% Related work
-%%
-\chapter{Related work}
-\label{ch:related-work}
-
-\section{Implementations of effect handlers}
-Any signature of abstract operations can be understood as a free
-algebra and represented as a functor. In particular, every such
-functor gives rise to a free monad. Thus, free monads provide a
-natural basis for implementing effect handlers (\citet{Swierstra2008b}
-provide an account of free monads for functional programmers).  Many
-of the library implementations of effect handlers include
-implementations based on free monads~\citep{Kammar2013, Kiselyov2013,
-  Kiselyov2015, Brady2013, Wu2014}.
-
-\citet{Kammar2013} provide an implementation of effect handlers using
-a continuation monad, which completely avoids materialising any data
-constructors. \citet{Wu2015} explain how it works, by taking advantage
-of Haskell's fusion optimisations. This approach does appear to depend
-rather critically on the handlers being deep rather than shallow, and
-in Haskell it relies on them being type classes, and hence not really
-first class.
-
-The Idris effects library by \cite{Brady2013} takes advantage of
-dependent types to provide effect handlers for a form of effects
-corresponding to parameterised monads~\citep{Atkey09}.
-%
-In the effects library, effects are represented as lists of types.
-
-We are aware of three languages that are specifically designed with
-effect handlers in mind.
-%
-\begin{itemize}
-\item The Eff language by \cite{Bauer2015} is a strict language with
-  Hindley-Milner type inference similar in spirit to ML, but extended
-  with effect handlers.
-%
-It includes a novel feature for supporting fresh generation of effects
-in order to support effects such as ML-style higher-order state (which
-has an operation for generating new references).
-%
-The original version of Eff~\citep{Bauer2015} does not include an
-effect type system. However, an effect type system has subsequently
-been experimented with~\citep{BauerP13, Pretnar2014}.
-%
-This effect type system is considerably more complicated than ours. It
-makes essential use of subtyping, includes a region system, and a form
-of effect polymorphism, which one might reasonably cast as a form of
-row polymorphism.
-
-\item Frank by \cite{McBride2014} takes the idea of effect handlers to
-  the extreme, having no primitive notion of function, only
-  handlers. In Frank a function is but a special case of a handler.
-  Frank is built on a bidirectional type system. It includes an effect
-  type system and a novel form of effect polymorphism in which the
-  programmer never needs to read or write any effect
-  variables. Frank's effect system can be viewed as implementing a
-  form of row polymorphism. Unlike Links, but much like
-  Koka by \cite{Leijen14}, Frank allows multiple occurrences of the same
-  label in a row. In contrast rows in Links are based on Remy's design
-  in which duplicates are not allowed, but negative information is.
-
-\item Shonky by \cite{McBride2016} amounts to a dynamically-typed variant
-  of Frank. Though it is not statically typed, handlers must be
-  annotated with the names of the effects that they handle. The
-  implementation of Shonky is quite similar to ours in that it uses a
-  generalisation of the CEK machine. The main differences are that
-  Shonky does not use an ANF representation, so has more forms of
-  continuation to handle, and in contrast to our nested continuation
-  structure, Shonky uses a completely flat structure.
-  % and where our continuations have a nested
-  % structure, Shonky uses a completely flat structure for
-  % continuations.
-\end{itemize}
-
-Although OCaml itself has no support for effect handlers, a
-development branch, Multicore OCaml~\cite{Dolan2015}, does. Multicore
-OCaml does not include an effect type system, and handlers are
-restricted so that continuations are affine, that is, they can be
-invoked at most once. This design admits a particularly efficient
-implementation, as continuations need never be copied, so they can
-simply be stored on the stack.
-
-\section{Parallel programming models}
-\todo{\cite{Marlow2013}}
-
-
-%%
 %% Background
 %%
 
@@ -665,25 +577,141 @@ inhabitants. Linear and exception handlers together constitute
 
 \subsection{Nominal typing}
 
-% \chapter{Background}
-% \section{The Links programming language}
-% \subsection{Concurrency model}
-% \subsection{Programming with handlers}
+%%
+%% Related work
+%%
+\chapter{Related work}
+\label{ch:related-work}
 
-% \section{Algebraic effects and handlers}
-% \subsection{Algebraic effects}
-% \subsection{Effect handlers}
+\section{Implementations of effect handlers}
+Any signature of abstract operations can be understood as a free
+algebra and represented as a functor. In particular, every such
+functor gives rise to a free monad. Thus, free monads provide a
+natural basis for implementing effect handlers (\citet{Swierstra2008b}
+provide an account of free monads for functional programmers).  Many
+of the library implementations of effect handlers include
+implementations based on free monads~\citep{Kammar2013, Kiselyov2013,
+  Kiselyov2015, Brady2013, Wu2014}.
 
+\citet{Kammar2013} provide an implementation of effect handlers using
+a continuation monad, which completely avoids materialising any data
+constructors. \citet{Wu2015} explain how it works, by taking advantage
+of Haskell's fusion optimisations. This approach does appear to depend
+rather critically on the handlers being deep rather than shallow, and
+in Haskell it relies on them being type classes, and hence not really
+first class.
+
+The Idris effects library by \cite{Brady2013} takes advantage of
+dependent types to provide effect handlers for a form of effects
+corresponding to parameterised monads~\citep{Atkey09}.
+%
+In the effects library, effects are represented as lists of types.
+
+We are aware of three languages that are specifically designed with
+effect handlers in mind.
+%
+\begin{itemize}
+\item The Eff language by \cite{Bauer2015} is a strict language with
+  Hindley-Milner type inference similar in spirit to ML, but extended
+  with effect handlers.
+%
+It includes a novel feature for supporting fresh generation of effects
+in order to support effects such as ML-style higher-order state (which
+has an operation for generating new references).
+%
+The original version of Eff~\citep{Bauer2015} does not include an
+effect type system. However, an effect type system has subsequently
+been experimented with~\citep{BauerP13, Pretnar2014}.
+%
+This effect type system is considerably more complicated than ours. It
+makes essential use of subtyping, includes a region system, and a form
+of effect polymorphism, which one might reasonably cast as a form of
+row polymorphism.
+
+\item Frank by \cite{McBride2014} takes the idea of effect handlers to
+  the extreme, having no primitive notion of function, only
+  handlers. In Frank a function is but a special case of a handler.
+  Frank is built on a bidirectional type system. It includes an effect
+  type system and a novel form of effect polymorphism in which the
+  programmer never needs to read or write any effect
+  variables. Frank's effect system can be viewed as implementing a
+  form of row polymorphism. Unlike Links, but much like
+  Koka by \cite{Leijen14}, Frank allows multiple occurrences of the same
+  label in a row. In contrast rows in Links are based on Remy's design
+  in which duplicates are not allowed, but negative information is.
+
+\item Shonky by \cite{McBride2016} amounts to a dynamically-typed variant
+  of Frank. Though it is not statically typed, handlers must be
+  annotated with the names of the effects that they handle. The
+  implementation of Shonky is quite similar to ours in that it uses a
+  generalisation of the CEK machine. The main differences are that
+  Shonky does not use an ANF representation, so has more forms of
+  continuation to handle, and in contrast to our nested continuation
+  structure, Shonky uses a completely flat structure.
+  % and where our continuations have a nested
+  % structure, Shonky uses a completely flat structure for
+  % continuations.
+\end{itemize}
+
+Although OCaml itself has no support for effect handlers, a
+development branch, Multicore OCaml~\cite{Dolan2015}, does. Multicore
+OCaml does not include an effect type system, and handlers are
+restricted so that continuations are affine, that is, they can be
+invoked at most once. This design admits a particularly efficient
+implementation, as continuations need never be copied, so they can
+simply be stored on the stack.
+
+\section{Parallel programming models}
+\todo{\cite{Marlow2013}}
 
 %%
 %% Concurrent programming with handlers
 %%
-\chapter{Concurrent programming with handlers}
+\chapter{Parallel programming with handlers}
+\label{ch:programming}
+
+\section{Pipeline parallelism}
+\label{sec:prime}
+
+\begin{figure}
+\tikzset{my ellipse/.style={
+        draw=black, 
+        ultra thick, 
+        ellipse, 
+        anchor=west,
+        minimum width=70pt,
+        minimum height=35pt
+        },
+}
+\tikzset{my arrow/.style={-latex,thick}}
+\tikzset{sarrow/.style={-latex,ultra thick,dotted}}
+
+\centering
+\begin{tikzpicture}[decoration=snake]
+
+\node(P0)[my ellipse] {$P_0$ (Generator)};
+
+\node(P1)[my ellipse,below=of P0,yshift=-20pt] {$P_1^2$};
+\node(P2)[my ellipse,right=of P1,xshift=85pt] {$P_2^3$};
+\node(P3)[my ellipse,below=of P2,yshift=-20pt] {$P_3^5$};
+\node(P4)[my ellipse,left=of P3,xshift=-85pt] {$P_4^7$};
+
+\draw[sarrow] (P0) to node[midway,right,align=center,yshift=2pt ] { $\{2,\dots,10\}$ } (P1);
+\draw[sarrow] (P1) to node[midway,above,align=center,yshift=2pt ] { $\{n \mid n \not\equiv 0 \; (\text{mod } 2) \}$ } (P2);
+\draw[sarrow] (P2) to node[midway,left,align=center ] { $\{n \mid n \not\equiv 0 \; (\text{mod } 3)\}$ } (P3);
+\draw[sarrow] (P3) to node[midway,below,align=center,yshift=-2pt ] { $\{n \mid n \not\equiv 0 \; (\text{mod } 5)\}$ } (P4);
+
+\end{tikzpicture}
+\caption{Sieve of Eratosthenes pipeline.}\label{fig:sieve}
+\end{figure}
 
 %%
 %% Compiling handlers
 %%
 \chapter{Compiling effect handlers}
+
+\section{Translating Links ANF into Lambda}
+\label{sec:translation}
 
 \begin{figure}
 \tikzset{my rectangle/.style={
@@ -693,24 +721,57 @@ inhabitants. Linear and exception handlers together constitute
         minimum width={width("OCaml frontend")+2pt}}
 }
 \centering
-\begin{tikzpicture}
+\begin{tikzpicture}[node distance=5pt,every node/.style={draw, minimum width=100pt, outer sep=0pt}]
 
-% Frontends
-\node [my rectangle] (OCaml frontend) at (0,0) {OCaml frontend};
-\node [my rectangle] (Links frontend) at (6,0) {Links frontend};
+  \node(A)          {OCaml frontend};
+  \node(B)[right=of A,xshift=40pt] {Links frontend};
 
-% OCaml backend
-\node [my rectangle,minimum width=270pt] (Lambda) at (3,-2) {Lambda};
-%\node[rectangle,draw=black,ultra thick,minimum height=+5.0cm,minimum width=+4.0cm,fit ={(Parser.north) (Typechecker.south)}] (Frontend) {};
+  \node(C)[inner sep=0pt,yshift=-50pt,fit={(A) (B)},label=center:Lambda] {};
+
+  \node[above=of C,draw=none,yshift=-2pt] {\footnotesize{\textit{\textbf{OCaml backend}}}};
+
+  \node(D)[yshift=-90pt]          {Byte code};
+  \node(E)[right=of D,xshift=40pt] {Flambda};
+
+  \node(G)[below=of E,yshift=-10pt] {Clambda};
+  \node(H)[below=of G,yshift=-10pt] {Native backends};
+
+  \node(F)[fit=(G)(H),inner sep=0,left=of G.north west,anchor=north east,xshift=-40pt]          {Custom backends};
+
+
+  \node(Z)[fit=(C)(H),inner sep=20pt] {};
+
+  \draw[->] (A.south) to ([xshift=50pt]C.north west);
+  \draw[->] (B.south) to ([xshift=-50pt]C.north east);
+
+  \draw[->] ([xshift=-72pt]C.south) to (D.north);
+
+  \draw[->] (D) to (F);
+
+  \draw[->] ([xshift=72pt]C.south) to (E.north);
+  \draw[->] (E) to (G);
+  \draw[->] (G) to (H);
+%  \node(C)[below=of B] {C};
+%  \node(D)[below=of C] {D};
+
+%  \node(Z)[fit=(A)(D),right=of A.north east,anchor=north west, inner sep=0] {Z};
+
+% % Frontends
+% \node [my rectangle] (OCaml frontend) at (0,0) {OCaml frontend};
+% \node [my rectangle] (Links frontend) at (6,0) {Links frontend};
+
+% % OCaml backend
+% \node [my rectangle,minimum width=270pt] (Lambda) at (3,-2) {Lambda};
+% %\node[rectangle,draw=black,ultra thick,minimum height=+5.0cm,minimum width=+4.0cm,fit ={(Parser.north) (Typechecker.south)}] (Frontend) {};
 \end{tikzpicture}
 \caption{OCaml backend}\label{fig:infra-diagram}
 \end{figure}
 
 We reuse most of the previous Links infrastructure. The Links frontend
 is type-checked and translated into a small, typed intermediate
-language in \emph{A-normal form} (ANF). The Links interpreter
-implements a generalised CEK machine \citep{Hillerstrom2016a}, which
-interprets ANF code.
+language in \emph{A-normal form} (ANF) \citep{Flanagan1993}. The Links
+interpreter implements a generalised CEK machine
+\citep{Hillerstrom2016a}, which interprets ANF code.
 
 %
 
@@ -812,8 +873,8 @@ value. By default we implement every handler as a multi-shot handler.
 \chapter{Experiments}
 \label{ch:experiments}
 
-\section{Experimental setup}
-\label{sec:exp-setup}
+\section{Methodology}
+\label{sec:methodology}
 
 %%
 %% Formalisation
@@ -1474,15 +1535,19 @@ effect $E$.
 %%
 \chapter{Conclusions and future work}
 \label{ch:conclusions}
+
+\section{Critical evaluation}
+\label{sec:criticaleval}
+
 \section{Future work}
 \label{sec:futurework}
 
 %%
 %% Appendices
 %%
-\appendix
-\chapter{Installing the Links compiler}
-\label{ch:install}
+% \appendix
+% \chapter{Installing the Links compiler}
+% \label{ch:install}
 
 %%%%%%%%
 %% Include your chapter files here. See the sample chapter file for the basic
