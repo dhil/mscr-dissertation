@@ -1,25 +1,30 @@
 {
-    "source": {
+    "wd": "/tmp/exps",
+    "project": {
         "git": {
             "branch": "effect-handlers-compilation",
             "url": "https://github.com/links-lang/links.git"
-        }
+        },
+        "directory": "$LINKS_SRC_DIR"
     },
     "compilers": [
         {
             "name": "linksc",
+            "interactive": false,
             "comment": "The Links compiler",
-            "exec": "links",
+            "exec": "$LINKS_SOURCE_DIR/links",
             "defaultFlags": "-c --native --verbose"
         },
         {
             "name": "linksi",
+            "interactive": true,
             "comment": "The Links interpreter",
-            "exec": "links",
+            "exec": "$LINKS_SOURCE_DIR/links",
             "defaultFlags": "--config=$LINKS_SOURCE_DIR/measure.config"
         },
         {
             "name": "ocamlopt",
+            "interactive": false,
             "comment": "The OCaml optimising compiler",
             "exec": "ocamlopt",
             "defaultFlags": "-dlambda -dclambda -dcmm"
