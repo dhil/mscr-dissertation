@@ -54,7 +54,8 @@ def read_contents(files):
     return contents
 
 def run(cmd, stdout= "/dev/stdout", stderr = "/dev/stderr"):
-    command = shlex.split(cmd)
+    #command = shlex.split(cmd)
+    command = cmd
     exit_code = -1
     with open(stdout, 'w') as out:
         out.write("## [STDOUT] {:s}\n".format(cmd))
@@ -86,17 +87,34 @@ def join_paths(d1, d2):
     return expandvars(os.path.join(d1, d2))
         
 # Log command
+def save_json(data, filename):
+    with open(filename, 'w') as f:
+        f.write(json.dumps(data, indent=2, sort_keys=False))
+    return ()
+
+
+def log_raw(stream, ctxt):
+    rawlog  = expandvars(ctxt['logs']['rawlog'])
+    with open(rawlog, 'a+') as raw:
+        for line in stream:
+            raw.write(line)
+        raw.flush()
+    return ()
+
+def log_entry(log, entry, log2):
+    return ()
+    
 def run_and_log(entryname, cmd, ctxt):
     print("[{:s}] {:s}".format(entryname, cmd))
     logs    = ctxt['logs']
-    rawlog  = expandvars(logs['rawlog'])
-    logname = join_paths(ctxt['wd'], entryname)
+    logname = join_paths(ctxt['settings']['wd'], entryname)
     log_stdout = "{:s}.stdout.log".format(logname)
     log_stderr = "{:s}.stderr.log".format(logname)
     exit_code, [stdout, stderr] = run(cmd, stdout = log_stdout, stderr=log_stderr)
     logs['log'].append({'entry': entryname, 'exitCode': exit_code, 'stdout': stdout, 'stderr': stderr})
-
-    merge_logs([log_stdout, log_stderr], rawlog)
+   
+    log_raw(stdout, ctxt)
+    log_raw(stderr, ctxt)
     
     quiet_rm(log_stdout)
     quiet_rm(log_stderr)
@@ -112,6 +130,38 @@ def run_pipeline(steps, seed):
     return value
 
 
+## Env info
+def dump_date(ctxt):
+    cmd = "date +'%Y-%m-%d %H:%M:%S %Z%z [%A, %B]'"
+    run_and_log("date", cmd, ctxt)
+    return ctxt
+
+def dump_printenv(ctxt):
+    cmd = "printenv"
+    run_and_log("printenv", cmd, ctxt)
+    return ctxt
+
+def dump_hostname(ctxt):
+    cmd = "cat /etc/hostname"
+    run_and_log("hostname", cmd, ctxt)
+    return ctxt
+
+def dump_uname(ctxt):
+    cmd = "uname -a"
+    run_and_log("uname", cmd, ctxt)
+    return ctxt
+
+def dump_who(ctxt):
+    cmd = "who -a"
+    run_and_log("who", cmd, ctxt)
+    return ctxt
+
+dump_env = [ dump_date,
+             dump_who,
+             dump_hostname,
+             dump_uname,
+             dump_printenv ]
+
 ## Checkout and build Links
 # def git_clone_project(ctxt):
 #     git = ctxt['settings']['project']['git']
@@ -124,25 +174,20 @@ def run_pipeline(steps, seed):
 def git_pull(ctxt):
     git = ctxt['settings']['project']['git']
     branch  = git['branch']
-    cmd = "\"git pull origin {:s}\"".format(branch)
+    cmd = "git pull origin {:s}".format(branch)
     run_and_log("pull", cmd, ctxt)
     return ctxt
 
 def dump_most_recent_git_commit(ctxt):
-    cmd = "\"git log -n1\""
+    cmd = "git log -n1"
     run_and_log("commitId", cmd, ctxt)
     return ctxt
 
 def dump_opam(ctxt):
-    cmd = "\"opam list\""
+    cmd = "opam list"
     run_and_log("packages", cmd, ctxt)
-    cmd = "\"opam switch\""
+    cmd = "opam switch"
     run_and_log("switch", cmd, ctxt)
-    return ctxt
-
-def dump_date(ctxt):
-    cmd = "date +'%Y-%m-%d %H:%M:%S %Z%z [%A, %B]'"
-    run_and_log("date", cmd, ctxt)
     return ctxt
 
 def build_project(ctxt):
@@ -151,11 +196,13 @@ def build_project(ctxt):
     return ctxt
 
 def setup_links(settings):
-    rawlog = join_paths("/tmp/exps", "setup.log")
-    ctxt = {'wd': '/tmp/exps', 'settings': settings, 'logs': { 'rawlog': rawlog, 'log': [] } }
+    wd = settings['wd']
+    rawlog = join_paths(wd, "setup.log")
+    jsonlog = join_paths(wd, "setup.json")
+    ctxt = {'settings': settings, 'logs': { 'rawlog': rawlog, 'log': [] } }
 
     cwd = os.getcwd()
-    print(expandvars(settings['project']['directory']))
+    #print(expandvars(settings['project']['directory']))
     os.chdir(expandvars(settings['project']['directory']))
 
     build_links = [ dump_date,
@@ -164,20 +211,16 @@ def setup_links(settings):
                     dump_opam,
                     build_project ]                    
                     
-    run_pipeline(build_links, ctxt)
+    ctxt = run_pipeline(dump_env + build_links, ctxt)
     os.chdir(cwd)
-    print(str(ctxt))
+    
+    # Dump json log
+    save_json(ctxt, jsonlog)
+    
     return ctxt
 
-
-setup_links(settings)
-
-def make_context(settings):
-    mySettings = settings.copy()
-    mySettings.update({'useCompilers': [0, 1, 2]})
-    return mySettings
-
-def select_experiments(settings):
+def select_experiments(ctxt):
+    settings = ctxt['settings']
     settings.update({'useCompilers': [0, 1, 2]})
     exps = []
     for (compId, val) in enumerate(settings['useCompilers']):
@@ -186,50 +229,74 @@ def select_experiments(settings):
             for prog in exp['programs']:
                 if (any(comp['id'] == compId for comp in prog['compilers'])):
                     filename = expandvars(os.path.join(exp['directory'], prog['filename']))
-                    compExps.append({'filename': prog['filename'], 'source': filename, 'checksum': prog['checksum']})
+                    compExps.append({'filename': prog['filename'], 'source': expandvars(filename), 'checksum': prog['checksum']})
         exps.append({'id': compId, 'programs': compExps})
-    print(exps)
-    exit(1)
-    ctxt = {'settings': settings, 'experiments': exps}
+    ctxt.update({'experiments': exps})
     return ctxt
 
-def prepare_experiment(ctxt):
+def prepare_compiler_experiment(programs, compiler, settings):
+    progs = []
+    for prog in programs:
+        name = "{:s}-{:s}".format(prog['filename'], compiler['name'])
+        target = "{:s}.out".format(join_paths(settings['wd'], prog['filename']))
+        build = "{:s} {:s} {:s} -o {:s}".format(expandvars(compiler['exec']), expandvars(compiler['defaultFlags']), prog['source'], target)
+        run    = target
+        progs.append({'name': name, 'build': build, 'run': run, 'interactive': False, 'checksum': prog['checksum']})
+    return progs
+
+def prepare_interpreter_experiment(programs, interpreter, settings):
+    progs = []
+    for prog in programs:
+        name = "{:s}-{:s}".format(prog['filename'], interpreter['name'])
+        run = "{:s} {:s} {:s}".format(expandvars(interpreter['exec']), expandvars(interpreter['defaultFlags']), prog['source'])
+        progs.append({'name': name, 'run': run, 'interactive': True, 'checksum': prog['checksum']})
+    return progs
+
+def prepare_builds(ctxt):
     compilers = ctxt['settings']['compilers']
     exps      = ctxt['experiments']
+    progs = []
     for exp in exps:
         compId = exp['id']
         compiler = compilers[compId]
         if compiler['interactive']:
-            build = "true" # Noop
-            run = "{:s} {:s} {:s}".format(expandvars(compiler['exec']), expandvars(compiler['defaultFlags']), exp['source'])
+            progs = progs + prepare_interpreter_experiment(exp['programs'], compiler, ctxt['settings'])
         else:
-            target = exp['filename'] + ".out"
-            build = "{:s} {:s} {:s} -o {:s}".format(expandvars(compiler['exec']), expandvars(compiler['defaultFlags']), exp['source'], )
+            progs = progs + prepare_compiler_experiment(exp['programs'], compiler, ctxt['settings'])
+    ctxt.update({'experiments': progs})
+    return ctxt
 
+def prepare_experiments(settings):
+    prepare = [ select_experiments,
+                prepare_builds ]
+    rawlog = join_paths(settings['wd'], "prepare.log")
+    jsonlog = join_paths(settings['wd'], "prepare.json")
+    ctxt = {'settings': settings.copy(), 'logs': { 'rawlog': rawlog, 'log': [] } }
+    ctxt = run_pipeline(dump_env + prepare, ctxt)
+    # Dump JSON
+    save_json(ctxt, jsonlog)
+    return ctxt
+
+## Running experiments
+def run_experiment(ctxt):
+    settings = ctxt['settings']
+    exp = ctxt['experiment']    
+    run_pipeline(dump_env, ctxt)
+    # build
+    run_and_log("build", exp['build'], ctxt)
+    # Run X times
+    prog = exp['run']
+    n = settings['repetitions']
+    return ctxt
 
 def run_experiments(ctxt):
+    settings = ctxt['settings']
+    exps = ctxt['experiments']
+    for exp in exps:
+        expContext = {'settings': settings.copy(), 'experiment': exp}
+        run_experiment(expContext)
     return ctxt
 
-def dump_printenv(ctxt):
-    cmd = "printenv"
-    dump_command(cmd, ctxt)
-    return ctxt
-
-def dump_hostname(ctxt):
-    cmd = "cat /etc/hostname"
-    dump_command(cmd, ctxt)
-    return ctxt
-
-def dump_uname(ctxt):
-    cmd = "uname -a"
-    dump_command(cmd, ctxt)
-    return ctxt
-
-def dump_who(ctxt):
-    cmd = "who -a"
-    dump_command(cmd, ctxt)
-    return ctxt
-       
 # methodology = [
 #     make_experiment_config,
 #     dump_date,
@@ -244,3 +311,15 @@ def dump_who(ctxt):
 #  ]
 
 # run_pipeline(methodology, settings)
+
+wd = settings['wd']
+for _, dirnames, _ in os.walk(wd):
+    wd = join_paths(wd, str(len(dirnames)+1))
+    os.makedirs(wd)
+    break
+settings.update({'wd': wd})
+
+setup_links(settings.copy())
+ctxt = prepare_experiments(settings.copy())
+#run_experiments(ctxt)
+
