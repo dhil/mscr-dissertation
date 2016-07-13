@@ -1,13 +1,13 @@
 #!/bin/bash
 
-WD="/tmp/exps"
+WD="$HOME/projects/links/benchmark-results"
 LOGFILENAME="experiments.log"
 LINKS_SRC_DIR="$HOME/projects/links/compiler"
 LINKS_EXPDIR="$LINKS_SRC_DIR/benchmarks"
 LINKS="$LINKS_SRC_DIR/links"
 CONFIG="$LINKS_SRC_DIR/measure.config"
 TIME="$HOME/.local/bin/time --verbose"
-REPETITIONS=5
+REPETITIONS=10
 export LINKS_LIB="$HOME/projects/links/compiler/lib"
 
 function log()
@@ -45,6 +45,7 @@ dump_env
 cwd=$(pwd)
 cd "$LINKS_SRC_DIR"
 run_and_log "git pull origin effect-handlers-compilation" $LOGFILE
+run_and_log "git log -n 1" $LOGFILE
 run_and_log "make nc" $LOGFILE
 cd "$cwd"
 
