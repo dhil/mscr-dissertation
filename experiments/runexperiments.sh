@@ -15,6 +15,7 @@ function log()
     TXT="$1"
     LOGFILE="$2"
     echo "## $TXT" >> $LOGFILE 2>&1
+    echo "## $TXT"
 }
 
 function dump_env()
