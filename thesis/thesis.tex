@@ -24,7 +24,7 @@
 \usepackage{tikz}
 \usetikzlibrary{fit,calc,trees,positioning,arrows,chains,shapes.geometric,%
     decorations.pathreplacing,decorations.pathmorphing,shapes,%
-    matrix,shapes.symbols}
+    matrix,shapes.symbols,intersections}
 
 % % Drawing
 % \usepackage{tikz}
@@ -34,6 +34,8 @@
 % \usetikzlibrary{shapes}
 
 \usepackage{pgf-umlsd}
+\usepackage{pgfplots}
+\usepgfplotslibrary{fillbetween}
 
 % Bibliography
 \usepackage{natbib}
@@ -250,6 +252,7 @@
 
 %% Information about the title, etc.
 \title{Compilation of Effect Handlers and their Applications in Parallelism}
+%\title{Compiling Effect Handlers}
 \author{Daniel Hillerström}
 
 %% If the year of submission is not the current year, uncomment this line and 
@@ -732,13 +735,13 @@ simply be stored on the stack.
 \draw[sarrow] (P3) to node[midway,below,align=center,yshift=-2pt ] { $\{n \mid n \not\equiv 0 \; (\text{mod } 5)\}$ } (P4);
 
 \end{tikzpicture}
-\caption{Sieve of Eratosthenes pipeline.}\label{fig:sieve}
+\caption{Conceptual representation of Sieve of Eratosthenes.}\label{fig:sieve}
 \end{figure}
 
-\section{Irregular parallelism}
+\section{Unbalanced parallelism}
 \begin{figure}
 \centering
-\begin{lstlisting}[style={},basicstyle=\ttfamily\tiny,breaklines=false,emph={\#},emphstyle={\color{red}}]
+\begin{lstlisting}[style={},basicstyle=\ttfamily\tiny,breaklines=false,morekeywords={\#},keywordstyle={\color{blue}}]
 ....................................................................................................
 ....................................................................................................
 .................................................................##.................................
@@ -816,6 +819,54 @@ simply be stored on the stack.
 ....................................................................................................
 \end{lstlisting}
 \caption{Mandelbrot set.}\label{fig:mandelbrot}
+\end{figure}
+
+\begin{figure}[t!]
+\begin{subfigure}[t]{0.5\textwidth}
+\centering
+\begin{tikzpicture}
+  \begin{axis}[ 
+    xlabel=$x$,
+    ylabel={$f(x) = \cosh^4(x)$},
+    ylabel near ticks,
+    enlargelimits=0.1,
+    xmin=-5,xmax=5
+  ] 
+    \addplot[name path=f,domain=-5:5] {cosh(x) * cosh(x) * cosh(x) * cosh(x)}; 
+  \end{axis}
+\end{tikzpicture}
+\caption{Plot of $f(x) = \cosh^4(x)$.}
+\end{subfigure}
+\hspace{1.0cm}
+\begin{subfigure}[t]{0.5\textwidth}
+\centering
+\begin{tikzpicture}
+  \begin{axis}[ 
+    xlabel=$x$,
+    ylabel={$f(x) = \cosh^4(x)$},
+    ylabel near ticks,
+    enlargelimits=0.1
+  ] 
+    \addplot[name path=f,domain=0:5] {cosh(x) * cosh(x) * cosh(x) * cosh(x)}; 
+
+    \path[name path=axis] (axis cs:0,0) -- (axis cs:5,0);
+
+    \addplot [
+        thick,
+        color=blue,
+        fill=blue, 
+        fill opacity=0.08
+    ]
+    fill between[
+        of=f and axis,
+        soft clip={domain=0:5},
+    ];
+  \end{axis}
+\end{tikzpicture}
+\caption{The integral $\displaystyle\int_0^5 \cosh^4(x)\,  \mathop{\mathrm{d}x}$.}
+\label{fig:integral}
+\end{subfigure}
+\caption{}\label{fig:quad}
 \end{figure}
 
 %%
@@ -1651,6 +1702,12 @@ effect $E$.
 
 \section{Critical evaluation}
 \label{sec:criticaleval}
+
+\section{Compiling effect handlers}
+\label{sec:conclude-compiling}
+
+\section{Effect handler enabled concurrency}
+\label{sec:conclude-concurrency}
 
 \section{Future work}
 \label{sec:futurework}
