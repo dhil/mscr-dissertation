@@ -1,11 +1,12 @@
 # This a comment
-file = "2/experiments.log-compiler.transposed.csv"
+file = "4/experiments.log-compiler.transposed.csv"
 # file = "2/experiments.log-interpreter.transposed.csv"
 # Read data
 dat = read.csv(paste("/home/dhil/projects/mscr-dissertation/experiments/results", file, sep="/"), header = TRUE)
 
 # Consider the following columns
-cols = list("state.links.out", "monadicstate.links.out", "purestate.links.out")
+#cols = list("state.links.out", "monadicstate.links.out", "purestate.links.out")
+cols = list("state.links", "monadicstate.links", "purestate.links")
 
 for (i in 1:length(cols)) {
   dataset = cols[[i]]
