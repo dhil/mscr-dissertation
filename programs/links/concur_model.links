@@ -1,0 +1,139 @@
+# An attempt at encoding the concurrency model of Links using effect
+# handlers.
+#
+# Ideally, the implementation should meet the following criteria:
+#
+# 1. Messages can only be sent to existing processes
+# 2. Process types carry effect information, e.g. Process({Foo:(Bar) {}-> Baz |e})
+# 3. Mailboxes are heterogeneous
+#
+
+# typename Option(a) = [|None
+#                       |Some:a
+#                       |];
+
+# typename Priority  = [|Low
+#                       |Medium
+#                       |High
+#                       |];
+
+# Generic execution unit type (process or thread)
+typename ExecutionUnit(id::Type,inp::Type,e::Row,out::Type) =
+         (id:id, comp:(inp) -e-> out);
+
+typename Pid = String;
+typename PackedProcess(e::Row,y::Type) = forall p :: Row . (ExecutionUnit(Pid,(),{ |e},())) -p-> y;
+typename EProcess(e::Row) = forall y, p :: Row . (PackedProcess({ |e}, y)) -p-> y;
+
+sig makeExecutionUnit : ((a) -e-> b, id) -> ExecutionUnit(id, a, { |e}, b)
+fun makeExecutionUnit(f, id) {
+    (id=id, comp=f)
+}
+
+sig makeProcess : (() -e-> (), Pid) -> EProcess({ |e})
+fun makeProcess(f, pid) {
+    var eu = makeExecutionUnit(fun(_) { f() }, pid);
+    fun( p : PackedProcess({ |e}, y) ) {
+       p(eu)
+    }
+}
+
+sig getPid : (EProcess({ |e})) -> Pid
+fun getPid(proc) {
+    #var packedFun = (fun(proc) { proc.id } : PackedProcess({ |e}, Pid) );
+    var packedFun = fun(proc) { proc.id };
+    proc(packedFun)
+}
+
+
+# Process creation
+sig pspawn : (() -e-> ()) {Spawn:(() -e-> ()) {}-> EProcess({ |e}) |_}-> EProcess({ |e})
+fun pspawn(f) {
+    do Spawn(f)
+}
+
+# Process suspension
+sig yield : () {Yield:() |_}-> ()
+fun yield() { do Yield }
+
+# Process queue
+typename Queue(a::Type) = ([a],[a]);
+
+sig emptyQueue : () -> Queue(a)
+fun emptyQueue() { ([], []) }
+
+sig isEmptyQueue : (Queue(a)) -> Bool
+fun isEmptyQueue(q) {
+    switch(q) {
+      case ([],[])   -> true
+      case otherwise -> false
+    }
+}
+
+sig enqueue : (Queue(a), a) -> Queue(a)
+fun enqueue((xs,ys), y) { (xs, y::ys) }
+
+sig dequeue : (Queue(a)) ~> (a, Queue(a))
+fun dequeue(q) {
+    switch (q) {
+      case (x :: xs, ys) -> (x, (xs, ys))
+      case ([], ys)      -> dequeue((ys,[]))
+    }
+}
+
+## TODO: Implement the queue as a handler
+
+# State handler
+sig evalState : (s) -> (Comp({Get:s,Put:(s) {}-> () |e}, a)) -> Comp({Get{_},Put{_} |e}, a)
+handler evalState(s) {
+  case Get(k)    -> k(s)(s)
+  case Put(s,k)  -> k(())(s)
+  case Return(x) -> x
+}
+
+sig get : () {Get:s|_}-> s
+fun get() {do Get}
+
+sig put : (s) {Put:(s) {}-> ()|_}-> ()
+fun put(s) {do Put(s)}
+
+# Process scheduler
+fun enqueueProcess(f) {
+  var q = enqueue(get(), f);
+  put(q)
+}
+
+fun dequeueProcess() {
+   var q = get();
+   if (isEmptyQueue(q)) { fun() { () } }
+   else {
+      var (p, q) = dequeue(q);
+      put(q);
+      p
+   }
+}
+
+handler process(parent, num) {
+  case Spawn(f,k) ->
+       var childPid = getPid(parent) ^^ "." ^^ intToString(num+1);
+       var proc = makeProcess(f, childPid);
+       enqueueProcess(fun() { k(proc)(parent, num+1) });
+       process(proc, 0)(f)()
+  case Yield(k)   ->
+       enqueueProcess(fun() { k(())(parent, num) });
+       dequeueProcess()()
+  case MyPid(k) -> k(getPid(parent))(parent, num)
+  case Return(_)  ->
+       dequeueProcess()()
+}
+
+fun hello() {
+    var sayHello = fun() { yield(); print("Hello from a subprocess " ^^ (do MyPid)) };
+    var sayHello2 = fun() {
+       print("Spawning " ^^ (do MyPid));
+       var _ = pspawn(sayHello);
+       print("I just spawned one! " ^^ (do MyPid));
+    };
+    var _ = map(pspawn, [sayHello, sayHello2, sayHello, sayHello]);
+    ()
+}
