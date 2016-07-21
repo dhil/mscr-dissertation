@@ -45,6 +45,11 @@ fun getPid(proc) {
     proc(packedFun)
 }
 
+sig makeChildPid : (EProcess({ |e}), Int) -> Pid
+fun makeChildPid(parent, childNumber) {
+    getPid(parent) ^^ "." ^^ intToString(childNumber)
+}
+
 
 # Process creation
 sig pspawn : (() -e-> ()) {Spawn:(() -e-> ()) {}-> EProcess({ |e}) |_}-> EProcess({ |e})
@@ -113,16 +118,16 @@ fun dequeueProcess() {
    }
 }
 
-handler process(parent, num) {
+handler process(parent, numChildren) {
   case Spawn(f,k) ->
-       var childPid = getPid(parent) ^^ "." ^^ intToString(num+1);
-       var proc = makeProcess(f, childPid);
-       enqueueProcess(fun() { k(proc)(parent, num+1) });
-       process(proc, 0)(f)()
+       var childPid = makeChildPid(parent, numChildren+1);
+       var child = makeProcess(f, childPid);
+       enqueueProcess(fun() { k(child)(parent, numChildren+1) });
+       process(child, 0)(f)()
   case Yield(k)   ->
-       enqueueProcess(fun() { k(())(parent, num) });
+       enqueueProcess(fun() { k(())(parent, numChildren) });
        dequeueProcess()()
-  case MyPid(k) -> k(getPid(parent))(parent, num)
+  case MyPid(k) -> k(getPid(parent))(parent, numChildren)
   case Return(_)  ->
        dequeueProcess()()
 }
@@ -130,10 +135,29 @@ handler process(parent, num) {
 fun hello() {
     var sayHello = fun() { yield(); print("Hello from a subprocess " ^^ (do MyPid)) };
     var sayHello2 = fun() {
-       print("Spawning " ^^ (do MyPid));
+       sayHello();
        var _ = pspawn(sayHello);
-       print("I just spawned one! " ^^ (do MyPid));
+       ()
     };
     var _ = map(pspawn, [sayHello, sayHello2, sayHello, sayHello]);
     ()
+}
+
+# Communication
+sig psend : (EProcess({ |e}), a) {Send:(Pid, a) {}-> (),Yield:()|_}-> ()
+fun psend(proc, msg) { do Send(getPid(proc), msg); yield() }
+
+op proc $! msg { psend(proc, msg) }
+
+sig precv : () {Recv:(Pid) {}-> Maybe(a),MyPid:Pid,Yield:()|_}~> a
+fun precv() {
+    fun loop(mypid : Pid) {
+       var msg = do Recv(mypid);
+       switch (msg : Maybe(a)) {
+         case Nothing   -> yield(); loop(mypid)
+	 case Just(msg) -> msg
+       }
+    }
+    var mypid = do MyPid;
+    loop(mypid)
 }
