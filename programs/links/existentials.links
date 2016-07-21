@@ -1,0 +1,38 @@
+# Encoding of existentials using first-class polymorphism
+typename MyPackage(t::Type) =
+         ( add : (t,t) {}~> t
+         , fromInt : (Int) {}~> t
+         , toString : (t) {}~> String);
+
+typename Packed(y::Type) = (unpacked : forall t . (MyPackage(t)) {}~> y);
+
+typename ClosedPackage(y::Type) = (Packed(y)) {}~> y;
+
+typename ReallyClosedPackage = forall y . (Packed(y)) {}~> y;
+
+sig intPackage : MyPackage(Int)
+var intPackage = (add = (+), fromInt = id, toString = intToString);
+
+sig closedIntPackage : ReallyClosedPackage
+var closedIntPackage = fun(p : Packed(y)) { p.unpacked(intPackage) };
+
+sig stringPackage : MyPackage(String)
+var stringPackage = (add = (^^), fromInt = intToString, toString = id);
+
+sig closedStringPackage : ReallyClosedPackage
+var closedStringPackage = fun(p : Packed(y)) { p.unpacked(stringPackage) };
+
+var packages = [closedIntPackage, closedStringPackage];
+
+sig doubledIntString : (MyPackage(a)) -> (Int) {}~> String
+fun doubledIntString(p)(x) {
+    var y = p.fromInt(x);
+    p.toString(p.add(y,y))
+}
+
+sig packedDoubledIntString : Packed((Int) {}~> String)
+var packedDoubledIntString = (unpacked = doubledIntString);
+
+fun applyToPackages(packedFun, i) { map(fun(p) { p(packedFun)(i) }, packages) }
+
+var vs = applyToPackages(packedDoubledIntString,3);
