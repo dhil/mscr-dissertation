@@ -22,6 +22,8 @@ typename ExecutionUnit(id::Type,inp::Type,e::Row,out::Type) =
          (id:id, comp:(inp) -e-> out);
 
 typename Pid = String;
+var pidToString = id;
+
 typename PackedProcess(e::Row,y::Type) = forall p :: Row . (ExecutionUnit(Pid,(),{ |e},())) -p-> y;
 typename EProcess(e::Row) = forall y, p :: Row . (PackedProcess({ |e}, y)) -p-> y;
 
@@ -44,6 +46,9 @@ fun getPid(proc) {
     var packedFun = fun(proc) { proc.id };
     proc(packedFun)
 }
+
+sig myPid : () {MyPid:Pid|_}-> Pid
+fun myPid() {do MyPid}
 
 sig makeChildPid : (EProcess({ |e}), Int) -> Pid
 fun makeChildPid(parent, childNumber) {
@@ -132,16 +137,24 @@ handler process(parent, numChildren) {
        dequeueProcess()()
 }
 
-fun hello() {
-    var sayHello = fun() { yield(); print("Hello from a subprocess " ^^ (do MyPid)) };
-    var sayHello2 = fun() {
-       sayHello();
-       var _ = pspawn(sayHello);
-       ()
-    };
-    var _ = map(pspawn, [sayHello, sayHello2, sayHello, sayHello]);
-    ()
+fun hello(depth)() {
+    if (depth == 0) { () }
+    else {
+         print("Hello from process #" ^^ pidToString(myPid()));
+         var _ = pspawn(hello(depth-1));
+         #yield();
+         var _ = pspawn(hello(depth-1));
+         ()
+    }
 }
+
+# Example
+op h -<- g { fun(m) { h(g(m)) } }
+op h -< m  { h(m) }
+
+fun run(m) { m() }
+
+var dummy = run -<- evalState(emptyQueue()) -<- process(makeProcess(fun() { () }, "0"), 0) -< hello(4);
 
 # Communication
 sig psend : (EProcess({ |e}), a) {Send:(Pid, a) {}-> (),Yield:()|_}-> ()
@@ -150,14 +163,156 @@ fun psend(proc, msg) { do Send(getPid(proc), msg); yield() }
 op proc $! msg { psend(proc, msg) }
 
 sig precv : () {Recv:(Pid) {}-> Maybe(a),MyPid:Pid,Yield:()|_}~> a
-fun precv() {
+fun precv() {    
     fun loop(mypid : Pid) {
        var msg = do Recv(mypid);
+       yield();
        switch (msg : Maybe(a)) {
-         case Nothing   -> yield(); loop(mypid)
+         case Nothing   -> loop(mypid)
 	 case Just(msg) -> msg
        }
     }
-    var mypid = do MyPid;
-    loop(mypid)
+    loop(myPid())
+}
+
+typename Ordering = [|GT
+                     |EQ
+                     |LT
+                     |];
+
+typename Comparer(a::Type,e::Row) = (a,a) ~e~> Ordering;
+
+typename Colour = [|Red|Black|BlackBlack|];
+
+typename RedBlackSet(a::Type) = [|Empty
+                                 |EmptyEmpty
+                                 |Node:(Colour,RedBlackSet(a),a,RedBlackSet(a))
+                                 |];
+
+sig rbEmpty : () -> RedBlackSet(a)
+fun rbEmpty() { Empty }
+
+sig rbMember : (a, RedBlackSet(a), (a,a) ~e~> Ordering) ~e~> Bool
+fun rbMember(x, rb, cmp) {
+    switch (rb) {
+      case Empty -> false
+      case Node(_,l,y,r) ->
+         switch (cmp(x,y)) {
+           case LT -> rbMember(x, l, cmp)
+           case EQ -> true
+           case GT -> rbMember(x, r, cmp)
+         }
+      case _ -> error("Impossible case rbMember")
+    }
+}
+
+sig rbBalance : ((Colour, RedBlackSet(a), a, RedBlackSet(a))) -> RedBlackSet(%b)
+fun rbBalance(node) {
+    switch (node) {
+      case (Black, Node(Red, Node(Red, a, x, b), y, c), z, d) -> Node(Red, Node(Black, a, x, b), y, Node(Black, c, z, d))
+      case (Black, Node(Red, a, x, Node(Red, b, y, c)), z, d) -> Node(Red, Node(Black, a, x, b), y, Node(Black, c, z, d))
+      case (Black, a, x, Node(Red, Node(Red, b, y, c), z, d)) -> Node(Red, Node(Black, a, x, b), y, Node(Black, c, z, d))
+      case (Black, a, x, Node(Red, b, y, Node(Red, c, z, d))) -> Node(Red, Node(Black, a, x, b), y, Node(Black, c, z, d))
+      case (BlackBlack, a, x, Node(Red, Node(Red, b, y, c), z, d)) -> Node(Black, Node(Black, a, x, b), y, Node(Black, c, z, d))
+      case (BlackBlack, Node(Red, a, x, Node(Red, b, y, c)), z, d) -> Node(Black, Node(Black, a, x, b), y, Node(Black, c, z, d))
+      case body                                               -> Node(body)
+    }
+}
+
+sig rbInsert : (a, RedBlackSet(a), (a,a) ~e~> Ordering) ~e~> RedBlackSet(a)
+fun rbInsert(x, rb, cmp) {
+   fun ins(rb) {
+     switch (rb) {
+       case Empty -> Node(Red, Empty, x, Empty)
+       case (Node(colour, a, y, b) as rb) ->
+          switch (cmp(x, y)) {
+             case LT -> rbBalance((colour, ins(a), y, b))
+             case EQ -> rb
+             case GT -> rbBalance((colour, a, y, ins(b)))
+          }
+       case _     -> error("Impossible case rbInsert")
+     }
+   }
+   switch (ins(rb)) {
+     case Node(_, a, y, b) -> Node(Black, a, y, b)
+     case _                -> error("Impossible case ins")
+   }
+}
+
+fun rbRotate(colour, left, x, right) {
+  switch ((colour, left, x, right)) {
+     case (Red, Node(BlackBlack, a, x, b), y, Node(Black, c, z, d)) -> rbBalance((Black, Node(Red, Node(Black, a, x, b), y, c), z, d))
+     case (Red, EmptyEmpty, y, Node(Black, c, z, d)) -> rbBalance((Black, Node(Red, Empty, y, c), z, d))
+     case (Red, Node(Black, a, x, b), y, Node(BlackBlack, c, z, d)) -> rbBalance((Black, a, x, Node(Red, b, y, Node(Black, c, z, d))))
+     case (Red, Node(BlackBlack, a, x, b), y, Node(Black, c, z, d)) -> rbBalance((BlackBlack, Node(Red, Node(Black, a, x, b), y, c), z, d))
+     case (Black, Node(BlackBlack, a, x ,b), y, Node(Black, c, z, d)) -> rbBalance((BlackBlack, Node(Red, Node(Black, a, x, b), y, c), z, d))
+     case (Black, EmptyEmpty, y, Node(Black, c, z, d)) -> rbBalance((BlackBlack, Node(Red, Empty, y, c), z, d))
+     case (Black, Node(Black, a, x, b), y, Node(BlackBlack, c, z, d)) -> rbBalance((BlackBlack, a, x, Node(Red, b, y, Node(Black, c, z, d))))
+     case (Black, Node(Black, a, x, b), y, EmptyEmpty) -> rbBalance((BlackBlack, a, x, Node(Red, b, y, Empty)))
+     case (Black, Node(BlackBlack, a, w, b), x, Node(Red, Node(Black, c, y, d), z, e)) ->
+       Node(Black, rbBalance((Black, Node(Red, Node(Black, a, w, b), x, c), y, d)), z, e)
+     case (Black, EmptyEmpty, x, Node(Red, Node(Black, c, y, d), z, e)) -> Node(Black, rbBalance((Black, Node(Red, Empty, x, c), y, d)), z, e)
+     case (Black, Node(Red, a, w, Node(Black, b, x, c)), y, EmptyEmpty) -> Node(Black, a, w, rbBalance((Black, b, x, Node(Red, c, y, Empty))))
+     case (colour, a, x, b) -> Node(colour, a, x, b)
+  }
+}
+
+fun rbDelete(x, rb, cmp) {
+
+   fun min_del(rb) {
+      switch(rb : RedBlackSet(a)) {
+        case Node(Red, Empty, x, Empty)   -> (x, Empty)
+        case Node(Black, Empty, x, Empty) -> (x, EmptyEmpty)
+        case Node(Black, Empty, x, Node(Red, Empty, y, Empty)) -> (x, Node(Black, Empty, y, Empty))
+        case Node(c, a, x, b) ->
+           var (y, d) = min_del(a);
+           (y, rbRotate(c, d, x, b))
+        case _ -> error("Impossible case min_del")
+      }
+   }
+   
+   fun del(rb) {
+      switch(rb : RedBlackSet(a)) {
+        case Empty -> Empty
+        case Node(Red, Empty, y, Empty) ->
+           switch(cmp(x, y)) {
+              case EQ        -> Empty
+              case otherwise -> Node(Red, Empty, y, Empty)
+           }
+        case Node(Black, Empty, y, Empty) ->
+           switch(cmp(x, y)) {
+              case EQ         -> EmptyEmpty
+              case otherwise  -> Node(Black, Empty, y, Empty)
+           }
+        case Node(Black, Node(Red, Empty, y, Empty), z, Empty) ->
+           switch(cmp(x, z)) {
+              case LT -> Node(Black, del(Node(Red, Empty, y, Empty)), z, Empty)
+              case EQ -> Node(Black, Empty, y, Empty)
+              case GT -> Node(Black, Node(Red, Empty, y, Empty), z, Empty)
+           }
+        case Node(c, a, y, b) ->
+           switch(cmp(x, y)) {
+              case LT -> rbRotate(c, del(a), y, b)
+              case EQ ->
+                var (z,d) = min_del(b);
+                rbRotate(c, a, z, d)
+              case GT -> rbRotate(c, a, y, del(b))
+           }
+        case _ -> error("Impossible case del")
+      }
+   }
+   fun redden(rb) {
+      switch(rb : RedBlackSet(a)) {
+         case Node(Black, Node(Black, a, x ,b), y, Node(Black, c, z, d)) -> Node(Red, Node(Black, a, x ,b), y, Node(Black, c, z, d))
+         case t -> t
+      }
+   }
+   del(redden(rb))   
+}
+
+sig rbReplace : (a, a, RedBlackSet(a), Comparer(a, { |e})) ~e~> RedBlackSet(a)
+fun rbReplace(x, y, rb, cmp) {
+    # delete x
+    # insert y
+    error("Not yet implemented.")
 }
