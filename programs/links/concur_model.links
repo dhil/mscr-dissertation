@@ -21,11 +21,24 @@
 typename ExecutionUnit(id::Type,inp::Type,e::Row,out::Type) =
          (id:id, comp:(inp) -e-> out);
 
-typename Pid = String;
-var pidToString = id;
+typename Pid = Int;
+var pidToString = intToString;
+
+# Fresh name generator
+sig names : ((a) {FreshName{p}|e}~> a, a) -> (Comp({FreshName:a|e}, b)) -> Comp({FreshName{p}|e}, b)
+fun names(gen, seed) {
+   var h = handler(next) {
+      case Return(x)    -> x
+      case FreshName(k) -> k(next)(gen(next))
+   };
+   h(seed)
+}
+
+fun freshName() {do FreshName}
 
 typename PackedProcess(e::Row,y::Type) = forall p :: Row . (ExecutionUnit(Pid,(),{ |e},())) -p-> y;
-typename EProcess(e::Row) = forall y, p :: Row . (PackedProcess({ |e}, y)) -p-> y;
+#typename EProcess(e::Row) = forall y, p :: Row . (PackedProcess({ |e}, y)) -p-> y;
+typename EProcess(e::Row) = (id:Pid);
 
 sig makeExecutionUnit : ((a) -e-> b, id) -> ExecutionUnit(id, a, { |e}, b)
 fun makeExecutionUnit(f, id) {
@@ -33,27 +46,35 @@ fun makeExecutionUnit(f, id) {
 }
 
 sig makeProcess : (() -e-> (), Pid) -> EProcess({ |e})
-fun makeProcess(f, pid) {
-    var eu = makeExecutionUnit(fun(_) { f() }, pid);
-    fun( p : PackedProcess({ |e}, y) ) {
-       p(eu)
-    }
-}
+fun makeProcess(_, pid) { (id=pid) }
 
 sig getPid : (EProcess({ |e})) -> Pid
-fun getPid(proc) {
-    #var packedFun = (fun(proc) { proc.id } : PackedProcess({ |e}, Pid) );
-    var packedFun = fun(proc) { proc.id };
-    proc(packedFun)
-}
+fun getPid(proc) { proc.id }
+
+#sig makeProcess : (() -e-> (), Pid) -> EProcess({ |e})
+#fun makeProcess(f, pid) {
+#    var eu = makeExecutionUnit(fun(_) { f() }, pid);
+#    fun( p : PackedProcess({ |e}, y) ) {
+#       p(eu)
+#    }
+#}
+
+#sig getPid : (EProcess({ |e})) -> Pid
+#fun getPid(proc) {
+#    #var packedFun = (fun(proc) { proc.id } : PackedProcess({ |e}, Pid) );
+#    var packedFun = fun(proc) { proc.id };
+#    proc(packedFun)
+#}
 
 sig myPid : () {MyPid:Pid|_}-> Pid
 fun myPid() {do MyPid}
 
-sig makeChildPid : (EProcess({ |e}), Int) -> Pid
-fun makeChildPid(parent, childNumber) {
-    getPid(parent) ^^ "." ^^ intToString(childNumber)
-}
+#sig makeChildPid : (EProcess({ |e}), Int) -> Pid
+#fun makeChildPid(parent, childNumber) {
+#    getPid(parent) ^^ "." ^^ intToString(childNumber)
+#}
+
+fun incrPid(i) { i + 1 }
 
 
 # Process creation
@@ -87,7 +108,7 @@ sig dequeue : (Queue(a)) ~> (a, Queue(a))
 fun dequeue(q) {
     switch (q) {
       case (x :: xs, ys) -> (x, (xs, ys))
-      case ([], ys)      -> dequeue((ys,[]))
+      case ([], ys)      -> dequeue((reverse(ys),[]))
     }
 }
 
@@ -111,30 +132,56 @@ fun put(s) {do Put(s)}
 fun enqueueProcess(f) {
   var q = enqueue(get(), f);
   put(q)
+  #var q = get();  
+  #put(q ++ [f])
 }
 
 fun dequeueProcess() {
    var q = get();
    if (isEmptyQueue(q)) { fun() { () } }
+#   if (length(q) == 0) { fun() { () } }
    else {
       var (p, q) = dequeue(q);
+      # var q = get();
+      # switch(q) {
+      #   case p :: q -> put(q); p
+      #   case []     -> error("Impossible")
+      # }
       put(q);
       p
    }
 }
 
-handler process(parent, numChildren) {
-  case Spawn(f,k) ->
-       var childPid = makeChildPid(parent, numChildren+1);
+# handler roundrobin(parent, numChildren) {
+#   case Spawn(f,k) ->
+#        var childPid = makeChildPid(parent, numChildren+1);
+#        var child = makeProcess(f, childPid);
+#        enqueueProcess(fun() { k(child)(parent, numChildren+1) });
+#        roundrobin(child, 0)(f)()
+#   case Yield(k)   ->
+#        enqueueProcess(fun() { k(())(parent, numChildren) });
+#        dequeueProcess()()
+#   case MyPid(k) -> k(getPid(parent))(parent, numChildren)
+#   case Return(_)  ->
+#        dequeueProcess()()
+# }
+
+fun roundrobin(m)() {
+  var root = makeProcess(m, freshName());
+  handler scheduler(activeProcess) {
+    case Spawn(f,k) ->
+       var childPid = freshName();
        var child = makeProcess(f, childPid);
-       enqueueProcess(fun() { k(child)(parent, numChildren+1) });
-       process(child, 0)(f)()
-  case Yield(k)   ->
-       enqueueProcess(fun() { k(())(parent, numChildren) });
+       enqueueProcess(fun() { k(child)(activeProcess) });
+       scheduler(child)(f)()
+    case Yield(k)   ->
+       enqueueProcess(fun() { k(())(activeProcess) });
        dequeueProcess()()
-  case MyPid(k) -> k(getPid(parent))(parent, numChildren)
-  case Return(_)  ->
+    case MyPid(k) -> k(getPid(activeProcess))(activeProcess)
+    case Return(_)  ->
        dequeueProcess()()
+  }
+  run -<- scheduler(root) -< m
 }
 
 fun hello(depth)() {
@@ -154,7 +201,7 @@ op h -< m  { h(m) }
 
 fun run(m) { m() }
 
-var dummy = run -<- evalState(emptyQueue()) -<- process(makeProcess(fun() { () }, "0"), 0) -< hello(4);
+#var dummy = run -<- evalState(emptyQueue()) -<- roundrobin(makeProcess(fun() { () }, "0"), 0) -< hello(4);
 
 # Communication
 sig psend : (EProcess({ |e}), a) {Send:(Pid, a) {}-> (),Yield:()|_}-> ()
@@ -182,137 +229,179 @@ typename Ordering = [|GT
 
 typename Comparer(a::Type,e::Row) = (a,a) ~e~> Ordering;
 
-typename Colour = [|Red|Black|BlackBlack|];
-
-typename RedBlackSet(a::Type) = [|Empty
-                                 |EmptyEmpty
-                                 |Node:(Colour,RedBlackSet(a),a,RedBlackSet(a))
-                                 |];
-
-sig rbEmpty : () -> RedBlackSet(a)
-fun rbEmpty() { Empty }
-
-sig rbMember : (a, RedBlackSet(a), (a,a) ~e~> Ordering) ~e~> Bool
-fun rbMember(x, rb, cmp) {
-    switch (rb) {
-      case Empty -> false
-      case Node(_,l,y,r) ->
-         switch (cmp(x,y)) {
-           case LT -> rbMember(x, l, cmp)
-           case EQ -> true
-           case GT -> rbMember(x, r, cmp)
-         }
-      case _ -> error("Impossible case rbMember")
-    }
+#
+fun pidKeyCmp((p,_),(q,_)) {
+    if (p < q) LT
+    else if (p > q) GT
+    else EQ
 }
 
-sig rbBalance : ((Colour, RedBlackSet(a), a, RedBlackSet(a))) -> RedBlackSet(%b)
-fun rbBalance(node) {
-    switch (node) {
-      case (Black, Node(Red, Node(Red, a, x, b), y, c), z, d) -> Node(Red, Node(Black, a, x, b), y, Node(Black, c, z, d))
-      case (Black, Node(Red, a, x, Node(Red, b, y, c)), z, d) -> Node(Red, Node(Black, a, x, b), y, Node(Black, c, z, d))
-      case (Black, a, x, Node(Red, Node(Red, b, y, c), z, d)) -> Node(Red, Node(Black, a, x, b), y, Node(Black, c, z, d))
-      case (Black, a, x, Node(Red, b, y, Node(Red, c, z, d))) -> Node(Red, Node(Black, a, x, b), y, Node(Black, c, z, d))
-      case (BlackBlack, a, x, Node(Red, Node(Red, b, y, c), z, d)) -> Node(Black, Node(Black, a, x, b), y, Node(Black, c, z, d))
-      case (BlackBlack, Node(Red, a, x, Node(Red, b, y, c)), z, d) -> Node(Black, Node(Black, a, x, b), y, Node(Black, c, z, d))
-      case body                                               -> Node(body)
-    }
-}
+# sig enqueueMessage : (Pid, a) {Get:RedBlackSet((Pid,Queue(a))),Put:(RedBlackSet((Pid,Queue(a)))) {}-> ()|_}~> ()
+# fun enqueueMessage(pid, msg) {
+#   var rb = get();
+#   var emptyQ = emptyQueue();
+#   switch (rbLookup((pid, emptyQ), rb, pidKeyCmp)) {
+#      case Just((_,q)) ->
+#         var rb = rbReplace((pid,q), (pid,enqueue(q, msg)), rb, pidKeyCmp);
+#         put(rb)
+#      case Nothing ->
+#         var rb = rbInsert((pid,enqueue(emptyQ, msg)), rb, pidKeyCmp);
+#         put(rb)
+#   }
+# }
 
-sig rbInsert : (a, RedBlackSet(a), (a,a) ~e~> Ordering) ~e~> RedBlackSet(a)
-fun rbInsert(x, rb, cmp) {
-   fun ins(rb) {
-     switch (rb) {
-       case Empty -> Node(Red, Empty, x, Empty)
-       case (Node(colour, a, y, b) as rb) ->
-          switch (cmp(x, y)) {
-             case LT -> rbBalance((colour, ins(a), y, b))
-             case EQ -> rb
-             case GT -> rbBalance((colour, a, y, ins(b)))
-          }
-       case _     -> error("Impossible case rbInsert")
-     }
-   }
-   switch (ins(rb)) {
-     case Node(_, a, y, b) -> Node(Black, a, y, b)
-     case _                -> error("Impossible case ins")
-   }
-}
+# # Typing bug?
+# #
+# # Type error: Because of the value restriction there can be no
+# # free rigid type variables at an ungeneralisable binding site,
+# # but the type `RedBlackSet ((Pid, Queue (a)))' has free rigid type variables.
+# # In expression: var rb = get();.
+# #sig dequeueMessage : (Pid) {Get:RedBlackSet ((Pid, Queue (a))),Put:(RedBlackSet ((Pid, Queue (a)))) {}-> ()|_}~> Maybe (a)
+# fun dequeueMessage(pid : Pid) {
+#   var rb = get();
+#   switch (rbLookup((pid, emptyQueue()), rb, pidKeyCmp)) {
+#      case Just((_,q)) ->
+#        if (isEmptyQueue(q)) {
+#          Nothing : Maybe(a)
+#        } else {
+#          var (msg, q) = dequeue(q);
+#          var rb = rbReplace((pid, emptyQueue()), (pid, q), rb, pidKeyCmp);
+#          put(rb);
+#          Just(msg) : Maybe(a)
+#        }
+#       case Nothing    -> Nothing : Maybe(a)
+#   }
+# }
 
-fun rbRotate(colour, left, x, right) {
-  switch ((colour, left, x, right)) {
-     case (Red, Node(BlackBlack, a, x, b), y, Node(Black, c, z, d)) -> rbBalance((Black, Node(Red, Node(Black, a, x, b), y, c), z, d))
-     case (Red, EmptyEmpty, y, Node(Black, c, z, d)) -> rbBalance((Black, Node(Red, Empty, y, c), z, d))
-     case (Red, Node(Black, a, x, b), y, Node(BlackBlack, c, z, d)) -> rbBalance((Black, a, x, Node(Red, b, y, Node(Black, c, z, d))))
-     case (Red, Node(BlackBlack, a, x, b), y, Node(Black, c, z, d)) -> rbBalance((BlackBlack, Node(Red, Node(Black, a, x, b), y, c), z, d))
-     case (Black, Node(BlackBlack, a, x ,b), y, Node(Black, c, z, d)) -> rbBalance((BlackBlack, Node(Red, Node(Black, a, x, b), y, c), z, d))
-     case (Black, EmptyEmpty, y, Node(Black, c, z, d)) -> rbBalance((BlackBlack, Node(Red, Empty, y, c), z, d))
-     case (Black, Node(Black, a, x, b), y, Node(BlackBlack, c, z, d)) -> rbBalance((BlackBlack, a, x, Node(Red, b, y, Node(Black, c, z, d))))
-     case (Black, Node(Black, a, x, b), y, EmptyEmpty) -> rbBalance((BlackBlack, a, x, Node(Red, b, y, Empty)))
-     case (Black, Node(BlackBlack, a, w, b), x, Node(Red, Node(Black, c, y, d), z, e)) ->
-       Node(Black, rbBalance((Black, Node(Red, Node(Black, a, w, b), x, c), y, d)), z, e)
-     case (Black, EmptyEmpty, x, Node(Red, Node(Black, c, y, d), z, e)) -> Node(Black, rbBalance((Black, Node(Red, Empty, x, c), y, d)), z, e)
-     case (Black, Node(Red, a, w, Node(Black, b, x, c)), y, EmptyEmpty) -> Node(Black, a, w, rbBalance((Black, b, x, Node(Red, c, y, Empty))))
-     case (colour, a, x, b) -> Node(colour, a, x, b)
+sig pop : (a, [(a,b)]) ~> (Maybe(b), [(a,b)])
+fun pop(x, alist) {
+  switch (lookup(x, alist)) {
+    case Just(y) -> (Just(y), removeAssoc(x, alist))
+    case Nothing -> (Nothing, alist)
   }
 }
 
-fun rbDelete(x, rb, cmp) {
+typename Mailbox(a::Type) = [(Pid, Queue(a))];
 
-   fun min_del(rb) {
-      switch(rb : RedBlackSet(a)) {
-        case Node(Red, Empty, x, Empty)   -> (x, Empty)
-        case Node(Black, Empty, x, Empty) -> (x, EmptyEmpty)
-        case Node(Black, Empty, x, Node(Red, Empty, y, Empty)) -> (x, Node(Black, Empty, y, Empty))
-        case Node(c, a, x, b) ->
-           var (y, d) = min_del(a);
-           (y, rbRotate(c, d, x, b))
-        case _ -> error("Impossible case min_del")
-      }
-   }
-   
-   fun del(rb) {
-      switch(rb : RedBlackSet(a)) {
-        case Empty -> Empty
-        case Node(Red, Empty, y, Empty) ->
-           switch(cmp(x, y)) {
-              case EQ        -> Empty
-              case otherwise -> Node(Red, Empty, y, Empty)
-           }
-        case Node(Black, Empty, y, Empty) ->
-           switch(cmp(x, y)) {
-              case EQ         -> EmptyEmpty
-              case otherwise  -> Node(Black, Empty, y, Empty)
-           }
-        case Node(Black, Node(Red, Empty, y, Empty), z, Empty) ->
-           switch(cmp(x, z)) {
-              case LT -> Node(Black, del(Node(Red, Empty, y, Empty)), z, Empty)
-              case EQ -> Node(Black, Empty, y, Empty)
-              case GT -> Node(Black, Node(Red, Empty, y, Empty), z, Empty)
-           }
-        case Node(c, a, y, b) ->
-           switch(cmp(x, y)) {
-              case LT -> rbRotate(c, del(a), y, b)
-              case EQ ->
-                var (z,d) = min_del(b);
-                rbRotate(c, a, z, d)
-              case GT -> rbRotate(c, a, y, del(b))
-           }
-        case _ -> error("Impossible case del")
-      }
-   }
-   fun redden(rb) {
-      switch(rb : RedBlackSet(a)) {
-         case Node(Black, Node(Black, a, x ,b), y, Node(Black, c, z, d)) -> Node(Red, Node(Black, a, x ,b), y, Node(Black, c, z, d))
-         case t -> t
-      }
-   }
-   del(redden(rb))   
+sig enqueueMessage : (Pid, a) {Get:Mailbox(a),Put:(Mailbox(a)) {}-> ()|_}~> ()
+fun enqueueMessage(pid, msg) {
+  var alist = get();
+  var alist = switch (pop(pid, alist)) {
+                 case (Just(q), alist) -> (pid, enqueue(q, msg)) :: alist
+                 case (Nothing, alist) -> (pid, enqueue(emptyQueue(), msg)) :: alist
+              };
+  put(alist)         
 }
 
-sig rbReplace : (a, a, RedBlackSet(a), Comparer(a, { |e})) ~e~> RedBlackSet(a)
-fun rbReplace(x, y, rb, cmp) {
-    # delete x
-    # insert y
-    error("Not yet implemented.")
+#sig dequeueMessage : (Pid) {Get:Mailbox(a),Put:(Mailbox(a)) {}-> ()|_}~> Maybe(a)
+fun dequeueMessage(pid : Pid) {
+  var alist = get();
+  var (msg, alist) = switch (pop(pid, alist : Mailbox(a))) {
+                       case (Just(q), alist) ->
+                            if (isEmptyQueue(q)) { (Nothing, alist) }
+                            else {
+                              var (msg, q) = dequeue(q);
+                              (Just(msg), (pid, q) :: alist) : (Maybe(a), Mailbox(a))
+                            }
+                       case (Nothing, alist) -> (Nothing, alist) : (Maybe(a), Mailbox(a))
+                     };
+  put(alist);
+  msg
 }
+
+#sig mailbox : (Comp({Recv:(Pid) {}-> Maybe(a),Send:(Pid,a) {}-> (),Get:RedBlackSet((Pid, Queue(a))),Put:((Pid, Queue(a))) {}-> ()|e}, a)) ->
+#               Comp({Recv{_},Send{_},Get:RedBlackSet((Pid, Queue(a))),Put:((Pid, Queue(a))) {}-> ()|e}, a)
+#sig mailbox : (Comp({Get:RedBlackSet ((Pid, Queue (a))),Put:(RedBlackSet ((Pid, Queue (a)))) {}-> (),Recv:(Pid) {}-> Maybe (a),Send:(Pid, a) {}-> ()|e}, b)) ->
+#               Comp({Get:RedBlackSet ((Pid, Queue (a))),Put:(RedBlackSet ((Pid, Queue (a)))) {}-> (),Recv{_},Send{_}|e}, b)
+fun mailbox(m)() {
+  handle(m) {
+    case Return(x)        -> x
+    case Recv(pid,resume) ->
+      var msg = dequeueMessage(pid);
+      resume(msg)
+    case Send(pid,msg,resume) ->
+      enqueueMessage(pid, msg);
+      resume(())
+  }
+}
+
+# Handshaking
+fun hello2(depth)() {    
+    var mypid = myPid();
+    print("P#" ^^ pidToString(mypid) ^^ ": Spawned!");
+    if (depth == 0) {
+       var msg = precv();
+       print("P#" ^^ pidToString(mypid) ^^ ": Received message: " ^^ msg)
+    } else {         
+         print("P#" ^^ pidToString(mypid) ^^ ": Spawning two children");
+         var p1 = pspawn(hello2(depth-1));
+         psend(p1, "Hello from P#" ^^ pidToString(mypid));
+         yield();
+         var p2 = pspawn(hello2(depth-1));
+         psend(p2, "Hello from P#" ^^ pidToString(mypid));
+         ()
+    }
+}
+
+fun test() {
+  print("MyPid: " ^^ pidToString(myPid()))
+}
+
+#run(evalState(rbEmpty())(mailbox(evalState(emptyQueue())(roundrobin(makeProcess(fun() { () }, "0"), 0)(hello2(2))))))
+
+fun stop(process) {
+  switch (process) {
+    case Nothing    -> ()
+    case Just(proc) -> proc $! Stop
+  }
+}
+
+fun fromCandidate(msg) {
+  switch(msg) {
+    case Candidate(i) -> i
+    case _ -> error("Attempt to unwrap non-candidate.")
+  }
+}
+
+fun printInt(i) {
+  print(intToString(i))
+}
+
+fun sieve() {
+  var myprime = fromCandidate(precv());
+  print(intToString(myprime));
+  fun loop(neighbour) {
+    switch (precv()) {
+       case Stop -> stop(neighbour)
+       case Candidate(prime) ->
+       if (prime `mod` myprime <> 0) {
+          var neighbour =
+            switch (neighbour) {
+              case Just(pid) -> pid
+              case Nothing   -> pspawn(sieve)
+            };
+          neighbour $! Candidate(prime);
+          loop(Just(neighbour))
+       } else { loop(neighbour) }
+    }
+  }
+  loop(Nothing)
+}
+
+fun foreach(xs, action) {
+  switch (xs) {
+    case [] -> ()
+    case x :: xs -> action(x); foreach(xs, action)
+  }
+}
+
+fun generator(n)() {
+  var first = pspawn(sieve);
+  foreach([2..n], fun(p) { psend(first, Candidate(p)) });
+  psend(first, Stop)
+}
+
+
+var dummy = run -<- names(incrPid, 0) -<- evalState([]) -<- mailbox -<- evalState(emptyQueue()) -<- roundrobin -< generator(101);
+
+#var dummy = run(names(incrPid, 0)(evalState([])(mailbox(evalState(emptyQueue())(roundrobin(generator(200)))))));
