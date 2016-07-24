@@ -169,16 +169,16 @@ fun dequeueProcess() {
 fun roundrobin(m)() {
   var root = makeProcess(m, freshName());
   handler scheduler(activeProcess) {
-    case Spawn(f,k) ->
+    case Spawn(f,resume) ->
        var childPid = freshName();
        var child = makeProcess(f, childPid);
-       enqueueProcess(fun() { k(child)(activeProcess) });
+       enqueueProcess(fun() { resume(child)(activeProcess) });
        scheduler(child)(f)()
-    case Yield(k)   ->
-       enqueueProcess(fun() { k(())(activeProcess) });
+    case Yield(resume)   ->
+       enqueueProcess(fun() { resume(())(activeProcess) });
        dequeueProcess()()
-    case MyPid(k) -> k(getPid(activeProcess))(activeProcess)
-    case Return(_)  ->
+    case MyPid(resume) -> resume(getPid(activeProcess))(activeProcess)
+    case Return(_)  -> #()
        dequeueProcess()()
   }
   run -<- scheduler(root) -< m
@@ -398,7 +398,7 @@ fun foreach(xs, action) {
 fun generator(n)() {
   var first = pspawn(sieve);
   foreach([2..n], fun(p) { psend(first, Candidate(p)) });
-  psend(first, Stop)
+  first $! Stop
 }
 
 
