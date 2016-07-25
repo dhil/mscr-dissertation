@@ -25,7 +25,7 @@ fun sieve() {
           var neighbour =
             switch (neighbour) {
               case Just(pid) -> pid
-              case Nothing   -> spawn { sieve() }
+              case Nothing   -> spawnAngel { sieve() }
             };
           neighbour ! Candidate(prime);
           loop(Just(neighbour))
@@ -44,22 +44,22 @@ fun foreach(xs, action) {
 }
 
 fun generator(n) {
-  var first = spawn { sieve() };
+  var first = spawnAngel { sieve() };
   foreach([2..n], fun(p) { first ! Candidate(p) });
   first ! Stop(self());
-  fun loop() {
-    switch (recv()) {
-      case Stop(_) -> ()
-      case _    -> loop()
-    }
-  }
-  loop()
+  # fun loop() {
+  #   switch (recv()) {
+  #     case Stop(_) -> ()
+  #     case _    -> loop()
+  #   }
+  # }
+  # loop()
 }
 
 fun run() {
-  print("#snippet:links_concur_model_example.output");
+  #print("#snippet:links_concur_model_example.output");
   generator(101);
-  print("#end")
+  #print("#end")
 }
 
 run()

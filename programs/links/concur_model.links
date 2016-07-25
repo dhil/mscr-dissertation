@@ -40,6 +40,10 @@ typename PackedProcess(e::Row,y::Type) = forall p :: Row . (ExecutionUnit(Pid,()
 #typename EProcess(e::Row) = forall y, p :: Row . (PackedProcess({ |e}, y)) -p-> y;
 typename EProcess(e::Row) = (id:Pid);
 
+fun showProcess(p) {
+    "P#" ^^ pidToString(getPid(p))
+}
+
 sig makeExecutionUnit : ((a) -e-> b, id) -> ExecutionUnit(id, a, { |e}, b)
 fun makeExecutionUnit(f, id) {
     (id=id, comp=f)
@@ -66,9 +70,6 @@ fun getPid(proc) { proc.id }
 #    proc(packedFun)
 #}
 
-sig myPid : () {MyPid:Pid|_}-> Pid
-fun myPid() {do MyPid}
-
 #sig makeChildPid : (EProcess({ |e}), Int) -> Pid
 #fun makeChildPid(parent, childNumber) {
 #    getPid(parent) ^^ "." ^^ intToString(childNumber)
@@ -79,13 +80,14 @@ fun incrPid(i) { i + 1 }
 
 # Process creation
 sig pspawn : (() -e-> ()) {Spawn:(() -e-> ()) {}-> EProcess({ |e}) |_}-> EProcess({ |e})
-fun pspawn(f) {
-    do Spawn(f)
-}
+fun pspawn(f) { do Spawn(f) }
 
 # Process suspension
 sig yield : () {Yield:() |_}-> ()
 fun yield() { do Yield }
+
+sig myself : () {Myself:EProcess({ |e}),Yield:() |_}-> EProcess({ |e})
+fun myself() {yield(); do Myself}
 
 # Process queue
 typename Queue(a::Type) = ([a],[a]);
@@ -177,7 +179,7 @@ fun roundrobin(m)() {
     case Yield(resume)   ->
        enqueueProcess(fun() { resume(())(activeProcess) });
        dequeueProcess()()
-    case MyPid(resume) -> resume(getPid(activeProcess))(activeProcess)
+    case Myself(resume) -> resume(activeProcess)(activeProcess)
     case Return(_)  -> #()
        dequeueProcess()()
   }
@@ -185,9 +187,9 @@ fun roundrobin(m)() {
 }
 
 fun hello(depth)() {
+    print("Hello from process " ^^ showProcess(myself()));
     if (depth == 0) { () }
-    else {
-         print("Hello from process #" ^^ pidToString(myPid()));
+    else {         
          var _ = pspawn(hello(depth-1));
          #yield();
          var _ = pspawn(hello(depth-1));
@@ -209,7 +211,7 @@ fun psend(proc, msg) { do Send(getPid(proc), msg); yield() }
 
 op proc $! msg { psend(proc, msg) }
 
-sig precv : () {Recv:(Pid) {}-> Maybe(a),MyPid:Pid,Yield:()|_}~> a
+sig precv : () {Recv:(Pid) {}-> Maybe(a),Myself:EProcess({ |_}),Yield:()|_}~> a
 fun precv() {    
     fun loop(mypid : Pid) {
        var msg = do Recv(mypid);
@@ -219,7 +221,7 @@ fun precv() {
 	 case Just(msg) -> msg
        }
     }
-    loop(myPid())
+    loop(getPid(myself()))
 }
 
 typename Ordering = [|GT
@@ -327,27 +329,22 @@ fun mailbox(m)() {
 
 # Handshaking
 fun hello2(depth)() {    
-    var mypid = myPid();
-    print("P#" ^^ pidToString(mypid) ^^ ": Spawned!");
+    var mypid = myself();
+    var me = showProcess(mypid);
+    print(me ^^ ": Spawned!");
     if (depth == 0) {
        var msg = precv();
-       print("P#" ^^ pidToString(mypid) ^^ ": Received message: " ^^ msg)
+       print(me ^^ ": Received message: " ^^ msg)
     } else {         
-         print("P#" ^^ pidToString(mypid) ^^ ": Spawning two children");
+         print(me ^^ ": Spawning two children");
          var p1 = pspawn(hello2(depth-1));
-         psend(p1, "Hello from P#" ^^ pidToString(mypid));
+         psend(p1, "Hello from " ^^ me);
          yield();
          var p2 = pspawn(hello2(depth-1));
-         psend(p2, "Hello from P#" ^^ pidToString(mypid));
+         psend(p2, "Hello from " ^^ me);
          ()
     }
 }
-
-fun test() {
-  print("MyPid: " ^^ pidToString(myPid()))
-}
-
-#run(evalState(rbEmpty())(mailbox(evalState(emptyQueue())(roundrobin(makeProcess(fun() { () }, "0"), 0)(hello2(2))))))
 
 fun stop(process) {
   switch (process) {
@@ -397,7 +394,7 @@ fun foreach(xs, action) {
 
 fun generator(n)() {
   var first = pspawn(sieve);
-  foreach([2..n], fun(p) { psend(first, Candidate(p)) });
+  foreach([2..n], fun(p) { first $! Candidate(p) });
   first $! Stop
 }
 
