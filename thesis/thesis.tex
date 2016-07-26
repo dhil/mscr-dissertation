@@ -82,7 +82,7 @@
   morekeywords={spawn, receive, typename, fun, op, var, if, this, true, false, else, case, switch, handle, handler, shallowhandler, do, sig},%
   sensitive=t, % 
   keywordstyle=\color{red},
-  emph={Comp,Player,Bool,Int,GTree,Cheat,Zero,Choose,Rand,Move,Winner,Take,Return,Get,Put,GameState,Alice,Bob,Fail,Nothing,Just,Maybe,Toss,Heads,Tails,Process},
+  emph={Comp,Player,Bool,Int,GTree,Cheat,Zero,Choose,Rand,Move,Winner,Take,Return,Get,Put,GameState,Alice,Bob,Fail,Nothing,Just,Maybe,Toss,Heads,Tails,Process,Buyer,Coffee,Pay,Cost},
   emphstyle={\color{blue}},
   comment=[l]{\#},% 
   commentstyle={\itshape\color{green}},%
@@ -807,12 +807,12 @@ links> self() + 1;
 <stdin>:1: Type error: [..]
 \end{lstlisting}
 %
-Here, we have omitted the full error message for brevity, but the
-essence of the problem is that the function \lstinline$(+)$ has type
-\lstinline$(Int,Int) -> Int$ and \lstinline$Int$ and
-\lstinline$Process({ |e })$ are incompatible types. This adds a layer
-of safety to the concurrency model as we cannot erroneously refer to
-an non-existent process.
+Here, we have omitted the full error message for brevity, however the
+problem is that the addition operator \lstinline$(+)$ expects two
+arguments of type \lstinline$Int$. The two types
+\lstinline$Process({ |e })$ and \lstinline$Int$ are incompatible. This
+adds a layer of safety to the concurrency model as we cannot
+erroneously refer to an non-existent process.
 %
 
 \paragraph{Spawning} The primitive \lstinline$spawn { expression }$
@@ -829,6 +829,38 @@ Hello World
 We obtain the handle \lstinline$1$ whose effect row contains the
 \lstinline$wild$ effect due to the fact that the subprocess prints to
 the standard out.
+
+\paragraph{Receiving and sending} A process can receive messages using
+the \lstinline$recv$ function, e.g.
+%
+\begin{lstlisting}
+links> var p1 = spawn { print("Message: " ^^ recv()) };
+p1 = 1 : Process ({ hear:String,wild|_ })
+\end{lstlisting}
+%
+The \lstinline$recv$ function blocks until a message becomes
+available.  Each mailbox is given a static type according to the
+messages it expects to receive. The built-in effect \lstinline$hear$
+reflects and tracks this type.
+%
+Now we can send message to process \lstinline$1$ using the \lstinline
+$(!)$ (pronounced ``send''):
+%
+\begin{lstlisting}
+links> p1 ! "Hello";
+Message: Hello
+() : ()
+\end{lstlisting}
+%
+Process \lstinline$1$ prints the received message \lstinline$"Hello"$
+and terminates afterwards. The process is only capable
+of receiving strings but often we want to communicate via richer
+types. To achieve this we can use polymorphic variants, e.g.
+%
+\begin{lstlisting}
+...
+\end{lstlisting}
+
 \section{A reconstruction of the Links concurrency model with handlers}
 \label{sec:links-model-handlers}
 
