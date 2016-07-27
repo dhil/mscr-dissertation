@@ -1,5 +1,5 @@
 %% Master by Research, CDT PPAR, print twosided, new chapters on right page
-\documentclass[mscres,cdtppar,twoside,openright,logo,rightchapter,normalheadings]{infthesis}
+\documentclass[12pt,mscres,cdtppar,twoside,openright,logo,rightchapter,normalheadings]{infthesis}
 \shieldtype{0}
 
 %% Packages
@@ -79,15 +79,16 @@
 
 % Define Links as a lst-language
 \lstdefinelanguage{Links}{% 
-  morekeywords={spawn, receive, typename, fun, op, var, if, this, true, false, else, case, switch, handle, handler, shallowhandler, do, sig},%
+  morekeywords={spawn, receive, typename, fun, op, var, if, this, true, false, else, case, switch, handle, handler, shallowhandler, do, sig, spawnAngel, spawnDemon, spawn},%
   sensitive=t, % 
   keywordstyle=\color{red},
-  emph={Comp,Player,Bool,Int,GTree,Cheat,Zero,Choose,Rand,Move,Winner,Take,Return,Get,Put,GameState,Alice,Bob,Fail,Nothing,Just,Maybe,Toss,Heads,Tails,Process,Buyer,Coffee,Pay,Cost},
+  emph={Comp,Player,Bool,Int,GTree,Cheat,Zero,Choose,Rand,Move,Winner,Take,Return,Get,Put,GameState,Alice,Bob,Fail,Nothing,Just,Maybe,Toss,Heads,Tails,Process,Buyer,Coffee,Pay,Cost,Candidate,Stop,PassingComet,CelebritySighting,Float,String},
   emphstyle={\color{blue}},
   comment=[l]{\#},% 
-  commentstyle={\itshape\color{green}},%
+  commentstyle={\itshape\color{darkgreen}},%
   escapeinside={(*}{*)},%
-  morestring=[d]{"}%
+  morestring=[d]{"},%
+  stringstyle={\color{violetred}}%
  }
 
 % Haskell style
@@ -853,12 +854,153 @@ Message: Hello
 \end{lstlisting}
 %
 Process \lstinline$1$ prints the received message \lstinline$"Hello"$
-and terminates afterwards. The process is only capable
-of receiving strings but often we want to communicate via richer
-types. To achieve this we can use polymorphic variants, e.g.
+and terminates afterwards. The process is only capable of receiving
+strings but often a process will use a variant to tag the different
+messages it can receive. Typically, a process will dispatch on the tag
+of received message. As a concrete example consider a coffee machine process that 
+gets informed about passing comets and celebrity sightings:
+\begin{lstlisting}
+var p3 = spawn {
+  fun loop() {
+    var _ = switch(recv()) {
+      case PassingComet(id, zenith, azimuth) -> cometSighted(id, zenith, azimuth)
+      case CelebritySighting(name, venue)    -> celebSighted(name, venue)
+    };
+    loop()
+  }
+  loop()
+};
+\end{lstlisting}
+%
+Here we assume the existence of two functions \lstinline$cometSighted$
+and \lstinline$celebSighted$ that register sightings of comets and
+sightings of celebrities, respectively. The \lstinline$hear$ effect in
+the type signature of \lstinline$p3$ now reflects that the process
+expects to receive messages tagged by either
+\lstinline$CelebritySighting$ or \lstinline$PassingComet$:
 %
 \begin{lstlisting}
-...
+links> p3;
+3 : Process ({ hear:[|CelebritySighting:(String, String)
+                     |PassingComet:(Int, Float, Float)|]
+             , wild|_ })
+\end{lstlisting}
+Now, we can inform the process of any passing comets and celebrity sightings:
+%
+\begin{lstlisting}
+links> p3 ! CelebritySighting("Ewan McGregor", "Leith");
+Ewan McGregor has been seen in Leith
+() : ()
+links> p3 ! PassingComet(42, 10.3, 180.5);
+Comet no. 42 sighted (10.3, 180.5)
+() : ()
+\end{lstlisting}
+%
+
+\subsection{Sieve of Eratosthenes example}
+\label{sec:sieve-example}
+
+We will now consider a larger example which will serve to demonstrate
+an actual concurrent application in Links. However, we shall reuse the
+example to demonstrate our reconstructed concurrency model in
+Section~\ref{sec:links-model-handlers} too.
+
+We shall implement a parallel version of the \emph{Sieve of
+  Eratosthenes} prime number finding algorithm. Starting from a prime
+number (e.g. $2$) the sequential version of the algorithm iteratively
+marks multiples of the given prime number as composite up to some
+specified limit. Thereafter the algorithm repeats the entire procedure
+on the first unmarked marker, which must be a prime. The algorithm
+continues so until some specified limit.
+
+\begin{figure}
+\tikzset{my ellipse/.style={
+        draw=black, 
+        ultra thick, 
+        ellipse, 
+        anchor=west,
+        minimum width=70pt,
+        minimum height=35pt
+        },
+}
+\tikzset{my arrow/.style={-latex,thick}}
+\tikzset{sarrow/.style={-latex,thick,dotted}}
+
+\centering
+\begin{tikzpicture}[decoration=snake]
+
+\node(P0)[my ellipse] {$P_0$ (Generator)};
+
+\node(P1)[my ellipse,below=of P0,yshift=-20pt] {$P_1^2$};
+\node(P2)[my ellipse,right=of P1,xshift=85pt] {$P_2^3$};
+\node(P3)[my ellipse,below=of P2,yshift=-20pt] {$P_3^5$};
+\node(P4)[my ellipse,left=of P3,xshift=-85pt] {$P_4^7$};
+
+\draw[sarrow] (P0) to node[midway,right,align=center,yshift=2pt ] { $\{2,\dots,10\}$ } (P1);
+\draw[sarrow] (P1) to node[midway,above,align=center,yshift=2pt ] { $\{n \mid n \not\equiv 0 \; (\text{mod } 2) \}$ } (P2);
+\draw[sarrow] (P2) to node[midway,left,align=center ] { $\{n \mid n \not\equiv 0 \; (\text{mod } 3)\}$ } (P3);
+\draw[sarrow] (P3) to node[midway,below,align=center,yshift=-2pt ] { $\{n \mid n \not\equiv 0 \; (\text{mod } 5)\}$ } (P4);
+
+\end{tikzpicture}
+\caption{Visual representation of Sieve of Eratosthenes.}\label{fig:sieve}
+\end{figure}
+
+The parallel version constructs a pipeline of processes where each
+process holds one prime number
+\citep{Andrews2000}. Figure~\ref{fig:sieve} depicts the sieve pipeline
+which finds primes between $2$ and $10$. The job of each sieve process
+is to receive and perform a primality test on candidate prime by
+dividing the candidate number by its own prime. If the remainder after
+division is positive then the process forwards the candidate to its
+neighbour process. The initial process generates a sequence of natural
+numbers. These numbers are sent one by one to the first sieve
+process. We implement this as the function \lstinline$generator(n)$
+where \lstinline$n$ is the upper bound on sequence being generated:
+%
+\begin{lstlisting}
+fun generator(n) {
+  var first = spawnAngel { sieve() };
+  foreach([2..n], fun(p) { first ! Candidate(p) });
+  first ! Stop
+}
+\end{lstlisting}
+%
+The function spawns the first sieve process and afterwards it
+generates the sequence $\{2,\dots,n\}$. The \lstinline$foreach$
+function has type \lstinline$([a], (a) ~e~> ()) ~e~> ()$, that is it
+takes a list and an action as arguments. The action is applied to each
+element in the list.
+%
+\begin{lstlisting}
+fun sieve() {
+  var myprime = fromCandidate(recv());
+  print(intToString(myprime));
+  fun loop(neighbour) {
+    switch (recv()) {
+       case Stop -> stop(neighbour)
+       case Candidate(prime) ->
+       if (prime `mod` myprime <> 0) {
+          var neighbour =
+            switch (neighbour) {
+              case Just(pid) -> pid
+              case Nothing   -> spawnAngel { sieve() }
+            };
+          neighbour ! Candidate(prime);
+          loop(Just(neighbour))
+       } else { loop(neighbour) }
+    }
+  }
+  loop(Nothing)
+}
+\end{lstlisting}
+%
+\begin{lstlisting}
+fun stop(process) {
+  switch (process) {
+    case Nothing   -> ()
+    case Just(pid) -> pid ! Stop
+  }
+}
 \end{lstlisting}
 
 \section{A reconstruction of the Links concurrency model with handlers}
@@ -866,38 +1008,6 @@ types. To achieve this we can use polymorphic variants, e.g.
 
 % \section{Pipeline parallelism}
 % \label{sec:prime}
-
-% \begin{figure}
-% \tikzset{my ellipse/.style={
-%         draw=black, 
-%         ultra thick, 
-%         ellipse, 
-%         anchor=west,
-%         minimum width=70pt,
-%         minimum height=35pt
-%         },
-% }
-% \tikzset{my arrow/.style={-latex,thick}}
-% \tikzset{sarrow/.style={-latex,ultra thick,dotted}}
-
-% \centering
-% \begin{tikzpicture}[decoration=snake]
-
-% \node(P0)[my ellipse] {$P_0$ (Generator)};
-
-% \node(P1)[my ellipse,below=of P0,yshift=-20pt] {$P_1^2$};
-% \node(P2)[my ellipse,right=of P1,xshift=85pt] {$P_2^3$};
-% \node(P3)[my ellipse,below=of P2,yshift=-20pt] {$P_3^5$};
-% \node(P4)[my ellipse,left=of P3,xshift=-85pt] {$P_4^7$};
-
-% \draw[sarrow] (P0) to node[midway,right,align=center,yshift=2pt ] { $\{2,\dots,10\}$ } (P1);
-% \draw[sarrow] (P1) to node[midway,above,align=center,yshift=2pt ] { $\{n \mid n \not\equiv 0 \; (\text{mod } 2) \}$ } (P2);
-% \draw[sarrow] (P2) to node[midway,left,align=center ] { $\{n \mid n \not\equiv 0 \; (\text{mod } 3)\}$ } (P3);
-% \draw[sarrow] (P3) to node[midway,below,align=center,yshift=-2pt ] { $\{n \mid n \not\equiv 0 \; (\text{mod } 5)\}$ } (P4);
-
-% \end{tikzpicture}
-% \caption{Conceptual representation of Sieve of Eratosthenes.}\label{fig:sieve}
-% \end{figure}
 
 % \section{Unbalanced parallelism}
 % \begin{figure}
