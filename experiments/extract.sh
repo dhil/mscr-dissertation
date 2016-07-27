@@ -17,7 +17,7 @@ cat $LOGFILE |
 grep -E "Running|milliseconds" | 
 sed -e 's/Elapsed (wall clock) time (milliseconds)://g' | 
 sed -e 's/^[[:blank:]]*//;s/[[:blank:]]*//' | 
-sed -e 's/^## Running \(.*\) 50 times$/\1/' |
+sed -e 's/^## Running .*\/\(.*.links\).* [0-9]* times$/\1/' |
 while read line; do 
 	if [[ $line =~ ^-?[0-9]+$ ]]; then
 		echo -n "$line,"
