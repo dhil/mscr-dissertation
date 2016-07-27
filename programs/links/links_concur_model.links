@@ -1,9 +1,9 @@
 # A concurrency example using the built-in concurrency model of Links
 
-fun stop(process, root) {
+fun stop(process) {
   switch (process) {
-    case Nothing    -> root ! Stop(root)
-    case Just(proc) -> proc ! Stop(root)
+    case Nothing    -> ()
+    case Just(proc) -> proc ! Stop
   }
 }
 
@@ -19,7 +19,7 @@ fun sieve() {
   print(intToString(myprime));
   fun loop(neighbour) {
     switch (recv()) {
-       case Stop(root) -> stop(neighbour, root)
+       case Stop -> stop(neighbour)
        case Candidate(prime) ->
        if (prime `mod` myprime <> 0) {
           var neighbour =
@@ -30,7 +30,7 @@ fun sieve() {
           neighbour ! Candidate(prime);
           loop(Just(neighbour))
        } else { loop(neighbour) }
-       case _ -> loop(neighbour)
+#       case _ -> loop(neighbour)
     }
   }
   loop(Nothing)
@@ -46,7 +46,7 @@ fun foreach(xs, action) {
 fun generator(n) {
   var first = spawnAngel { sieve() };
   foreach([2..n], fun(p) { first ! Candidate(p) });
-  first ! Stop(self());
+  first ! Stop
   # fun loop() {
   #   switch (recv()) {
   #     case Stop(_) -> ()
@@ -56,10 +56,11 @@ fun generator(n) {
   # loop()
 }
 
-fun run() {
+fun runSieve(n) {
   #print("#snippet:links_concur_model_example.output");
-  generator(101);
+  var _ = spawn { generator(n) };
+  ()
   #print("#end")
 }
 
-run()
+runSieve(10)
