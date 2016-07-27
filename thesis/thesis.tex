@@ -82,7 +82,7 @@
   morekeywords={spawn, receive, typename, fun, op, var, if, this, true, false, else, case, switch, handle, handler, shallowhandler, do, sig, spawnAngel, spawnDemon, spawn},%
   sensitive=t, % 
   keywordstyle=\color{red},
-  emph={Comp,Player,Bool,Int,GTree,Cheat,Zero,Choose,Rand,Move,Winner,Take,Return,Get,Put,GameState,Alice,Bob,Fail,Nothing,Just,Maybe,Toss,Heads,Tails,Process,Buyer,Coffee,Pay,Cost,Candidate,Stop,PassingComet,CelebritySighting,Float,String},
+  emph={Comp,Player,Bool,Int,GTree,Cheat,Zero,Choose,Rand,Move,Winner,Take,Return,Get,Put,GameState,Alice,Bob,Fail,Nothing,Just,Maybe,Toss,Heads,Tails,Process,Buyer,Coffee,Pay,Cost,Candidate,Stop,PassingComet,CelebritySighting,Float,String,Pid,EProcess,Row},
   emphstyle={\color{blue}},
   comment=[l]{\#},% 
   commentstyle={\itshape\color{darkgreen}},%
@@ -731,10 +731,10 @@ at a time.
 %
 \todo{Tie this together somewhat better}
 Figure~\ref{fig:links-model} displays an abstract representation of
-the interaction between two processes. The process $P_0$ cannot access
-the state of process $P_1$ -- and vice versa. Each mailbox is
-intrinsic to each process. The process $P_0$ interact with $P_1$ via a
-message $s$ depending on the contents of $s$ the process $P_1$ may
+the interaction between two processes. The process $P_1$ cannot access
+the state of process $P_2$ -- and vice versa. Each mailbox is
+intrinsic to each process. The process $P_1$ interact with $P_2$ via a
+message $s$ depending on the contents of $s$ the process $P_2$ may
 choose to alter its own state.
 %
 \begin{figure}
@@ -743,28 +743,28 @@ choose to alter its own state.
 \tikzset{sarrow/.style={-latex,thick,dotted}}
 
 
-  \node(P0) [draw=none,minimum width=30pt]         {$P_0$};
+  \node(P0) [draw=none,minimum width=30pt]         {$P_1$};
   \node(P0M0) [left=of P0,minimum height=22pt] { $m_0$ };
   \node(P0M1) [left=of P0M0,xshift=5pt,minimum height=22pt,minimum width=22pt] { $m_1$ };
   \node(P0MC) [left=of P0M1,xshift=5pt,minimum height=22pt,minimum width=22pt] { $\cdots$ };
   \node(P0MN) [left=of P0MC,xshift=5pt,minimum height=22pt,minimum width=22pt] { $m_k$ };
   \node(P0MT) [left=of P0MN,draw=none] { \textit{\textbf{\footnotesize{Mailbox}}} };
-  \node(P0M) [fit={(P0M0) (P0M1) (P0MC) (P0MN) (P0MT)}] { };
+  \node(P0M) [fill=black,fill opacity=0.05,fit={(P0M0) (P0M1) (P0MC) (P0MN) (P0MT)}] { };
   \node(P0B) [fit={(P0M) (P0)}] { };
 
-  \node(P1) [draw=none,below=of P0,yshift=-70pt,minimum width=30pt]         {$P_1$};
+  \node(P1) [draw=none,below=of P0,yshift=-70pt,minimum width=30pt]         {$P_2$};
   \node(P1M0) [left=of P1,minimum height=22pt] { $n_0$ };
   \node(P1M1) [left=of P1M0,xshift=5pt,minimum height=22pt,minimum width=22pt] { $n_1$ };
   \node(P1MC) [left=of P1M1,xshift=5pt,minimum height=22pt,minimum width=22pt] { $\cdots$ };
   \node(P1MN) [left=of P1MC,xshift=5pt,minimum height=22pt,minimum width=22pt] { $s$ };
   \node(P1MT) [left=of P1MN,draw=none] { \textit{\textbf{\footnotesize{Mailbox}}} };
-  \node(P1M) [fit={(P1M0) (P1M1) (P1MC) (P1MN) (P1MT)}] { };
+  \node(P1M) [fill=black,fill opacity=0.05,fit={(P1M0) (P1M1) (P1MC) (P1MN) (P1MT)}] { };
   \node(P1B) [fit={(P1M) (P1)}] { };
   
 %  \draw[sarrow] (P0B.east) to node[draw=none,midway,right,align=center,out=40,in=] { asd } (P1B.west);
 %\path[every node/.style={font=\sffamily\small}]
 %    (P0B.south east) edge [out=300, in=120,style={-latex,thick,dotted}]  (P1B.north west);
-\draw[sarrow] (P0B.south east) to [out=300, in=120,style={-latex,thick,dotted}]  (P1B.north west) node [draw=none,midway,yshift=-35pt,xshift=-80pt] {$P_0$ sends message $s$ to $P_1$};
+\draw[sarrow] (P0B.south east) to [out=300, in=120,style={-latex,thick,dotted}]  (P1B.north west) node [draw=none,midway,yshift=-35pt,xshift=-80pt] {$P_1$ sends message $s$ to $P_2$};
 \end{tikzpicture}
 \caption{Interaction between processes.}
 \label{fig:links-model}
@@ -906,12 +906,13 @@ example to demonstrate our reconstructed concurrency model in
 Section~\ref{sec:links-model-handlers} too.
 
 We shall implement a parallel version of the \emph{Sieve of
-  Eratosthenes} prime number finding algorithm. Starting from a prime
-number (e.g. $2$) the sequential version of the algorithm iteratively
-marks multiples of the given prime number as composite up to some
-specified limit. Thereafter the algorithm repeats the entire procedure
-on the first unmarked marker, which must be a prime. The algorithm
-continues so until some specified limit.
+  Eratosthenes} prime number finding algorithm. 
+% %Starting from a prime
+% number (e.g. $2$) the sequential version of the algorithm iteratively
+% marks multiples of the given prime number as composite up to some
+% specified limit. Thereafter the algorithm repeats the entire procedure
+% on the first unmarked marker, which must be a prime. The algorithm
+% continues so until some specified limit.
 
 \begin{figure}
 \tikzset{my ellipse/.style={
@@ -929,12 +930,12 @@ continues so until some specified limit.
 \centering
 \begin{tikzpicture}[decoration=snake]
 
-\node(P0)[my ellipse] {$P_0$ (Generator)};
+\node(P0)[my ellipse] {$P_1$ (Generator)};
 
-\node(P1)[my ellipse,below=of P0,yshift=-20pt] {$P_1^2$};
-\node(P2)[my ellipse,right=of P1,xshift=85pt] {$P_2^3$};
-\node(P3)[my ellipse,below=of P2,yshift=-20pt] {$P_3^5$};
-\node(P4)[my ellipse,left=of P3,xshift=-85pt] {$P_4^7$};
+\node(P1)[my ellipse,below=of P0,yshift=-20pt] {$P_2^2$};
+\node(P2)[my ellipse,right=of P1,xshift=85pt] {$P_3^3$};
+\node(P3)[my ellipse,below=of P2,yshift=-20pt] {$P_4^5$};
+\node(P4)[my ellipse,left=of P3,xshift=-85pt] {$P_5^7$};
 
 \draw[sarrow] (P0) to node[midway,right,align=center,yshift=2pt ] { $\{2,\dots,10\}$ } (P1);
 \draw[sarrow] (P1) to node[midway,above,align=center,yshift=2pt ] { $\{n \mid n \not\equiv 0 \; (\text{mod } 2) \}$ } (P2);
@@ -947,15 +948,17 @@ continues so until some specified limit.
 
 The parallel version constructs a pipeline of processes where each
 process holds one prime number
-\citep{Andrews2000}. Figure~\ref{fig:sieve} depicts the sieve pipeline
-which finds primes between $2$ and $10$. The job of each sieve process
-is to receive and perform a primality test on candidate prime by
-dividing the candidate number by its own prime. If the remainder after
-division is positive then the process forwards the candidate to its
-neighbour process. The initial process generates a sequence of natural
-numbers. These numbers are sent one by one to the first sieve
-process. We implement this as the function \lstinline$generator(n)$
-where \lstinline$n$ is the upper bound on sequence being generated:
+\citep{Andrews2000}. Figure~\ref{fig:sieve} visualises the sieve
+pipeline which finds primes between $2$ and $10$. In the figure the
+subscript of each process is its identifier and the superscript is the
+prime number it holds. The job of each sieve process is to receive and
+perform a primality test on candidate prime by dividing the candidate
+number by its own prime. If the remainder after division is positive
+then the process forwards the candidate to its neighbour process. The
+initial process generates a sequence of natural numbers. These numbers
+are sent one by one to the first sieve process. We implement this as
+the function \lstinline$generator(n)$ where \lstinline$n$ is the upper
+bound on sequence being generated:
 %
 \begin{lstlisting}
 fun generator(n) {
@@ -965,46 +968,168 @@ fun generator(n) {
 }
 \end{lstlisting}
 %
-The function spawns the first sieve process and afterwards it
-generates the sequence $\{2,\dots,n\}$. The \lstinline$foreach$
-function has type \lstinline$([a], (a) ~e~> ()) ~e~> ()$, that is it
-takes a list and an action as arguments. The action is applied to each
-element in the list.
+The function spawns the first sieve as an angel process. The
+\lstinline$foreach$ function has type
+\lstinline$([a], (a) ~e~> ()) ~e~> ()$, that is it takes a list and an
+action as arguments. The action is applied to each element in the
+list. The notation \lstinline$[2..n]$ is a shorthand for generating
+the sequence of integers between $2$ and $n$. The action function
+sends a \lstinline$Candidate$-tagged number to the first sieve
+process. When the entire sequence has been transmitted the generator
+sends the \lstinline$Stop$ signal.
+
+The first message sent to a sieve process will always be its
+prime. Subsequent messages may either be a \lstinline$Candidate$ prime
+number or the \lstinline$Stop$ signal. The implementation of
+\lstinline$sieve$ is given below.
 %
-\begin{lstlisting}
+\begin{lstlisting}[numbers=left]
 fun sieve() {
   var myprime = fromCandidate(recv());
   print(intToString(myprime));
   fun loop(neighbour) {
     switch (recv()) {
        case Stop -> stop(neighbour)
-       case Candidate(prime) ->
-       if (prime `mod` myprime <> 0) {
+       case Candidate(number) ->
+       if (number `mod` myprime == 0) {
+          loop(neighbour)
+       } else {
           var neighbour =
             switch (neighbour) {
               case Just(pid) -> pid
               case Nothing   -> spawnAngel { sieve() }
             };
-          neighbour ! Candidate(prime);
+          neighbour ! Candidate(number);
           loop(Just(neighbour))
-       } else { loop(neighbour) }
+       }
     }
   }
   loop(Nothing)
 }
 \end{lstlisting}
 %
+We describe function line by line.
+\begin{description}
+\item[Line 2] receives the process's prime number. The
+  \lstinline$fromCandidate$ simply removes the \lstinline$Candidate$
+  tag from the number.
+\item[Line 3] simply prints the prime to standard out.
+\item[Line 4] begins the definition of process's main loop. The
+  function is parameterised by a handle to its neighbouring process.
+\item[Lines 5-9] dispatch on the message tag. If the message is
+  \lstinline$Stop$ then the auxiliary function \lstinline$stop$
+  (described below) propagates the stop signal to the neighbour
+  process. If a candidate prime number is received then the process
+  performs a primality test on the candidate number. In case the
+  number is composite the \lstinline$loop$ function recursively calls
+  itself to repeat the procedure.
+\item[Lines 11-17] forwards the candidate \lstinline$number$ to its
+  neighbour. However before doing so the process must ensure it has a
+  neighbour. If the process already has a neighbour then the
+  \lstinline$switch$ expression simply removes the \lstinline$Just$
+  tag from the neighbour's identifier. In case it does not have a
+  neighbour it spawns one and returns the new neighbour's identifier.
+  Thereafter the process rewraps the candidate number and sends it to
+  its neighbour. Finally, the \lstinline$loop$ function gets called
+  recursively with the neighbour's identifier wrapped in a
+  \lstinline$Just$.
+\end{description}
+%
+The \lstinline$stop$ function handles the special case of when the
+process has no neighbour:
+%
 \begin{lstlisting}
-fun stop(process) {
-  switch (process) {
+fun stop(neighbour) {
+  switch (neighbour) {
     case Nothing   -> ()
     case Just(pid) -> pid ! Stop
   }
 }
 \end{lstlisting}
+%
+If it has no neighbour it silently exists, otherwise it forwards the
+\lstinline$Stop$ message before exiting. Now, we can run the example:
+\begin{lstlisting}
+links> generator(10);
+2
+3
+5
+7
+() : ()
+\end{lstlisting}
+%
+As expected it the primes between $2$ and $10$ get printed.
 
 \section{A reconstruction of the Links concurrency model with handlers}
 \label{sec:links-model-handlers}
+
+We will now attempt to reconstruct the concurrency of model of Links
+using effect handlers. We will do this reconstruction in several steps:
+first we consider how to design the process abstraction. Afterwards we
+consider the problem of scheduling processes. Thereafter we consider
+how to implement communication between processes.
+
+\subsection{Process abstraction}
+\label{sec:links-model-handlers-process}
+
+Initially, we choose to represent process identifiers as integers:
+\begin{lstlisting}
+typename Pid = Int;
+var pidToString = intToString;
+\end{lstlisting}
+%
+As for the process type we parameterise it by the effects that it may
+perform, thus we name it \lstinline$EProcess$ for \emph{effectful
+  process}:
+%
+\begin{lstlisting}
+typename EProcess(e::Row) = (id:Pid);
+\end{lstlisting}
+%
+The type is a simple alias for the singleton record type with an
+\lstinline$id$ field of type \lstinline$Pid$. However, the process
+type is parameterised by a \emph{phantom} row \lstinline$e$ -- it is
+not mentioned in the definition of \lstinline$EProcess$ -- which we
+will use to track the effects of processes. We use a small trick to
+get effect tracking to work as desired. The trick is obvious: let the
+type and effect system do the work for us. We make essential use of a
+helper function to create processes:
+%
+\begin{lstlisting}
+sig makeProcess : (() -e-> (), Pid) -> EProcess({ |e})
+fun makeProcess(_, pid) { (id=pid) }
+\end{lstlisting}
+%
+The trick lies in the type signature. First note that the function
+accepts as its first argument a nullary function that has effect row
+\lstinline$e$ and returns unit. We intent that this nullary function
+is the computation that the process will execute. Now, observe that
+the function wholly ignores the first argument. It only uses the
+second argument to construct a singleton record is structural
+compatible with an inhabitant of the type \lstinline$EProcess$. The
+type system captures the effect row on the first argument and uses it
+to construct a process type with an open row that mentions
+\lstinline$e$, i.e. \lstinline$EProcess({ |e})$. Because the process
+type mentions \lstinline$e$ it must, by row polymorphism, have the
+same effects as the ignored input function. We can try it out to see
+that it indeed works:
+%
+\begin{lstlisting}
+links> makeProcess(fun() { print("I am wild!") }, 1);
+(id=1) : EProcess ({ |wild|_ })
+links> makeProcess(fun() { if (do Choose) { print("True") } else { print("False") } }, 2);
+(id=2) : EProcess ({ |Choose:Bool,wild|_ })
+\end{lstlisting}
+%
+
+\subsection{A round-robin scheduler}
+\label{sec:links-model-handlers-scheduler}
+
+\subsection{Handling communication}
+\label{sec:links-model-handlers-communication}
+
+\subsection{Sieve of Eratosthenes example, revisited}
+\label{sec:links-model-handlers-example}
 
 % \section{Pipeline parallelism}
 % \label{sec:prime}
