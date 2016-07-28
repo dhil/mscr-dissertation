@@ -131,6 +131,7 @@ sig put : (s) {Put:(s) {}-> ()|_}-> ()
 fun put(s) {do Put(s)}
 
 # Process scheduler
+sig enqueueProcess : (() -e-> ()) {Get:Queue(() -e-> ()),Put:(Queue(() -e-> ())) {}-> ()|_}~> ()
 fun enqueueProcess(f) {
   var q = enqueue(get(), f);
   put(q)
@@ -396,6 +397,28 @@ fun generator(n)() {
   var first = pspawn(sieve);
   foreach([2..n], fun(p) { first $! Candidate(p) });
   first $! Stop
+}
+
+handler rr {
+  case Return(_) ->
+    dequeueProcess()()
+  case Spawn(f,resume) ->
+    var child = makeProcess(f, 0);
+    enqueueProcess(fun() { resume(child) });
+    rr(f)()
+  case Yield(resume) ->
+    enqueueProcess(fun() { resume(()) });
+    dequeueProcess()()
+}
+
+fun sayHello(n)() {
+   print("Hello!");
+   if (n == 0) { () }
+   else {
+     var p1 = pspawn(sayHello(n-1));
+     var p2 = pspawn(sayHello(n-1));
+     ()
+   }
 }
 
 
