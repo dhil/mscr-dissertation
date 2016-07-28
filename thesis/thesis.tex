@@ -1164,24 +1164,82 @@ scheduler to share execution time among processes.
 
 We will begin by considering a simple fair, round-robin scheduler. The
 main idea is to maintain a process queue with first-in-first-out
-semantics. In order to maintain the queue we will use a stateful
-interpretation. We will define two auxiliary functions to enqueue and
-dequeue processes from the queue:
+semantics. There are two obvious scheduling policies to choose from
+when a process invokes the \lstinline$Spawn$ operation. The scheduler
+either enqueues the parent process and runs the child process
+immediately or enqueues the child process and resumes the parent
+process. We will adopt the former policy. Using this policy an
+invocation of \lstinline$Yield$ simply enqueues the yielding process
+and dequeues the next process to run. We implement the scheduler as a
+handler:
+%
+\begin{lstlisting}[numbers=left]
+handler basicRoundrobin {
+  case Spawn(f, resume) ->
+    var child = makeProcess(f, 0);
+    enqueueProcess(fun() { resume(child) });
+    basicRoundrobin(f)()
+  case Yield(resume) ->
+    enqueueProcess(fun() { resume(()) });
+    dequeueProcess()()
+  case Return(_) ->
+    dequeueProcess()()
+}
+\end{lstlisting}
+%
+We describe the handler line by line.
+%
+\begin{description}
+\item[Lines 2-5] handle the \lstinline$Spawn$ operation by first
+  creating an process handle of type
+  \lstinline[mathescape]!EProcess($\cdot$)! to the new
+  \lstinline$child$ process. This handle is returned to the parent via
+  the resumption function, \lstinline$resume$. However, the evaluation
+  of the resumption function is delayed as we store it inside a thunk.
+  This effectively amounts to suspending the process. The thunk goes
+  into the process queue. Afterwards the scheduler transfers control
+  to the forked computation \lstinline$f$. It is crucial that the
+  scheduler is invoked recursively in order to handle any effects that
+  \lstinline$f$ may perform.
+
+\item[Lines 6-8] suspend the yielding process and transfers control to
+  the next process in the queue. The \lstinline$dequeueProcess$
+  returns a thunk which starts evaluating immediately.
+
+\item[Lines 9-10] handle the case when a process terminates. This
+  leaves room for another process to run hence we dequeue the next
+  process.
+
+\end{description}
+%
+The auxiliary functions \lstinline$enqueueProcess$ and
+\lstinline$dequeueProcess$ hides the details of the process queue
+management. In order to maintain the queue we require a stateful
+interpretation. The two function uses the \lstinline$Get$ and
+\lstinline$Put$ operations that we define in Section~\ref{sec:??}:
 %
 \begin{lstlisting}
 sig enqueueProcess : 
-   (() -e-> ()) {Get:Queue(() -e-> ())
+   (() -e-> ()) {Get: Queue(() -e-> ())
                 ,Put:(Queue(() -e-> ())) {}-> ()|_}~> ()
-fun enqueueProcess(f) {
-  var q = enqueue(get(), f);
+fun enqueueProcess(p) {
+  var q = enqueue(get(), p);
   put(q)
 }
 \end{lstlisting}
+Here \lstinline[mathescape]!Queue($\cdot$)! is a type constructor for
+a queue type. We will omit the implementation details of the queue
+itself. The function \lstinline$enqueue$ stores the process
+\lstinline$p$ in the queue retrieved by the \lstinline$get$
+operation. Similarly, \lstinline$dequeueProcess$ removes a process
+from the queue. However when the queue is empty it returns the trivial
+process. This way we will not have to concern ourselves with special
+cases in the scheduler. The implementation is straightforward:
 %
 \begin{lstlisting}
 fun dequeueProcess() {
   var q = get();
-  if (isEmptyQueue(q)) { fun() { () } }
+  if (isEmptyQueue(q)) { fun() { () } } # Special case
   else {
     var (p, q) = dequeue(q);
     put(q);
@@ -1189,13 +1247,7 @@ fun dequeueProcess() {
   }
 }
 \end{lstlisting}
-
-There are two obvious scheduling policies to choose from
-when a process invokes the \lstinline$Spawn$ operation. The scheduler
-either enqueues the parent process and runs the child process
-immediately or enqueues the child process and resumes the parent
-process. We will adopt the former policy. When \lstinline$Yield$ is
-invoked We implement this scheduler as a handler:
+%
 
 \subsection{Handling communication}
 \label{sec:links-model-handlers-communication}
