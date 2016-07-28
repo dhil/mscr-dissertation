@@ -82,7 +82,7 @@
   morekeywords={spawn, receive, typename, fun, op, var, if, this, true, false, else, case, switch, handle, handler, shallowhandler, do, sig, spawnAngel, spawnDemon, spawn},%
   sensitive=t, % 
   keywordstyle=\color{red},
-  emph={Comp,Player,Bool,Int,GTree,Cheat,Zero,Choose,Rand,Move,Winner,Take,Return,Get,Put,GameState,Alice,Bob,Fail,Nothing,Just,Maybe,Toss,Heads,Tails,Process,Buyer,Coffee,Pay,Cost,Candidate,Stop,PassingComet,CelebritySighting,Float,String,Pid,EProcess,Row},
+  emph={Comp,Player,Bool,Int,GTree,Cheat,Zero,Choose,Rand,Move,Winner,Take,Return,Get,Put,GameState,Alice,Bob,Fail,Nothing,Just,Maybe,Toss,Heads,Tails,Process,Buyer,Coffee,Pay,Cost,Candidate,Stop,PassingComet,CelebritySighting,Float,String,Pid,EProcess,Row,Spawn,Yield,Recv,Send,FreshName,Queue,Dictionary},
   emphstyle={\color{blue}},
   comment=[l]{\#},% 
   commentstyle={\itshape\color{darkgreen}},%
@@ -1047,8 +1047,9 @@ fun stop(neighbour) {
 }
 \end{lstlisting}
 %
-If it has no neighbour it silently exists, otherwise it forwards the
-\lstinline$Stop$ message before exiting. Now, we can run the example:
+The process silently exits if it does not have a neighbour. Otherwise
+the process forwards the \lstinline$Stop$ message before exiting. Now,
+we can run the example:
 \begin{lstlisting}
 links> generator(10);
 2
@@ -1117,13 +1118,84 @@ that it indeed works:
 \begin{lstlisting}
 links> makeProcess(fun() { print("I am wild!") }, 1);
 (id=1) : EProcess ({ |wild|_ })
-links> makeProcess(fun() { if (do Choose) { print("True") } else { print("False") } }, 2);
+links> makeProcess(fun() { if (do Choose) print("True") 
+......                     else print("False") }, 2);
 (id=2) : EProcess ({ |Choose:Bool,wild|_ })
 \end{lstlisting}
 %
 
-\subsection{A round-robin scheduler}
+\subsection{Spawning, suspending, and scheduling processes}
 \label{sec:links-model-handlers-scheduler}
+
+\todo{Introduce fibers}
+Though, the caveat is that cooperative multi-tasking does not
+immediately provide preemptive concurrency. 
+
+\subsubsection{Concurrency operations}
+
+We require an interface to spawn and suspend processes. We define an
+operation \lstinline$Spawn$ that takes a nullary function with an
+effect signature \lstinline$e$ as its argument and returns a process
+of type \lstinline$EProcess({ |e})$, i.e.
+\begin{lstlisting}
+sig pspawn : (() -e-> ()) {Spawn:(() -e-> ()) {}-> EProcess({ |e}) |_}-> EProcess({ |e})
+fun pspawn(f) { do Spawn(f) }
+\end{lstlisting}
+As usual the operation is quite simple. Most of the work is concerned
+with getting the type signature right. The signature enforces any
+interpretation of \lstinline$pspawn$ to at least return a process
+handle. In a similar fashion we define an operation for suspending a
+computation:
+\begin{lstlisting}
+sig yield : () {Yield:() |_}-> ()
+fun yield() { do Yield }
+\end{lstlisting}
+%
+This settles the interface for fibers. Next, we need to give a
+concrete implementation of fibers through an interpretation of
+\lstinline$Spawn$ and \lstinline$Yield$.
+
+\subsubsection{A basic round-robin scheduler}
+
+An interpretation of \lstinline$Spawn$ and \lstinline$Yield$ amounts
+to scheduling processes. Our programs will be running in the a single
+thread of control and therefore it is the responsibility of the
+scheduler to share execution time among processes.
+
+We will begin by considering a simple fair, round-robin scheduler. The
+main idea is to maintain a process queue with first-in-first-out
+semantics. In order to maintain the queue we will use a stateful
+interpretation. We will define two auxiliary functions to enqueue and
+dequeue processes from the queue:
+%
+\begin{lstlisting}
+sig enqueueProcess : 
+   (() -e-> ()) {Get:Queue(() -e-> ())
+                ,Put:(Queue(() -e-> ())) {}-> ()|_}~> ()
+fun enqueueProcess(f) {
+  var q = enqueue(get(), f);
+  put(q)
+}
+\end{lstlisting}
+%
+\begin{lstlisting}
+fun dequeueProcess() {
+  var q = get();
+  if (isEmptyQueue(q)) { fun() { () } }
+  else {
+    var (p, q) = dequeue(q);
+    put(q);
+    p # Returning the process
+  }
+}
+\end{lstlisting}
+
+There are two obvious scheduling policies to choose from
+when a process invokes the \lstinline$Spawn$ operation. The scheduler
+either enqueues the parent process and runs the child process
+immediately or enqueues the child process and resumes the parent
+process. We will adopt the former policy. When \lstinline$Yield$ is
+invoked We implement this scheduler as a handler:
 
 \subsection{Handling communication}
 \label{sec:links-model-handlers-communication}
@@ -1131,6 +1203,57 @@ links> makeProcess(fun() { if (do Choose) { print("True") } else { print("False"
 \subsection{Sieve of Eratosthenes example, revisited}
 \label{sec:links-model-handlers-example}
 
+Generator
+%
+\begin{lstlisting}
+fun generator(n)() {
+  var first = pspawn(sieve);
+  foreach([2..n], fun(p) { first $! Candidate(p) });
+  first $! Stop
+}
+\end{lstlisting}
+%
+Sieve
+%
+\begin{lstlisting}
+fun sieve() {
+  var myprime = fromCandidate(precv());
+  print(intToString(myprime));
+  fun loop(neighbour) {
+    switch (precv()) {
+      case Stop -> stop(neighbour)
+      case Candidate(prime) ->
+        if (prime `mod` myprime <> 0) {
+          var neighbour =
+            switch (neighbour) {
+              case Just(pid) -> pid
+              case Nothing   -> pspawn(sieve)
+            };
+          neighbour $! Candidate(prime);
+          loop(Just(neighbour))
+        } else { loop(neighbour) }
+    }
+  }
+  loop(Nothing)
+}
+\end{lstlisting}
+Now we can plug everything together
+%
+\begin{lstlisting}
+run -<- names(incrPid, 0) 
+    -<- evalState(emptyDictionary()) -<- mailbox 
+    -<- evalState(emptyQueue())      -<- roundrobin 
+    -<  generator(10);
+\end{lstlisting}
+Next, we can compile the program and run it:
+\begin{lstlisting}
+$ ./links -c concur_model.links -o concur_model
+$ ./concur_model
+2
+3
+5
+7
+\end{lstlisting}
 % \section{Pipeline parallelism}
 % \label{sec:prime}
 
