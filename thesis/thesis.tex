@@ -51,6 +51,8 @@
 \usepackage{xcolor}
 \usepackage{listings}
 
+\newcommand{\snippet}[1]{\lstinputlisting{snippets/#1}}
+
 \lstset{
  backgroundcolor=\color{white},   % choose the background color; you must add \usepackage{color} or \usepackage{xcolor}
  basicstyle=\ttfamily\small,        % the size of the fonts that are used for the code
@@ -532,7 +534,7 @@ algebraic effect that is given by a nondeterministic choice operation
 called \lstinline$Choose$. In Links, we may use this operation to
 implement a coin toss:
 %
-\lstinputlisting{snippets/toss.links}
+\snippet{toss.links}
 %
 This declares an \emph{abstract computation} \lstinline$toss$, which
 invokes an operation \lstinline$Choose$ using the \lstinline$do$
@@ -548,7 +550,7 @@ Introduction of another operation causes the effect signature to grow
 accordingly. For example, if we introduce an exception operation
 \lstinline$Fail : Zero$, then we can model a drunk coin toss:
 %
-\lstinputlisting{snippets/drunkToss.links}
+\snippet{drunkToss.links}
 %
 Here \lstinline$Zero$ is the empty type, and thus the
 \lstinline$switch$ pattern matching construct has no clauses.
@@ -557,7 +559,7 @@ An effect handler instantiates a subset of the operations of an
 abstract computation. For example, the following handler interprets
 \lstinline$Choose$ randomly:
 %
-\lstinputlisting{snippets/randomResult.links}
+\snippet{randomResult.links}
 %
 The signature conveys that the handler interprets the operation
 \lstinline$Choose$ and leaves any other operations uninterpreted. The
@@ -584,7 +586,7 @@ uniformly distributed.
 Alternatively, we may define a handler for \lstinline$Choose$ that
 invokes its continuation twice to enumerate every possible outcome:
 %
-\lstinputlisting{snippets/allResults.links}
+\snippet{allResults.links}
 %
 Observe that the return value is lifted into a singleton list. The
 \lstinline$Choose$-clause concatenates the outcomes obtained by
@@ -601,7 +603,7 @@ following handler, which returns \lstinline$Just$ the result of the
 computation or returns \lstinline$Nothing$ if the operation
 \lstinline$Fail$ is performed:
 %
-\lstinputlisting{snippets/maybeResult.links}
+\snippet{maybeResult.links}
 %
 The type system prevents invocation of the continuation in the
 \lstinline$Fail$-clause, because the type \lstinline$Zero$ has zero
@@ -1074,18 +1076,14 @@ how to implement communication between processes.
 \label{sec:links-model-handlers-process}
 
 Initially, we choose to represent process identifiers as integers:
-\begin{lstlisting}
-typename Pid = Int;
-var pidToString = intToString;
-\end{lstlisting}
+%
+\snippet{pidInt.links}
 %
 As for the process type we parameterise it by the effects that it may
 perform, thus we name it \lstinline$EProcess$ for \emph{effectful
   process}:
 %
-\begin{lstlisting}
-typename EProcess(e::Row) = (id:Pid);
-\end{lstlisting}
+\snippet{eprocess.links}
 %
 The type is a simple alias for the singleton record type with an
 \lstinline$id$ field of type \lstinline$Pid$. However, the process
@@ -1096,10 +1094,7 @@ get effect tracking to work as desired. The trick is obvious: let the
 type and effect system do the work for us. We make essential use of a
 helper function to create processes:
 %
-\begin{lstlisting}
-sig makeProcess : (() -e-> (), Pid) -> EProcess({ |e})
-fun makeProcess(_, pid) { (id=pid) }
-\end{lstlisting}
+\snippet{makeProcess.links}
 %
 The trick lies in the type signature. First note that the function
 accepts as its first argument a nullary function that has effect row
@@ -1137,19 +1132,17 @@ We require an interface to spawn and suspend processes. We define an
 operation \lstinline$Spawn$ that takes a nullary function with an
 effect signature \lstinline$e$ as its argument and returns a process
 of type \lstinline$EProcess({ |e})$, i.e.
-\begin{lstlisting}
-sig pspawn : (() -e-> ()) {Spawn:(() -e-> ()) {}-> EProcess({ |e}) |_}-> EProcess({ |e})
-fun pspawn(f) { do Spawn(f) }
-\end{lstlisting}
-As usual the operation is quite simple. Most of the work is concerned
+%
+\snippet{pspawn.links}
+%
+We dub the function \lstinline$pspawn$ for \emph{process} spawn. As
+usual the operation is quite simple. Most of the work is concerned
 with getting the type signature right. The signature enforces any
 interpretation of \lstinline$pspawn$ to at least return a process
 handle. In a similar fashion we define an operation for suspending a
 computation:
-\begin{lstlisting}
-sig yield : () {Yield:() |_}-> ()
-fun yield() { do Yield }
-\end{lstlisting}
+%
+\snippet{yield.links}
 %
 This settles the interface for fibers. Next, we need to give a
 concrete implementation of fibers through an interpretation of
@@ -1164,7 +1157,46 @@ scheduler to share execution time among processes.
 
 We will begin by considering a simple fair, round-robin scheduler. The
 main idea is to maintain a process queue with first-in-first-out
-semantics. There are two obvious scheduling policies to choose from
+semantics. 
+We omit the implementation of the process queue data
+structure. Instead we describe its interface:
+\begin{itemize}
+\item We assume a type constructor \lstinline$Queue(a)$ that
+  constructs a queue type whose elements have type \lstinline$a$.
+\item We assume a function
+  \lstinline$enqueue : (Queue(a), a) -> Queue(a)$ that given a queue
+  and an element appends the element onto a copy of the queue.
+\item Similarly, the function
+  \lstinline$dequeue : (Queue(a)) ~> (a, Queue(a))$ given a queue it
+  returns the head and a copy of the tail of the queue. An attempt to
+  dequeue the empty queue is considered an error.
+\end{itemize}
+The process queue is naturally stateful as it will change every time a
+process is being spawned or suspended. Therefore we will use a state
+interpretation The auxiliary functions \lstinline$enqueueProcess$ and
+\lstinline$dequeueProcess$ hides the details of the process queue
+management. We do not present the implementation details of the
+underlying queue data structure. In order to maintain the queue we
+require a stateful interpretation. The two function use the
+\lstinline$Get$ and \lstinline$Put$ operations that we defined in
+Section~\ref{sec:??}:
+%
+\snippet{enqueueProcess.links}
+%
+Here \lstinline[mathescape]!Queue($\cdot$)! is a type constructor for
+a queue type. We will omit the implementation details of the queue
+itself. The function \lstinline$enqueue$ stores the process
+\lstinline$p$ in the queue retrieved by the \lstinline$get$
+operation. Similarly, \lstinline$dequeueProcess$ removes a process
+from the queue. However when the queue is empty it returns the trivial
+process. This way we will not have to concern ourselves with special
+cases in the scheduler. The implementation is straightforward:
+%
+\snippet{dequeueProcess.links}
+%
+
+%
+There are two obvious scheduling policies to choose from
 when a process invokes the \lstinline$Spawn$ operation. The scheduler
 either enqueues the parent process and runs the child process
 immediately or enqueues the child process and resumes the parent
@@ -1173,33 +1205,23 @@ invocation of \lstinline$Yield$ simply enqueues the yielding process
 and dequeues the next process to run. We implement the scheduler as a
 handler:
 %
-\begin{lstlisting}[numbers=left]
-handler basicRoundrobin {
-  case Spawn(f, resume) ->
-    var child = makeProcess(f, 0);
-    enqueueProcess(fun() { resume(child) });
-    basicRoundrobin(f)()
-  case Yield(resume) ->
-    enqueueProcess(fun() { resume(()) });
-    dequeueProcess()()
-  case Return(_) ->
-    dequeueProcess()()
-}
-\end{lstlisting}
+\lstinputlisting[numbers=left]{snippets/basicRoundrobin.links}
 %
 We describe the handler line by line.
 %
 \begin{description}
 \item[Lines 2-5] handle the \lstinline$Spawn$ operation by first
   creating an process handle of type
-  \lstinline[mathescape]!EProcess($\cdot$)! to the new
-  \lstinline$child$ process. This handle is returned to the parent via
-  the resumption function, \lstinline$resume$. However, the evaluation
-  of the resumption function is delayed as we store it inside a thunk.
-  This effectively amounts to suspending the process. The thunk goes
-  into the process queue. Afterwards the scheduler transfers control
-  to the forked computation \lstinline$f$. It is crucial that the
-  scheduler is invoked recursively in order to handle any effects that
+  \lstinline[mathescape]!EProcess($\cdot$)! for the new
+  \lstinline$child$ process. Note that for now we impetuously assign
+  the identifier \lstinline$0$ to every process. Later we will rectify
+  this. The handle is returned to the parent via the resumption
+  function, \lstinline$resume$. However, the evaluation of the
+  resumption function is delayed as we store it inside a thunk.  This
+  effectively amounts to suspending the process. The thunk goes into
+  the process queue. Afterwards the scheduler transfers control to the
+  forked computation \lstinline$f$. It is crucial that the scheduler
+  is invoked recursively in order to handle any effects that
   \lstinline$f$ may perform.
 
 \item[Lines 6-8] suspend the yielding process and transfers control to
@@ -1212,42 +1234,6 @@ We describe the handler line by line.
 
 \end{description}
 %
-The auxiliary functions \lstinline$enqueueProcess$ and
-\lstinline$dequeueProcess$ hides the details of the process queue
-management. In order to maintain the queue we require a stateful
-interpretation. The two function uses the \lstinline$Get$ and
-\lstinline$Put$ operations that we define in Section~\ref{sec:??}:
-%
-\begin{lstlisting}
-sig enqueueProcess : 
-   (() -e-> ()) {Get: Queue(() -e-> ())
-                ,Put:(Queue(() -e-> ())) {}-> ()|_}~> ()
-fun enqueueProcess(p) {
-  var q = enqueue(get(), p);
-  put(q)
-}
-\end{lstlisting}
-Here \lstinline[mathescape]!Queue($\cdot$)! is a type constructor for
-a queue type. We will omit the implementation details of the queue
-itself. The function \lstinline$enqueue$ stores the process
-\lstinline$p$ in the queue retrieved by the \lstinline$get$
-operation. Similarly, \lstinline$dequeueProcess$ removes a process
-from the queue. However when the queue is empty it returns the trivial
-process. This way we will not have to concern ourselves with special
-cases in the scheduler. The implementation is straightforward:
-%
-\begin{lstlisting}
-fun dequeueProcess() {
-  var q = get();
-  if (isEmptyQueue(q)) { fun() { () } } # Special case
-  else {
-    var (p, q) = dequeue(q);
-    put(q);
-    p # Returning the process
-  }
-}
-\end{lstlisting}
-%
 
 \subsection{Handling communication}
 \label{sec:links-model-handlers-communication}
@@ -1257,38 +1243,12 @@ fun dequeueProcess() {
 
 Generator
 %
-\begin{lstlisting}
-fun generator(n)() {
-  var first = pspawn(sieve);
-  foreach([2..n], fun(p) { first $! Candidate(p) });
-  first $! Stop
-}
-\end{lstlisting}
+\snippet{generator.links}
 %
 Sieve
 %
-\begin{lstlisting}
-fun sieve() {
-  var myprime = fromCandidate(precv());
-  print(intToString(myprime));
-  fun loop(neighbour) {
-    switch (precv()) {
-      case Stop -> stop(neighbour)
-      case Candidate(prime) ->
-        if (prime `mod` myprime <> 0) {
-          var neighbour =
-            switch (neighbour) {
-              case Just(pid) -> pid
-              case Nothing   -> pspawn(sieve)
-            };
-          neighbour $! Candidate(prime);
-          loop(Just(neighbour))
-        } else { loop(neighbour) }
-    }
-  }
-  loop(Nothing)
-}
-\end{lstlisting}
+\snippet{sieve.links}
+%
 Now we can plug everything together
 %
 \begin{lstlisting}

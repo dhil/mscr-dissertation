@@ -3,21 +3,21 @@ CFLAGS=-interaction=nonstopmode -halt-on-error -file-line-error
 BIBC=bibtex
 PAPER=thesis
 BIBLIO=references
-EXAMPLES=sourcecode/coin.links
+EXAMPLES=sourcecode/coin.links ../programs/links/concur_model.links ../programs/links/links_concur_model.links
 LINKS=$(HOME)/projects/links/compiler/links
 LFLAGS=--config=$(HOME)/projects/links/compiler/default.config
 LINKSC=$(LINKS) -c --native
 
 all: $(PAPER).pdf
 
-program_outputs: $(EXAMPLES)
+program_outputs: sourcecode/coin.links
 	mkdir -p outputs
 	$(LINKS) $(LFLAGS) $(EXAMPLES) > output.tmp
 	bash mksnippets.sh output.tmp outputs
 
-snippets: program_outputs $(EXAMPLES)
+snippets: $(EXAMPLES)
 	mkdir -p snippets
-	bash mksnippets.sh $(EXAMPLES) snippets
+	$(foreach src,$(EXAMPLES),bash mksnippets.sh $(src) snippets;)
 
 $(PAPER).aux: $(PAPER).tex
 	$(TEXC) $(CFLAGS) $(PAPER)
@@ -26,7 +26,7 @@ $(BIBLIO).bbl: $(PAPER).aux $(BIBLIO).bib
 	$(TEXC) $(CFLAGS) $(PAPER)
 	$(BIBC) $(PAPER)
 
-$(PAPER).pdf: snippets $(PAPER).aux $(BIBLIO).bbl 
+$(PAPER).pdf: program_outputs snippets $(PAPER).aux $(BIBLIO).bbl 
 	$(TEXC) $(CFLAGS) $(PAPER)
 	$(TEXC) $(CFLAGS) $(PAPER)
 
@@ -42,3 +42,5 @@ clean:
 	rm -rf snippets
 	rm -rf outputs
 	rm -f output.tmp
+
+.PHONY: all camera-ready clean
