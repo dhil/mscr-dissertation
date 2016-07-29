@@ -21,10 +21,13 @@
 typename ExecutionUnit(id::Type,inp::Type,e::Row,out::Type) =
          (id:id, comp:(inp) -e-> out);
 
+#snippet:pidInt.links
 typename Pid = Int;
 var pidToString = intToString;
+#end
 
 # Fresh name generator
+#snippet:freshnames.links
 sig names : ((a) {FreshName{p}|e}~> a, a) -> (Comp({FreshName:a|e}, b)) -> Comp({FreshName{p}|e}, b)
 fun names(gen, seed) {
    var h = handler(next) {
@@ -33,12 +36,17 @@ fun names(gen, seed) {
    };
    h(seed)
 }
+#end
 
+#snippet:freshname.links
 fun freshName() {do FreshName}
+#end
 
 typename PackedProcess(e::Row,y::Type) = forall p :: Row . (ExecutionUnit(Pid,(),{ |e},())) -p-> y;
 #typename EProcess(e::Row) = forall y, p :: Row . (PackedProcess({ |e}, y)) -p-> y;
+#snippet:eprocess.links
 typename EProcess(e::Row) = (id:Pid);
+#end
 
 fun showProcess(p) {
     "P#" ^^ pidToString(getPid(p))
@@ -49,8 +57,10 @@ fun makeExecutionUnit(f, id) {
     (id=id, comp=f)
 }
 
+#snippet:makeProcess.links
 sig makeProcess : (() -e-> (), Pid) -> EProcess({ |e})
 fun makeProcess(_, pid) { (id=pid) }
+#end
 
 sig getPid : (EProcess({ |e})) -> Pid
 fun getPid(proc) { proc.id }
@@ -79,15 +89,21 @@ fun incrPid(i) { i + 1 }
 
 
 # Process creation
+#snippet:pspawn.links
 sig pspawn : (() -e-> ()) {Spawn:(() -e-> ()) {}-> EProcess({ |e}) |_}-> EProcess({ |e})
 fun pspawn(f) { do Spawn(f) }
+#end
 
 # Process suspension
+#snippet:yield.links
 sig yield : () {Yield:() |_}-> ()
 fun yield() { do Yield }
+#end
 
+#snippet:myself.links
 sig myself : () {Myself:EProcess({ |e}),Yield:() |_}-> EProcess({ |e})
 fun myself() {yield(); do Myself}
+#end
 
 # Process queue
 typename Queue(a::Type) = ([a],[a]);
@@ -106,11 +122,13 @@ fun isEmptyQueue(q) {
 sig enqueue : (Queue(a), a) -> Queue(a)
 fun enqueue((xs,ys), y) { (xs, y::ys) }
 
-sig dequeue : (Queue(a)) ~> (a, Queue(a))
+# Loops forever when attempting to dequeue the empty queue
+sig dequeue : (Queue(a)) ~> (Maybe(a), Queue(a))
 fun dequeue(q) {
     switch (q) {
-      case (x :: xs, ys) -> (x, (xs, ys))
-      case ([], ys)      -> dequeue((reverse(ys),[]))
+      case (x :: xs, ys) -> (Just(x), (xs, ys))
+      case ([], [])      -> (Nothing, q)
+      case ([], ys)      -> dequeue((reverse(ys), []))
     }
 }
 
@@ -131,29 +149,31 @@ sig put : (s) {Put:(s) {}-> ()|_}-> ()
 fun put(s) {do Put(s)}
 
 # Process scheduler
-sig enqueueProcess : (() -e-> ()) {Get:Queue(() -e-> ()),Put:(Queue(() -e-> ())) {}-> ()|_}~> ()
+#snippet:enqueueProcess.links
+sig enqueueProcess :
+   (() -e-> ()) {Get: Queue(() -e-> ())
+                ,Put:(Queue(() -e-> ())) {}-> ()|_}~> ()
 fun enqueueProcess(f) {
   var q = enqueue(get(), f);
   put(q)
-  #var q = get();  
-  #put(q ++ [f])
 }
+#end
 
+#snippet:dequeueProcess.links
 fun dequeueProcess() {
    var q = get();
-   if (isEmptyQueue(q)) { fun() { () } }
-#   if (length(q) == 0) { fun() { () } }
-   else {
-      var (p, q) = dequeue(q);
-      # var q = get();
-      # switch(q) {
-      #   case p :: q -> put(q); p
-      #   case []     -> error("Impossible")
-      # }
-      put(q);
-      p
+   switch (dequeue(q)) {
+     case (Just(p), q) -> put(q); p
+     case (Nothing, q) -> fun() { () }
    }
+   # if (isEmptyQueue(q)) { fun() { () } }
+   # else {
+   #    var (p, q) = dequeue(q);
+   #    put(q);
+   #    p       # Return process
+   # }
 }
+#end
 
 # handler roundrobin(parent, numChildren) {
 #   case Spawn(f,k) ->
@@ -169,6 +189,7 @@ fun dequeueProcess() {
 #        dequeueProcess()()
 # }
 
+#snippet:roundrobin.links
 fun roundrobin(m)() {
   var root = makeProcess(m, freshName());
   handler scheduler(activeProcess) {
@@ -186,6 +207,7 @@ fun roundrobin(m)() {
   }
   run -<- scheduler(root) -< m
 }
+#end
 
 fun hello(depth)() {
     print("Hello from process " ^^ showProcess(myself()));
@@ -207,11 +229,16 @@ fun run(m) { m() }
 #var dummy = run -<- evalState(emptyQueue()) -<- roundrobin(makeProcess(fun() { () }, "0"), 0) -< hello(4);
 
 # Communication
+#snippet:psend.links
 sig psend : (EProcess({ |e}), a) {Send:(Pid, a) {}-> (),Yield:()|_}-> ()
 fun psend(proc, msg) { do Send(getPid(proc), msg); yield() }
+#end
 
+#snippet:psendOp.links
 op proc $! msg { psend(proc, msg) }
+#end
 
+#snippet:precv.links
 sig precv : () {Recv:(Pid) {}-> Maybe(a),Myself:EProcess({ |_}),Yield:()|_}~> a
 fun precv() {    
     fun loop(mypid : Pid) {
@@ -224,6 +251,7 @@ fun precv() {
     }
     loop(getPid(myself()))
 }
+#end
 
 typename Ordering = [|GT
                      |EQ
@@ -365,6 +393,7 @@ fun printInt(i) {
   print(intToString(i))
 }
 
+#snippet:sieve.links
 fun sieve() {
   var myprime = fromCandidate(precv());
   print(intToString(myprime));
@@ -372,7 +401,9 @@ fun sieve() {
     switch (precv()) {
        case Stop -> stop(neighbour)
        case Candidate(prime) ->
-       if (prime `mod` myprime <> 0) {
+       if (prime `mod` myprime == 0) {
+         loop(neighbour)
+       } else {
           var neighbour =
             switch (neighbour) {
               case Just(pid) -> pid
@@ -380,11 +411,12 @@ fun sieve() {
             };
           neighbour $! Candidate(prime);
           loop(Just(neighbour))
-       } else { loop(neighbour) }
+      }
     }
-  }
-  loop(Nothing)
+ }
+ loop(Nothing)
 }
+#end
 
 fun foreach(xs, action) {
   switch (xs) {
@@ -393,23 +425,27 @@ fun foreach(xs, action) {
   }
 }
 
+#snippet:generator.links
 fun generator(n)() {
   var first = pspawn(sieve);
   foreach([2..n], fun(p) { first $! Candidate(p) });
   first $! Stop
 }
+#end
 
-handler rr {
-  case Return(_) ->
-    dequeueProcess()()
+#snippet:basicRoundrobin.links
+handler basicRoundrobin {
   case Spawn(f,resume) ->
     var child = makeProcess(f, 0);
     enqueueProcess(fun() { resume(child) });
-    rr(f)()
+    basicRoundrobin(f)()
   case Yield(resume) ->
     enqueueProcess(fun() { resume(()) });
     dequeueProcess()()
+  case Return(_) ->
+    dequeueProcess()()
 }
+#end
 
 fun sayHello(n)() {
    print("Hello!");
