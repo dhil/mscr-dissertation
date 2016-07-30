@@ -128,7 +128,14 @@
 
 \lstset{style={links}}
 
-
+% Terminal / prompt style
+\lstdefinestyle{terminal}{
+  caption={},
+  basicstyle=\linespread{1.0}\ttfamily\footnotesize,
+  keywordstyle={},
+  emphstyle={},
+  commentstyle={}
+}
 
 % Theorem environments
 \newtheorem{theorem}{Theorem}[section]
@@ -490,6 +497,23 @@ effect handlers in Links and OCaml, respectively.
 
 \section{A theory of algebraic effects and handlers}
 \label{sec:theory-handlers}
+
+\section{Links primer}
+\label{sec:links-primer}
+
+We omit the implementation of the process queue data
+structure. Instead we describe its interface:
+\begin{itemize}
+\item We assume a type constructor \lstinline$Queue(a)$ that
+  constructs a queue type whose elements have type \lstinline$a$.
+\item We assume a function
+  \lstinline$enqueue : (Queue(a), a) -> Queue(a)$ that given a queue
+  and an element appends the element onto a copy of the queue.
+\item Similarly, the function
+  \lstinline$dequeue : (Queue(a)) ~> (a, Queue(a))$ given a queue it
+  returns the head and a copy of the tail of the queue. An attempt to
+  dequeue the empty queue is considered an error.
+\end{itemize}
 
 \section{Links with effect handlers}
 \label{sec:links-handlers}
@@ -1157,50 +1181,11 @@ scheduler to share execution time among processes.
 
 We will begin by considering a simple fair, round-robin scheduler. The
 main idea is to maintain a process queue with first-in-first-out
-semantics. 
-We omit the implementation of the process queue data
-structure. Instead we describe its interface:
-\begin{itemize}
-\item We assume a type constructor \lstinline$Queue(a)$ that
-  constructs a queue type whose elements have type \lstinline$a$.
-\item We assume a function
-  \lstinline$enqueue : (Queue(a), a) -> Queue(a)$ that given a queue
-  and an element appends the element onto a copy of the queue.
-\item Similarly, the function
-  \lstinline$dequeue : (Queue(a)) ~> (a, Queue(a))$ given a queue it
-  returns the head and a copy of the tail of the queue. An attempt to
-  dequeue the empty queue is considered an error.
-\end{itemize}
-The process queue is naturally stateful as it will change every time a
-process is being spawned or suspended. Therefore we will use a state
-interpretation The auxiliary functions \lstinline$enqueueProcess$ and
-\lstinline$dequeueProcess$ hides the details of the process queue
-management. We do not present the implementation details of the
-underlying queue data structure. In order to maintain the queue we
-require a stateful interpretation. The two function use the
-\lstinline$Get$ and \lstinline$Put$ operations that we defined in
-Section~\ref{sec:??}:
-%
-\snippet{enqueueProcess.links}
-%
-Here \lstinline[mathescape]!Queue($\cdot$)! is a type constructor for
-a queue type. We will omit the implementation details of the queue
-itself. The function \lstinline$enqueue$ stores the process
-\lstinline$p$ in the queue retrieved by the \lstinline$get$
-operation. Similarly, \lstinline$dequeueProcess$ removes a process
-from the queue. However when the queue is empty it returns the trivial
-process. This way we will not have to concern ourselves with special
-cases in the scheduler. The implementation is straightforward:
-%
-\snippet{dequeueProcess.links}
-%
-
-%
-There are two obvious scheduling policies to choose from
-when a process invokes the \lstinline$Spawn$ operation. The scheduler
-either enqueues the parent process and runs the child process
-immediately or enqueues the child process and resumes the parent
-process. We will adopt the former policy. Using this policy an
+(FIFO) semantics.  There are two obvious scheduling policies to choose
+from when a process invokes the \lstinline$Spawn$ operation. The
+scheduler either enqueues the parent process and runs the child
+process immediately or enqueues the child process and resumes the
+parent process. We will adopt the former policy. Using this policy an
 invocation of \lstinline$Yield$ simply enqueues the yielding process
 and dequeues the next process to run. We implement the scheduler as a
 handler:
@@ -1234,6 +1219,122 @@ We describe the handler line by line.
 
 \end{description}
 %
+
+The process queue is inherently stateful as it changes every time a
+process is spawned or suspended.  The auxiliary functions
+\lstinline$enqueueProcess$ and \lstinline$dequeueProcess$ use the
+abstract state operations \lstinline$Get$ and \lstinline$Put$ that we
+introduced in Section~\ref{sec:??} to maintain the queue. The
+underlying queue data structure is the one we implemented in
+Section~\ref{sec:links-primer}. The \lstinline$enqueueProcess$ simply
+retrieves and updates the queue, i.e.
+%
+\snippet{enqueueProcess.links}
+%
+Similarly, \lstinline$dequeueProcess$ retrieves and removes a process
+from the queue. However if the queue is empty then it returns the
+trivial process. This way the scheduler does not need to handle any
+special cases. The implementation is straightforward:
+%
+\snippet{dequeueProcess.links}
+%
+Now we have all the necessary infrastructure in place to spawn simple
+non-interacting processes. In the following small example we spawn a
+family of non-interacting processes where each generation has only one
+child:
+%
+\snippet{spawnLoneChild.links}
+%
+To run this example we plug our handlers together, i.e.
+%
+\begin{lstlisting}
+run -<- evalState(emptyQueue()) 
+    -<- basicRoundrobin -< spawnLoneChild(2);
+\end{lstlisting}
+%
+Initially the process queue is empty hence why we seed the state
+handler with the empty queue. The program compiles and runs:
+%
+\begin{lstlisting}[style=terminal]
+$ ./links -c basic_concur_model.links -o basic_model
+$ ./basic_model
+Spawned P#0
+Spawned P#0
+\end{lstlisting}
+%
+Under the \lstinline$basicRoundrobin$ scheduler a parent and its child
+process are indistinguishable because the scheduler assigns both of
+them the \lstinline$0$ identifier.
+
+\subsubsection{Unique processes and self-referral}
+
+The scheduler \lstinline$basicRoundrobin$ neatly demonstrates that the
+essence of the scheduling is fairly simple: variations on enqueuing
+and dequeuing of processes. However, in order to have interacting
+processes we need to be able to uniquely identify processes. 
+
+As a first attempt at making processes unique we might consider a
+parameterised version of basic round-robin scheduler that carries the
+identifier of the executing process, that is
+%
+\snippet{wrongRoundrobin.links}
+%
+%This scheduler follows the same pattern as \lstinline$basicRoundrobin$
+The handler takes a parameter \lstinline$pid$ which is supposed to be
+identifier of the executing process. When the executing process spawns
+a new child process that child process gets assigned the identifier
+\lstinline$pid+1$. The parent process gets suspended before control is
+transferred to the child process. 
+
+Since the handler is parameterised the resumption function
+\lstinline$resume$ becomes a curried function that carries over the
+values of the handler parameter to a subsequent invocation of the
+handler. An invocation of \lstinline$resume(child)(pid)$ orchestrates
+the initial return of control to the parent process. First the process
+handle \lstinline$child$ gets passed to the parent process. Afterwards
+it installs parent identifier \lstinline$pid$ as the identifier of the
+executing process.
+
+Let us try out this scheduler on the previous example. We plug
+everything together as before, except that the scheduler now takes the
+identifier of the root process, which we will define to be \lstinline$0$:
+%
+\begin{lstlisting}
+run -<- evalState(emptyQueue()) 
+    -<- wrongRoundrobin(0) -< spawnLoneChild(2);
+\end{lstlisting}
+%
+Compiling and running the program yields a promising
+result:
+%
+\begin{lstlisting}[style=terminal]
+$ ./links -c wrong_concur_model1.links -o wrong_model1
+$ ./wrong_model1
+Spawned P#1
+Spawned P#2
+\end{lstlisting}
+Whilst this is the result we desire the model is not correct. The following example illustrates the problem with the model:
+%
+\snippet{spawnSiblings.links}
+%
+The difference from the previous program \lstinline$spawnLoneChild$ is
+that each child gets a sibling. Substituting \lstinline$spawnSiblings$
+for \lstinline$spawnLoneChild$ above yields:
+%
+\begin{lstlisting}[style=terminal]
+$ ./links -c wrong_concur_model2.links -o wrong_model2
+$ ./wrong_model2
+Spawned P#1
+Spawned P#2
+Spawned P#1
+Spawned P#2
+Spawned P#2
+Spawned P#2
+\end{lstlisting}
+%
+This is definitely not what we wanted. The scheduler
+\lstinline$wrongRoundrobin$ fails to capture the hierarchical
+structure properly.
 
 \subsection{Handling communication}
 \label{sec:links-model-handlers-communication}
