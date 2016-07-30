@@ -160,18 +160,15 @@ fun enqueueProcess(f) {
 #end
 
 #snippet:dequeueProcess.links
+sig dequeueProcess :
+   () {Get: %q
+      ,Put:(%q) {}-> ()|_}~> (() -e-> ())
 fun dequeueProcess() {
    var q = get();
    switch (dequeue(q)) {
      case (Just(p), q) -> put(q); p
-     case (Nothing, q) -> fun() { () }
+     case (Nothing, q) -> fun() { () } # The trivial process
    }
-   # if (isEmptyQueue(q)) { fun() { () } }
-   # else {
-   #    var (p, q) = dequeue(q);
-   #    put(q);
-   #    p       # Return process
-   # }
 }
 #end
 
@@ -304,7 +301,9 @@ fun pidKeyCmp((p,_),(q,_)) {
 #   }
 # }
 
-sig pop : (a, [(a,b)]) ~> (Maybe(b), [(a,b)])
+typename Dictionary(k,a) = [(k,a)];
+
+sig pop : (k, Dictionary(k,a)) ~> (Maybe(a), Dictionary(k,a))
 fun pop(x, alist) {
   switch (lookup(x, alist)) {
     case Just(y) -> (Just(y), removeAssoc(x, alist))
@@ -312,7 +311,7 @@ fun pop(x, alist) {
   }
 }
 
-typename Mailbox(a::Type) = [(Pid, Queue(a))];
+typename Mailbox(a::Type) = Dictionary(Pid, Queue(a));
 
 sig enqueueMessage : (Pid, a) {Get:Mailbox(a),Put:(Mailbox(a)) {}-> ()|_}~> ()
 fun enqueueMessage(pid, msg) {
@@ -324,20 +323,28 @@ fun enqueueMessage(pid, msg) {
   put(alist)         
 }
 
-#sig dequeueMessage : (Pid) {Get:Mailbox(a),Put:(Mailbox(a)) {}-> ()|_}~> Maybe(a)
+sig dequeueMessage : (Pid) {Get:%b,Put:(%b) {}-> ()|_}~> Maybe(a)
 fun dequeueMessage(pid : Pid) {
   var alist = get();
-  var (msg, alist) = switch (pop(pid, alist : Mailbox(a))) {
-                       case (Just(q), alist) ->
-                            if (isEmptyQueue(q)) { (Nothing, alist) }
-                            else {
-                              var (msg, q) = dequeue(q);
-                              (Just(msg), (pid, q) :: alist) : (Maybe(a), Mailbox(a))
-                            }
-                       case (Nothing, alist) -> (Nothing, alist) : (Maybe(a), Mailbox(a))
-                     };
-  put(alist);
-  msg
+  # var (msg, alist) = switch (pop(pid, alist : Mailbox(a))) {
+  #                      case (Just(q), alist) ->
+  #                           if (isEmptyQueue(q)) { (Nothing, alist) }
+  #                           else {
+  #                             var (msg, q) = dequeue(q);
+  #                             (Just(msg), (pid, q) :: alist) : (Maybe(a), Mailbox(a))
+  #                           }
+  #                      case (Nothing, alist) -> (Nothing, alist) : (Maybe(a), Mailbox(a))
+  #                    };
+    switch (pop(pid, alist)) {
+      case (Nothing, alist) -> Nothing
+      case (Just(q), alist) ->
+        switch (dequeue(q)) {
+          case (Nothing, q) -> Nothing
+          case (msg, q)     -> put((pid, q) :: alist); msg
+      }
+  }
+#  put(alist);
+#  msg
 }
 
 #sig mailbox : (Comp({Recv:(Pid) {}-> Maybe(a),Send:(Pid,a) {}-> (),Get:RedBlackSet((Pid, Queue(a))),Put:((Pid, Queue(a))) {}-> ()|e}, a)) ->
@@ -447,15 +454,48 @@ handler basicRoundrobin {
 }
 #end
 
-fun sayHello(n)() {
-   print("Hello!");
-   if (n == 0) { () }
-   else {
-     var p1 = pspawn(sayHello(n-1));
-     var p2 = pspawn(sayHello(n-1));
-     ()
-   }
+#snippet:spawnLoneChild.links
+fun spawnLoneChild(n)() {
+    if (n == 0) ()
+    else {
+       var p1 = pspawn(spawnLoneChild(n-1));
+       print("Spawned " ^^ showProcess(p1))
+    }
 }
+#end
+
+# fun helloFamily() {
+#    sayHello("Parent")();
+#    var p1 = pspawn(fun() { yield(); sayHello("Child 1")() });
+#    var p2 = pspawn(sayHello("Child 2"));
+#    ()
+# }
+
+#snippet:wrongRoundrobin.links
+handler wrongRoundrobin(pid) {
+  case Spawn(f,resume) ->
+    var child = makeProcess(f, pid+1);
+    enqueueProcess(fun() { resume(child)(pid) });
+    wrongRoundrobin(pid+1)(f)()
+  case Yield(resume) ->
+    enqueueProcess(fun() { resume(())(pid) });
+    dequeueProcess()()
+  case Return(_) ->
+    dequeueProcess()()
+}
+#end
+
+#snippet:spawnSiblings.links
+fun spawnSiblings(n)() {
+  if (n == 0) ()
+  else {
+    var p1 = pspawn(spawnSiblings(n-1));
+    print("Spawned " ^^ showProcess(p1));
+    var p2 = pspawn(spawnSiblings(n-1));
+    print("Spawned " ^^ showProcess(p2))
+  }
+}
+#end
 
 
 var dummy = run -<- names(incrPid, 0) -<- evalState([]) -<- mailbox -<- evalState(emptyQueue()) -<- roundrobin -< generator(101);
