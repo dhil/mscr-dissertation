@@ -28,17 +28,20 @@ var pidToString = intToString;
 
 # Fresh name generator
 #snippet:freshnames.links
-sig names : ((a) {FreshName{p}|e}~> a, a) -> (Comp({FreshName:a|e}, b)) -> Comp({FreshName{p}|e}, b)
+sig names : ((a)   {FreshName{p}|e}~> a ,a)  ->
+            (Comp( {FreshName:a |e}    ,b)) ->
+             Comp( {FreshName{p}|e}    ,b)
 fun names(gen, seed) {
-   var h = handler(next) {
+   var h = handler(name) {
       case Return(x)    -> x
-      case FreshName(k) -> k(next)(gen(next))
+      case FreshName(k) -> k(name)(gen(name))
    };
    h(seed)
 }
 #end
 
 #snippet:freshname.links
+sig freshName : () {FreshName:a|_}-> a
 fun freshName() {do FreshName}
 #end
 
@@ -497,6 +500,23 @@ fun spawnSiblings(n)() {
 }
 #end
 
+#snippet:uniqueRoundrobin.links
+handler uniqueRoundrobin {
+  case Spawn(f,resume) ->
+    var child = makeProcess(f, freshName());
+    enqueueProcess(fun() { resume(child) });
+    uniqueRoundrobin(f)()
+  case Yield(resume) ->
+    enqueueProcess(fun() { resume(()) });
+    dequeueProcess()()
+  case Return(_) ->
+    dequeueProcess()()
+}
+#end
+
+#snippet:pidgenerator.links
+var pidgenerator = names(fun(i) { i + 1 }, 0);
+#end
 
 var dummy = run -<- names(incrPid, 0) -<- evalState([]) -<- mailbox -<- evalState(emptyQueue()) -<- roundrobin -< generator(101);
 
