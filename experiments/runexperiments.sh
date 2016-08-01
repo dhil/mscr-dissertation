@@ -9,6 +9,7 @@ CONFIG="$LINKS_SRC_DIR/measure.config"
 TIME="$HOME/.local/bin/time --verbose"
 REPETITIONS=10
 export LINKS_LIB="$HOME/projects/links/compiler/lib"
+export OCAMLRUNPARAM="s=1G"
 
 function log()
 {
