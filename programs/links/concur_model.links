@@ -104,8 +104,8 @@ fun yield() { do Yield }
 #end
 
 #snippet:myself.links
-sig myself : () {Myself:EProcess({ |e}),Yield:() |_}-> EProcess({ |e})
-fun myself() {yield(); do Myself}
+sig myself : () {Myself:EProcess({ |e}) |_}-> EProcess({ |e})
+fun myself() {do Myself}
 #end
 
 # Process queue
@@ -194,30 +194,31 @@ fun roundrobin(m)() {
   var root = makeProcess(m, freshName());
   handler scheduler(activeProcess) {
     case Spawn(f,resume) ->
-       var childPid = freshName();
-       var child = makeProcess(f, childPid);
-       enqueueProcess(fun() { resume(child)(activeProcess) });
-       scheduler(child)(f)()
+      var childPid = freshName();
+      var child = makeProcess(f, childPid);
+      enqueueProcess(fun() { resume(child)(activeProcess) });
+      scheduler(child)(f)()
     case Yield(resume)   ->
-       enqueueProcess(fun() { resume(())(activeProcess) });
-       dequeueProcess()()
-    case Myself(resume) -> resume(activeProcess)(activeProcess)
-    case Return(_)  -> #()
-       dequeueProcess()()
+      enqueueProcess(fun() { resume(())(activeProcess) });
+      dequeueProcess()()
+    case Myself(resume)  ->
+      resume(activeProcess)(activeProcess)
+    case Return(_)       -> 
+      dequeueProcess()()
   }
-  run -<- scheduler(root) -< m
+  run(scheduler(root)(m))
 }
 #end
 
 fun hello(depth)() {
-    print("Hello from process " ^^ showProcess(myself()));
-    if (depth == 0) { () }
-    else {         
-         var _ = pspawn(hello(depth-1));
-         #yield();
-         var _ = pspawn(hello(depth-1));
-         ()
-    }
+  var self = myself();
+  print("Hello from process " ^^ showProcess(self));
+  if (depth == 0) { () }
+  else {         
+    var _ = pspawn(hello(depth-1));
+    var _ = pspawn(hello(depth-1));
+    ()
+  }
 }
 
 # Example
@@ -414,17 +415,17 @@ fun sieve() {
        if (prime `mod` myprime == 0) {
          loop(neighbour)
        } else {
-          var neighbour =
-            switch (neighbour) {
-              case Just(pid) -> pid
-              case Nothing   -> pspawn(sieve)
-            };
-          neighbour $! Candidate(prime);
-          loop(Just(neighbour))
-      }
+         var neighbour =
+           switch (neighbour) {
+             case Just(pid) -> pid
+             case Nothing   -> pspawn(sieve)
+           };
+         neighbour $! Candidate(prime);
+         loop(Just(neighbour))
+       }
     }
- }
- loop(Nothing)
+  }
+  loop(Nothing)
 }
 #end
 
@@ -500,17 +501,34 @@ fun spawnSiblings(n)() {
 }
 #end
 
+#snippet:spawnFamily.links
+fun spawnFamily(n)() {
+  var self = myself();
+  print("Spawned " ^^ showProcess(self));
+  if (n == 0) { () }
+  else {         
+    var _ = pspawn(spawnFamily(n-1));
+    var _ = pspawn(spawnFamily(n-1));
+    ()
+  }
+}
+#end
+
 #snippet:uniqueRoundrobin.links
-handler uniqueRoundrobin {
-  case Spawn(f,resume) ->
-    var child = makeProcess(f, freshName());
-    enqueueProcess(fun() { resume(child) });
-    uniqueRoundrobin(f)()
-  case Yield(resume) ->
-    enqueueProcess(fun() { resume(()) });
-    dequeueProcess()()
-  case Return(_) ->
-    dequeueProcess()()
+fun upRoundrobin(m)() {
+  var root = makeProcess(m, freshName());
+  handler scheduler {
+    case Spawn(f,resume) ->
+      var child = makeProcess(f, freshName());
+      enqueueProcess(fun() { resume(child) });
+      scheduler(f)()
+    case Yield(resume) ->
+      enqueueProcess(fun() { resume(()) });
+      dequeueProcess()()
+    case Return(_) ->
+      dequeueProcess()()
+  }
+  run(scheduler(m))
 }
 #end
 
