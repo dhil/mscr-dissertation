@@ -50,6 +50,15 @@
 % Source code listings
 \usepackage{xcolor}
 \usepackage{listings}
+\usepackage{lstlinebgrd}
+\usepackage{expl3,xparse}
+
+\ExplSyntaxOn
+\NewDocumentCommand \lstcolorlines { O{orange!15} m }
+{
+ \clist_if_in:nVT { #2 } { \the\value{lstnumber} }{ \color{#1} }
+}
+\ExplSyntaxOff
 
 \newcommand{\snippet}[1]{\lstinputlisting{snippets/#1}}
 
@@ -84,7 +93,7 @@
   morekeywords={spawn, receive, typename, fun, op, var, if, this, true, false, else, case, switch, handle, handler, shallowhandler, do, sig, spawnAngel, spawnDemon, spawn},%
   sensitive=t, % 
   keywordstyle=\color{red},
-  emph={Comp,Player,Bool,Int,GTree,Cheat,Zero,Choose,Rand,Move,Winner,Take,Return,Get,Put,GameState,Alice,Bob,Fail,Nothing,Just,Maybe,Toss,Heads,Tails,Process,Buyer,Coffee,Pay,Cost,Candidate,Stop,PassingComet,CelebritySighting,Float,String,Pid,EProcess,Row,Spawn,Yield,Recv,Send,FreshName,Queue,Dictionary},
+  emph={Comp,Player,Bool,Int,GTree,Cheat,Zero,Choose,Rand,Move,Winner,Take,Return,Get,Put,GameState,Alice,Bob,Fail,Nothing,Just,Maybe,Toss,Heads,Tails,Process,Buyer,Coffee,Pay,Cost,Candidate,Stop,PassingComet,CelebritySighting,Float,String,Pid,EProcess,Row,Spawn,Yield,Recv,Send,FreshName,Queue,Dictionary,Myself},
   emphstyle={\color{blue}},
   comment=[l]{\#},% 
   commentstyle={\itshape\color{darkgreen}},%
@@ -1266,7 +1275,7 @@ Under the \lstinline$basicRoundrobin$ scheduler a parent and its child
 process are indistinguishable because the scheduler assigns both of
 them the \lstinline$0$ identifier.
 
-\subsubsection{Unique processes and self-referral}
+\subsubsection{Unique processes}
 
 The scheduler \lstinline$basicRoundrobin$ neatly demonstrates that the
 essence of the scheduling is fairly simple: variations on enqueuing
@@ -1363,10 +1372,87 @@ process identifier generator:
 \snippet{pidgenerator.links}
 %
 Now, we have to update our round-robin scheduler to use the name
-generation operation:
+generation operation. However, simply using \lstinline$freshName$ in
+the \lstinline$Spawn$-clause will not be enough as the initial process
+is spawned through the handler. Thus the initial process would be
+nameless. The workaround is to define a function
+\lstinline$upRoundrobin$ (``up'' for \emph{unique processes}) that
+embeds a scheduler. Prior to invoking the scheduler the function
+generates a name for initial process:
 %
-\snippet{uniqueRoundrobin.links}
+\lstinputlisting[linebackgroundcolor={\lstcolorlines{1,2,5,14}}]{snippets/uniqueRoundrobin.links}
 %
+The implementation of \lstinline$scheduler$ is similar to
+\lstinline$basicRoundrobin$ the only difference is the use of
+\lstinline$freshName$. The first invocation of \lstinline$freshName$
+generates a name for the initial process which is the input
+computation \lstinline$m$. We run the scheduler on the initial process
+to handle its effects. We end up with the following pipeline of
+handlers:
+%
+\begin{lstlisting}
+run -<- pidgenerator 
+    -<- evalState(emptyQueue()) -<- upRoundrobin 
+    -<  spawnSiblings(2);
+\end{lstlisting}
+%
+Compiling and running the program yields:
+%
+\begin{lstlisting}[style=terminal]
+$ ./links -c up_concur_model.links -o up_model
+$ ./up_model
+Spawned P#1
+Spawned P#2
+Spawned P#3
+Spawned P#4
+Spawned P#5
+Spawned P#6
+\end{lstlisting}
+%
+As we see every process gets a unique name.
+
+\subsubsection{Self-referral}
+
+We now consider a final refinement of the round-robin scheduler:
+process self-referral. We introduce a new operation \lstinline$Myself$:
+%
+\snippet{myself.links}
+%
+The idea is that an invocation of \lstinline$Myself$ should return the
+handle of the calling process. We may implement this functionality
+through a small extension to our scheduler. The main idea is to let
+the scheduler keep track of the executing process. One possible way to
+enable this tracking is to parameterise the scheduler by the executing
+process:
+%
+\lstinputlisting[linebackgroundcolor={\lstcolorlines{3,7,8,10,12,13}},numbers=left]{snippets/roundrobin.links}
+%
+We describe the changes line by line.
+\begin{description}
+\item[Line 3] begins the definition of \lstinline$scheduler$ that now
+  takes a parameter \lstinline$activeProcess$ which is a handle to the
+  current executing process.
+\item[Lines 7-8] suspends the parent process. As usual the
+  \lstinline$resume$ function returns the child handle. In addition it
+  also sets the executing process. Once \lstinline$resume$ gets
+  invoked control gets transferred back to the parent process, hence
+  the parent process becomes the active process.  The
+  \lstinline$scheduler$ is invoked with \lstinline$child$ as the
+  active process.
+\item[Line 10] suspends the executing process and wakes up the next
+  process to run.
+\item[Lines 12-13] returns the handle to the executing process. This
+  clause, unlike the two previous clauses, does not alter the state of
+  the executing process.
+\end{description}
+
+To illustrate the extension in action consider a variation of the
+\lstinline$spawnSiblings$ example:
+%
+\lstinputlisting{snippets/spawnFamily.links}
+%
+In this example each process announces that it has been spawned rather
+than their parent.
 
 \subsection{Handling communication}
 \label{sec:links-model-handlers-communication}
@@ -1385,7 +1471,7 @@ Sieve
 Now we can plug everything together
 %
 \begin{lstlisting}
-run -<- names(incrPid, 0) 
+run -<- pidgenerator
     -<- evalState(emptyDictionary()) -<- mailbox 
     -<- evalState(emptyQueue())      -<- roundrobin 
     -<  generator(10);
