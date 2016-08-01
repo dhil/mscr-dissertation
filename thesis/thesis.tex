@@ -1449,13 +1449,45 @@ We describe the changes line by line.
 To illustrate the extension in action consider a variation of the
 \lstinline$spawnSiblings$ example:
 %
-\lstinputlisting{snippets/spawnFamily.links}
+\lstinputlisting[linebackgroundcolor{\lstcolorlines{2}}]{snippets/spawnFamily.links}
 %
 In this example each process announces that it has been spawned rather
-than their parent.
+than its parent. Thus, we do not care about the process names returned
+by the calls to \lstinline$pspawn$. We wire everything together as
+follows:
+%
+\begin{lstlisting}
+run -<- pidgenerator 
+    -<- evalState(emptyQueue()) -<- roundrobin 
+    -<  spawnFamily(2);
+\end{lstlisting}
+%
+Compiling and running the program produce the desired result:
+%
+\begin{lstlisting}[style=terminal]
+$ ./links -c rr_concur_model -o rr_model
+$ ./rr_model
+Spawned P#0
+Spawned P#1
+Spawned P#2
+Spawned P#3
+Spawned P#4
+Spawned P#5
+Spawned P#6
+\end{lstlisting}
+%
+From the perspective of computations the initial process is no longer
+a special case. Every process gets handled uniformly by this
+scheduler. 
 
 \subsection{Handling communication}
 \label{sec:links-model-handlers-communication}
+
+In this section we will augment the implementation of the concurrency
+model with primitives for interaction between processes. Our
+concurrency model is an instance of a message-passing model, thus we
+need at least a primitive for sending messages and another for
+receiving them.
 
 \subsection{Sieve of Eratosthenes example, revisited}
 \label{sec:links-model-handlers-example}
