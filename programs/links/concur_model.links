@@ -536,6 +536,23 @@ fun upRoundrobin(m)() {
 var pidgenerator = names(fun(i) { i + 1 }, 0);
 #end
 
+
+# Fibonacci example
+fun fib(n,parent)() {
+  if (n == 0 || n == 1) psend(parent, n)
+  else {
+    var me = myself();
+    var _  = pspawn(fib(n-1, me));
+    var _  = pspawn(fib(n-2, me));
+    psend(parent, precv() + precv())
+  }
+}
+
+fun nthfib(n)() {
+  fib(n, myself())();
+  print("Fib: " ^^ intToString(precv()))
+}
+
 var dummy = run -<- names(incrPid, 0) -<- evalState([]) -<- mailbox -<- evalState(emptyQueue()) -<- roundrobin -< generator(101);
 
 #var dummy = run(names(incrPid, 0)(evalState([])(mailbox(evalState(emptyQueue())(roundrobin(generator(200)))))));
