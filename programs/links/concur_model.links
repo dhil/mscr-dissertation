@@ -125,14 +125,13 @@ fun isEmptyQueue(q) {
 sig enqueue : (Queue(a), a) -> Queue(a)
 fun enqueue((xs,ys), y) { (xs, y::ys) }
 
-# Loops forever when attempting to dequeue the empty queue
 sig dequeue : (Queue(a)) ~> (Maybe(a), Queue(a))
 fun dequeue(q) {
-    switch (q) {
-      case (x :: xs, ys) -> (Just(x), (xs, ys))
-      case ([], [])      -> (Nothing, q)
-      case ([], ys)      -> dequeue((reverse(ys), []))
-    }
+  switch (q) {
+    case (x :: xs, ys) -> (Just(x), (xs, ys))
+    case ([], [])      -> (Nothing, q)
+    case ([], ys)      -> dequeue((reverse(ys), []))
+  }
 }
 
 ## TODO: Implement the queue as a handler
@@ -203,7 +202,7 @@ fun roundrobin(m)() {
       dequeueProcess()()
     case Myself(resume)  ->
       resume(activeProcess)(activeProcess)
-    case Return(_)       -> 
+    case Return(_)       ->
       dequeueProcess()()
   }
   run(scheduler(root)(m))
@@ -231,8 +230,9 @@ fun run(m) { m() }
 
 # Communication
 #snippet:psend.links
-sig psend : (EProcess({ |e}), a) {Send:(Pid, a) {}-> (),Yield:()|_}-> ()
-fun psend(proc, msg) { do Send(getPid(proc), msg); yield() }
+sig psend :
+  (EProcess({ |e}), a) {Send:(EProcess({ |e}), a) {}-> (),Yield:()|_}-> ()
+fun psend(proc, msg) { do Send(proc, msg); yield() }
 #end
 
 #snippet:psendOp.links
@@ -240,17 +240,17 @@ op proc $! msg { psend(proc, msg) }
 #end
 
 #snippet:precv.links
-sig precv : () {Recv:(Pid) {}-> Maybe(a),Myself:EProcess({ |_}),Yield:()|_}~> a
+sig precv : () {Recv: (EProcess({ |e})) {}-> Maybe(a)
+               ,Myself:EProcess({ |e}),Yield:()|_}~> a
 fun precv() {    
-    fun loop(mypid : Pid) {
-       var msg = do Recv(mypid);
-       yield();
-       switch (msg : Maybe(a)) {
-         case Nothing   -> loop(mypid)
-	 case Just(msg) -> msg
-       }
+  fun loop(proc) {
+    var msg = do Recv(proc);
+    switch (msg) {
+      case Nothing   -> yield(); loop(proc)
+      case Just(msg) -> msg
     }
-    loop(getPid(myself()))
+  }
+  loop(myself())
 }
 #end
 
@@ -315,57 +315,75 @@ fun pop(x, alist) {
   }
 }
 
+sig dictLookup : (k, Dictionary(k,a)) ~> Maybe(a)
+var dictLookup = lookup;
+
+sig dictModify : (k, a, Dictionary(k,a)) ~> Dictionary(k,a)
+fun dictModify(k, x, dict) {
+  (k, x) :: removeAssoc(k, dict)
+}
+
 typename Mailbox(a::Type) = Dictionary(Pid, Queue(a));
 
-sig enqueueMessage : (Pid, a) {Get:Mailbox(a),Put:(Mailbox(a)) {}-> ()|_}~> ()
+#snippet:enqueueMessage.links
+sig enqueueMessage : (Pid, a) {Get:Dictionary(Pid,Queue(a)),Put:(Dictionary(Pid,Queue(a))) {}-> ()|_}~> ()
 fun enqueueMessage(pid, msg) {
-  var alist = get();
-  var alist = switch (pop(pid, alist)) {
-                 case (Just(q), alist) -> (pid, enqueue(q, msg)) :: alist
-                 case (Nothing, alist) -> (pid, enqueue(emptyQueue(), msg)) :: alist
-              };
-  put(alist)         
+  var dict = get();
+  var q = switch (dictLookup(pid, dict)) {
+            case Nothing -> enqueue(emptyQueue(), msg)
+            case Just(q) -> enqueue(q, msg)
+          };
+  put(dictModify(pid, q, dict))         
 }
+#end
 
-sig dequeueMessage : (Pid) {Get:%b,Put:(%b) {}-> ()|_}~> Maybe(a)
-fun dequeueMessage(pid : Pid) {
-  var alist = get();
-  # var (msg, alist) = switch (pop(pid, alist : Mailbox(a))) {
-  #                      case (Just(q), alist) ->
-  #                           if (isEmptyQueue(q)) { (Nothing, alist) }
-  #                           else {
-  #                             var (msg, q) = dequeue(q);
-  #                             (Just(msg), (pid, q) :: alist) : (Maybe(a), Mailbox(a))
-  #                           }
-  #                      case (Nothing, alist) -> (Nothing, alist) : (Maybe(a), Mailbox(a))
-  #                    };
-    switch (pop(pid, alist)) {
-      case (Nothing, alist) -> Nothing
-      case (Just(q), alist) ->
-        switch (dequeue(q)) {
-          case (Nothing, q) -> Nothing
-          case (msg, q)     -> put((pid, q) :: alist); msg
+#snippet:dequeueMessage.links
+sig dequeueMessage : (Pid) {Get:Dictionary(Pid,Queue(a)),Put:(Dictionary(Pid,Queue(a))) {}-> ()|_}~> Maybe(a)
+fun dequeueMessage(pid) {
+  switch (dictLookup(pid, get())) {
+    case Nothing -> Nothing
+    case Just(q) ->
+      switch (dequeue(q)) {
+        case (Nothing, q) -> Nothing
+        case (msg    , q) -> put(dictModify(pid, q, get())); msg
       }
   }
-#  put(alist);
-#  msg
 }
+#end
 
 #sig mailbox : (Comp({Recv:(Pid) {}-> Maybe(a),Send:(Pid,a) {}-> (),Get:RedBlackSet((Pid, Queue(a))),Put:((Pid, Queue(a))) {}-> ()|e}, a)) ->
 #               Comp({Recv{_},Send{_},Get:RedBlackSet((Pid, Queue(a))),Put:((Pid, Queue(a))) {}-> ()|e}, a)
 #sig mailbox : (Comp({Get:RedBlackSet ((Pid, Queue (a))),Put:(RedBlackSet ((Pid, Queue (a)))) {}-> (),Recv:(Pid) {}-> Maybe (a),Send:(Pid, a) {}-> ()|e}, b)) ->
 #               Comp({Get:RedBlackSet ((Pid, Queue (a))),Put:(RedBlackSet ((Pid, Queue (a)))) {}-> (),Recv{_},Send{_}|e}, b)
-fun mailbox(m)() {
-  handle(m) {
-    case Return(x)        -> x
-    case Recv(pid,resume) ->
-      var msg = dequeueMessage(pid);
-      resume(msg)
-    case Send(pid,msg,resume) ->
-      enqueueMessage(pid, msg);
-      resume(())
-  }
+# fun mailbox2(m)() {
+#   handle(m) {
+#     case Return(x)        -> x
+#     case Recv(proc,resume) ->
+#       var msg = dequeueMessage(pid);
+#       resume(msg)
+#     case Send(proc,msg,resume) ->
+#       enqueueMessage(pid, msg);
+#       resume(())
+#   }
+# }
+
+sig mailbox : (Comp({Get:Dictionary(Pid,Queue(a)),Put:(Dictionary(Pid,Queue(a))) {}-> ()
+                    ,Recv:(EProcess({ |_})) {}-> Maybe(a)
+                    ,Send:(EProcess({ |_}),a) {}-> ()|e}, b)) ->
+               Comp({Get:Dictionary(Pid,Queue(a)),Put:(Dictionary(Pid,Queue(a))) {}-> ()
+                    ,Recv{_}
+                    ,Send{_}                         |e}, b)
+#snippet:communication.links
+handler mailbox {
+  case Return(x)             -> x
+  case Recv(proc,resume)     ->
+    var msg = dequeueMessage(getPid(proc));
+    resume(msg)
+  case Send(proc,msg,resume) ->
+    enqueueMessage(getPid(proc), msg);
+    resume(())
 }
+#end
 
 # Handshaking
 fun hello2(depth)() {    
