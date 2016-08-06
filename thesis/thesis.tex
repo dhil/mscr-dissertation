@@ -1492,17 +1492,37 @@ receiving them.
 \subsubsection{Sending and receiving}
 
 The built-in concurrency model of Links implements both blocking send
-and receive. We name it \lstinline$psend$ (for \emph{process} send):
+and receive. We encode these as two abstract operations
+\lstinline$Send$ and \lstinline$Recv$. The former is a binary
+operation which takes the process name of the target process and the
+message to send. We wrap it inside a function \lstinline$psend$ (for
+\emph{process} send):
 %
 \snippet{psend.links}
 %
+In addition to the \lstinline$Send$ operation the function also
+performs the \lstinline$Yield$ operation, which will transfer control
+to another process. After sending a message another process will
+presumably be able to make progress. Thus it seems like a reasonable
+heuristic to yield control at this point.  
 
-We define an infix operator that looks similar to the bang operator
-(\lstinline$!$):
+To obtain the look-and-feel of the bang operator, \lstinline$!$, we
+define an infix operator that looks similar:
 %
 \snippet{psendOp.links}
 %
+Since the bang operator built deeply into the parsing level of Links
+we cannot override its definition in programming language level. Thus
+\lstinline$!!$ is the closest we can get. We dub it \emph{bang-bang}.
 
+There are several interesting designs to choose from for implementing
+a blocking receive. We may do the straightforward thing of ``just''
+performing an abstract operation \lstinline$Recv$ leaving it for a
+handler to implement the blocking semantics. Alternatively, we may use
+type system to hint handlers of \lstinline$Recv$ that it is not
+important whether the operation is blocking or not, but rather whether
+a message was received or not. It is easy implement a blocking receive
+in terms of a non-blocking receive, e.g.
 %
 \snippet{precv.links}
 %
