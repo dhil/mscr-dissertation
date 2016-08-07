@@ -1449,7 +1449,7 @@ We describe the changes line by line.
 To illustrate the extension in action consider a variation of the
 \lstinline$spawnSiblings$ example:
 %
-\lstinputlisting[linebackgroundcolor{\lstcolorlines{2}}]{snippets/spawnFamily.links}
+\lstinputlisting[linebackgroundcolor={\lstcolorlines{2}}]{snippets/spawnFamily.links}
 %
 In this example each process announces that it has been spawned rather
 than its parent. Thus, we do not care about the process names returned
@@ -1535,18 +1535,42 @@ there are no messages then the function invokes itself in order to
 retry. However, before retrying the function yields in order to let
 another process run.
 
+\subsubsection{Mailbox}
+%
+\lstinputlisting{snippets/communication.links}
+%
+
+%
+\snippet{enqueueMessage.links}
+%
+
+%
+\snippet{dequeueMessage.links}
+%
+
 \subsection{Sieve of Eratosthenes example revisited}
 \label{sec:links-model-handlers-example}
 
-Generator
+We need to make a few changes to sieve example in order to adapt it to
+our new concurrency implementation. The changes are only
+syntactical. For example, we changes the \lstinline$generator$
+function as follows:
 %
-\snippet{generator.links}
+\lstinputlisting[linebackgroundcolor={\lstcolorlines{1,2,3,4}}]{snippets/generator.links}
 %
-Sieve
+The function has become a curried function whose second parameter is
+unit. This means that applying \lstinline$n$ effectively returns a
+thunk which is precisely the type of function we can apply to a
+handler. The other changes are mundane: \lstinline$spawn$ becomes
+\lstinline$pspawn$ and \lstinline$!$ becomes \lstinline$!!$.
+
+We have to make the same changes in the \lstinline$sieve$ function. In
+addition to the aforementioned changes we also have to rewrite
+\lstinline$recv$ as \lstinline$precv$:
 %
-\snippet{sieve.links}
+\lstinputlisting[linebackgroundcolor={\lstcolorlines{2,4,14,16}}]{snippets/sieve.links}
 %
-Now we can plug everything together
+Now we can wire everything together
 %
 \begin{lstlisting}
 run -<- pidgenerator
@@ -1563,6 +1587,8 @@ $ ./concur_model
 5
 7
 \end{lstlisting}
+The resulting program yields the same output as the program we
+described in Section~\ref{??}.
 % \section{Pipeline parallelism}
 % \label{sec:prime}
 
