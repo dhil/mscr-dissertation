@@ -1535,10 +1535,35 @@ there are no messages then the function invokes itself in order to
 retry. However, before retrying the function yields in order to let
 another process run.
 
-\subsubsection{Mailbox}
-%
-\lstinputlisting{snippets/communication.links}
-%
+\subsubsection{Facilitating communication}
+
+In the sieve example we do not know the precise number of processes,
+and hence the number of mailboxes, that we need ahead of
+time\footnote{Although, in this particular example we could
+  approximate the number of primes, $\pi(n)$, less than $n$ (and
+  thereby the number of processes) using the asymptotic law of
+  distribution of prime numbers: $\pi(n) \approx
+  \frac{n}{\log(n)}$.}. Furthermore, a mailbox is essentially a FIFO
+queue of messages that is private to some process. Thus we can
+represent a single mailbox as a pair of a process identifier and a
+queue. We can represent many of such pairs with dictionary type that
+maps process identifiers to mailboxes. We will omit the implementation
+details of the dictionary we use, however, we do present its
+interface:
+\begin{itemize}
+\item A type \lstinline$Dictionary(k,a)$ that classifies mappings from
+  keys of type \lstinline$k$ to elements of type \lstinline$a$.
+\item A function
+  \lstinline$dictLookup : (k, Dictionary(k,a)) ~> Maybe(a)$ that given
+  a key and a dictionary returns \lstinline$Just$ the element
+  associated with the key or \lstinline$Nothing$ if the key is not
+  present in dictionary.
+\item Another function
+  \lstinline$dictModify : (k, a, Dictionary(k,a)) ~> Dictionary(k,a)$
+  which adds a binding from a key of type \lstinline$k$ to an element
+  of type \lstinline$a$ to a given dictionary. If the key is already
+  bound, then that binding is overwritten.
+\end{itemize}
 
 %
 \snippet{enqueueMessage.links}
@@ -1547,6 +1572,11 @@ another process run.
 %
 \snippet{dequeueMessage.links}
 %
+
+%
+\lstinputlisting{snippets/communication.links}
+%
+
 
 \subsection{Sieve of Eratosthenes example revisited}
 \label{sec:links-model-handlers-example}
