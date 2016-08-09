@@ -170,6 +170,7 @@
 \newcommand{\rulesep}{\unskip\ \vrule\ } % Inserts a vertical line
 
 % Formalisation
+% Formalisation
 %\newcommand{\Calc}{\ensuremath{\lambda_{\text{effrow}}}\xspace}
 \newcommand{\Calc}{\ensuremath{\lambda_{\text{eff}}^\rho}\xspace}
 
@@ -196,6 +197,10 @@
 \newcommand{\Presence}{\mathsf{Presence}}
 \newcommand{\Row}{\mathsf{Row}}
 \newcommand{\Type}{\mathsf{Type}}
+
+\newcommand{\Comp}{\mathsf{Comp}}
+\newcommand{\Effect}{\mathsf{Effect}}
+\newcommand{\Handler}{\mathsf{Handler}}
 
 \newcommand{\Int}{\mathsf{Int}}
 \newcommand{\Bool}{\mathsf{Bool}}
@@ -554,7 +559,6 @@ structure. Instead we describe its interface:
   \caption{Sequence diagram.}\label{fig:sequence}
 \end{figure}
 
-\subsection{Structural typing}
 
 \subsection{Affine and multi-shot effect handlers}
 \label{sec:links-affine-multi}
@@ -598,7 +602,7 @@ The signature conveys that the handler interprets the operation
 \lstinline$Choose$ and leaves any other operations uninterpreted. The
 notation \lstinline$Choose{_}$ denotes that the operation is
 polymorphic in its presence.  The handler comprises two clauses:
-\begin{enumerate}[1)]
+\begin{enumerate}
   \item the \lstinline$Return$-clause specifies how to handle the return
     value of the computation.
   \item the \lstinline$Choose$-clause specifies how to handle a
@@ -642,114 +646,6 @@ The type system prevents invocation of the continuation in the
 \lstinline$Fail$-clause, because the type \lstinline$Zero$ has zero
 inhabitants. Linear and exception handlers together constitute
 \emph{affine handlers}.
-
-\section{OCaml with handlers}
-\label{sec:ocaml-handlers}
-
-\subsection{Nominal typing}
-
-%%
-%% Related work
-%%
-\chapter{Related work}
-\label{ch:related-work}
-
-\section{Implementations of effect handlers}
-Any signature of abstract operations can be understood as a free
-algebra and represented as a functor. In particular, every such
-functor gives rise to a free monad. Thus, free monads provide a
-natural basis for implementing effect handlers (\citet{Swierstra2008b}
-provide an account of free monads for functional programmers).  Many
-of the library implementations of effect handlers include
-implementations based on free monads~\citep{Kammar2013, Kiselyov2013,
-  Kiselyov2015, Brady2013, Wu2014}.
-
-\citet{Kammar2013} provide an implementation of effect handlers using
-a continuation monad, which completely avoids materialising any data
-constructors. \citet{Wu2015} explain how it works, by taking advantage
-of Haskell's fusion optimisations. This approach does appear to depend
-rather critically on the handlers being deep rather than shallow, and
-in Haskell it relies on them being type classes, and hence not really
-first class.
-
-The Idris effects library by \cite{Brady2013} takes advantage of
-dependent types to provide effect handlers for a form of effects
-corresponding to parameterised monads~\citep{Atkey09}.
-%
-In the effects library, effects are represented as lists of types.
-
-We are aware of three languages that are specifically designed with
-effect handlers in mind.
-%
-\begin{itemize}
-\item The Eff language by \cite{Bauer2015} is a strict language with
-  Hindley-Milner type inference similar in spirit to ML, but extended
-  with effect handlers.
-%
-It includes a novel feature for supporting fresh generation of effects
-in order to support effects such as ML-style higher-order state (which
-has an operation for generating new references).
-%
-The original version of Eff~\citep{Bauer2015} does not include an
-effect type system. However, an effect type system has subsequently
-been experimented with~\citep{BauerP13, Pretnar2014}.
-%
-This effect type system is considerably more complicated than ours. It
-makes essential use of subtyping, includes a region system, and a form
-of effect polymorphism, which one might reasonably cast as a form of
-row polymorphism.
-
-\item Frank by \cite{McBride2014} takes the idea of effect handlers to
-  the extreme, having no primitive notion of function, only
-  handlers. In Frank a function is but a special case of a handler.
-  Frank is built on a bidirectional type system. It includes an effect
-  type system and a novel form of effect polymorphism in which the
-  programmer never needs to read or write any effect
-  variables. Frank's effect system can be viewed as implementing a
-  form of row polymorphism. Unlike Links, but much like
-  Koka by \cite{Leijen14}, Frank allows multiple occurrences of the same
-  label in a row. In contrast rows in Links are based on Remy's design
-  in which duplicates are not allowed, but negative information is.
-
-\item Shonky by \cite{McBride2016} amounts to a dynamically-typed variant
-  of Frank. Though it is not statically typed, handlers must be
-  annotated with the names of the effects that they handle. The
-  implementation of Shonky is quite similar to ours in that it uses a
-  generalisation of the CEK machine. The main differences are that
-  Shonky does not use an ANF representation, so has more forms of
-  continuation to handle, and in contrast to our nested continuation
-  structure, Shonky uses a completely flat structure.
-  % and where our continuations have a nested
-  % structure, Shonky uses a completely flat structure for
-  % continuations.
-\end{itemize}
-
-Although OCaml itself has no support for effect handlers, a
-development branch, Multicore OCaml~\cite{Dolan2015}, does. Multicore
-OCaml does not include an effect type system, and handlers are
-restricted so that continuations are affine, that is, they can be
-invoked at most once. This design admits a particularly efficient
-implementation, as continuations need never be copied, so they can
-simply be stored on the stack.
-
-\section{Parallel programming models}
-\todo{\cite{Marlow2013}}
-
-%%
-%% Concurrent programming with handlers
-%%
-\chapter{Encoding concurrency models with handlers}
-\label{ch:programming}
-
-In this chapter we explore the admissibility of building an entire
-concurrency model with effect handlers. As a starting point we attempt
-to reconstruct the built-in concurrency model of Links, therefore we
-begin with a tour of the Links model in
-Section~\ref{sec:links-model}. Afterwards in
-Section~\ref{sec:links-model-handlers} we demonstrate a possible
-encoding of the concurrency model using algebraic effects and
-handlers. In the subsequent Sections~\ref{sec:thread-model} and
-\ref{sec:???} we explore further developments of the model.
 
 \section{The built-in concurrency model of Links}
 \label{sec:links-model}
@@ -1096,16 +992,952 @@ links> generator(10);
 %
 As expected it the primes between $2$ and $10$ get printed.
 
-\section{A reconstruction of the Links concurrency model with handlers}
-\label{sec:links-model-handlers}
 
-We will now attempt to reconstruct the concurrency of model of Links
-using effect handlers. We will do this reconstruction in several steps:
-first we consider how to design the process abstraction. Afterwards we
-consider the problem of scheduling processes. Thereafter we consider
-how to implement communication between processes.
+\section{OCaml with handlers}
+\label{sec:ocaml-handlers}
 
-\subsection{Process abstraction}
+\subsection{Nominal typing}
+
+%%
+%% Related work
+%%
+\chapter{Related work}
+\label{ch:related-work}
+
+\section{Implementations of effect handlers}
+Any signature of abstract operations can be understood as a free
+algebra and represented as a functor. In particular, every such
+functor gives rise to a free monad. Thus, free monads provide a
+natural basis for implementing effect handlers (\citet{Swierstra2008b}
+provide an account of free monads for functional programmers).  Many
+of the library implementations of effect handlers include
+implementations based on free monads~\citep{Kammar2013, Kiselyov2013,
+  Kiselyov2015, Brady2013, Wu2014}.
+
+\citet{Kammar2013} provide an implementation of effect handlers using
+a continuation monad, which completely avoids materialising any data
+constructors. \citet{Wu2015} explain how it works, by taking advantage
+of Haskell's fusion optimisations. This approach does appear to depend
+rather critically on the handlers being deep rather than shallow, and
+in Haskell it relies on them being type classes, and hence not really
+first class.
+
+The Idris effects library by \cite{Brady2013} takes advantage of
+dependent types to provide effect handlers for a form of effects
+corresponding to parameterised monads~\citep{Atkey09}.
+%
+In the effects library, effects are represented as lists of types.
+
+We are aware of three languages that are specifically designed with
+effect handlers in mind.
+%
+\begin{itemize}
+\item The Eff language by \cite{Bauer2015} is a strict language with
+  Hindley-Milner type inference similar in spirit to ML, but extended
+  with effect handlers.
+%
+It includes a novel feature for supporting fresh generation of effects
+in order to support effects such as ML-style higher-order state (which
+has an operation for generating new references).
+%
+The original version of Eff~\citep{Bauer2015} does not include an
+effect type system. However, an effect type system has subsequently
+been experimented with~\citep{BauerP13, Pretnar2014}.
+%
+This effect type system is considerably more complicated than ours. It
+makes essential use of subtyping, includes a region system, and a form
+of effect polymorphism, which one might reasonably cast as a form of
+row polymorphism.
+
+\item Frank by \cite{McBride2014} takes the idea of effect handlers to
+  the extreme, having no primitive notion of function, only
+  handlers. In Frank a function is but a special case of a handler.
+  Frank is built on a bidirectional type system. It includes an effect
+  type system and a novel form of effect polymorphism in which the
+  programmer never needs to read or write any effect
+  variables. Frank's effect system can be viewed as implementing a
+  form of row polymorphism. Unlike Links, but much like
+  Koka by \cite{Leijen14}, Frank allows multiple occurrences of the same
+  label in a row. In contrast rows in Links are based on Remy's design
+  in which duplicates are not allowed, but negative information is.
+
+\item Shonky by \cite{McBride2016} amounts to a dynamically-typed variant
+  of Frank. Though it is not statically typed, handlers must be
+  annotated with the names of the effects that they handle. The
+  implementation of Shonky is quite similar to ours in that it uses a
+  generalisation of the CEK machine. The main differences are that
+  Shonky does not use an ANF representation, so has more forms of
+  continuation to handle, and in contrast to our nested continuation
+  structure, Shonky uses a completely flat structure.
+  % and where our continuations have a nested
+  % structure, Shonky uses a completely flat structure for
+  % continuations.
+\end{itemize}
+
+Although OCaml itself has no support for effect handlers, a
+development branch, Multicore OCaml~\cite{Dolan2015}, does. Multicore
+OCaml does not include an effect type system, and handlers are
+restricted so that continuations are affine, that is, they can be
+invoked at most once. This design admits a particularly efficient
+implementation, as continuations need never be copied, so they can
+simply be stored on the stack.
+
+\section{Parallel programming models}
+\todo{\cite{Marlow2013}}
+
+%%
+%% Compiling handlers
+%%
+\chapter{Compiling effect handlers}
+
+\section{Compilation strategy}
+\label{sec:translation}
+
+\begin{figure}
+\tikzset{my rectangle/.style={
+        draw=black,
+        thick, 
+        rectangle, 
+        minimum width={width("OCaml frontend")+2pt}}
+}
+\centering
+\begin{tikzpicture}[node distance=5pt,every node/.style={draw, minimum width=100pt, outer sep=0pt}]
+
+  \node(A)          {OCaml frontend};
+  \node(B)[right=of A,xshift=40pt] {Links};
+
+  \node(C)[inner sep=0pt,yshift=-50pt,fit={(A) (B)},label=center:Lambda] {};
+
+  \node[above=of C,draw=none,yshift=-2pt] {\footnotesize{\textit{\textbf{OCaml backend}}}};
+
+  \node(D)[yshift=-90pt]          {Byte code};
+  \node(E)[right=of D,xshift=40pt] {Flambda};
+
+  \node(G)[below=of E,yshift=-10pt] {Clambda};
+  \node(H)[below=of G,yshift=-10pt] {Native backends};
+
+  \node(F)[fit=(G)(H),inner sep=0,left=of G.north west,anchor=north east,xshift=-40pt]          {Custom backends};
+
+
+  \node(Z)[thick,fit=(C)(H),inner sep=20pt] {};
+
+  \draw[->] (A.south) to ([xshift=50pt]C.north west);
+  \draw[->] (B.south) to ([xshift=-50pt]C.north east);
+
+  \draw[->] ([xshift=-72pt]C.south) to (D.north);
+
+  \draw[->] (D) to (F);
+
+  \draw[->] ([xshift=72pt]C.south) to (E.north);
+  \draw[->] (E) to (G);
+  \draw[->] (G) to (H);
+%  \node(C)[below=of B] {C};
+%  \node(D)[below=of C] {D};
+
+%  \node(Z)[fit=(A)(D),right=of A.north east,anchor=north west, inner sep=0] {Z};
+
+% % Frontends
+% \node [my rectangle] (OCaml frontend) at (0,0) {OCaml frontend};
+% \node [my rectangle] (Links frontend) at (6,0) {Links frontend};
+
+% % OCaml backend
+% \node [my rectangle,minimum width=270pt] (Lambda) at (3,-2) {Lambda};
+% %\node[rectangle,draw=black,ultra thick,minimum height=+5.0cm,minimum width=+4.0cm,fit ={(Parser.north) (Typechecker.south)}] (Frontend) {};
+\end{tikzpicture}
+\caption{OCaml backend \citep{Hillerstrom2016b}.}\label{fig:infra-diagram}
+\end{figure}
+
+We reuse most of the previous Links infrastructure. The Links frontend
+is type-checked and translated into a small, typed intermediate
+language in \emph{A-normal form} (ANF) \citep{Flanagan1993}. The Links
+interpreter implements a generalised CEK machine
+\citep{Hillerstrom2016a}, which interprets ANF code.
+
+%
+
+Our compilation strategy is to translate the Links ANF language into the OCaml
+\emph{Lambda} language, which is a small, untyped lambda calculus. The OCaml
+backend exposes a hierarchy of intermediate representations (IRs), where the
+top representation is known as Lambda. As shown in the Figure
+\ref{fig:infra-diagram}, the Lambda IR offers two different compilation
+options: byte code and native code. Therefore by targeting Lambda rather than
+a lower level IR, we achieve maximum flexibility as a translation into byte
+code, in principle, enables us to take advantage of custom backends such as
+\texttt{js\_of\_ocaml} to produce efficient JavaScript.
+
+%
+
+There are several semantic differences between Links and OCaml, e.g. Links
+employs structural typing, whilst OCaml predominantly employs nominal typing.
+In particular, Links employs row typing for effects, records, and variants,
+whereas OCaml only supports row typing for the latter. Exhibiting a faithful
+translation from Links to OCaml amounts to a lot of value boxing. Thus, we
+target Lambda for greater flexibility and control.  We effectively subvert
+OCaml's typechecker by targeting Lambda, however the translation is safe as
+Links programs are already typechecked.
+
+\subsection{Compiler overview}
+\begin{figure}
+%\centering
+\tikzset{frontend/.style={
+        draw=black,  
+        rectangle, 
+        minimum width={width("Lambda Compiler")+10pt}}
+}
+
+\tikzset{backend/.style={
+        draw=black,  
+        rectangle, 
+        minimum width={width("Lambda Compiler")+10pt}}
+}
+\begin{tikzpicture}
+  %% Frontend
+  \node (FrontendLabel) {\textbf{\textit{Frontend}}};
+  \node [frontend, below=of FrontendLabel,yshift=20pt] (Parser) {Parser};
+  \node [frontend, below=of Parser,yshift=10pt]   (EDesugar) {Early desugar};
+  \node [frontend, below=of EDesugar,yshift=10pt] (Typechecker) {Type checker};
+  % Arrows
+  \draw [->] (Parser.south)   -- (EDesugar.north)    {};
+  \draw [->] (EDesugar.south) -- (Typechecker.north) {};
+  % Frame
+  \node [draw,rectangle,thick,minimum width=125pt,minimum
+height=140pt,fit=(FrontendLabel)(Parser)(Typechecker)] (Frontend) {};  
+
+  %% Source
+  \node [draw,rectangle,left=of Frontend] (Source) {Source};
+  % Arrow from Source to box
+  \draw [->,thick] (Source.east) -- (Frontend.west) {};
+
+  %% Links backend
+  \node [right=of FrontendLabel,xshift=70pt] (BackendLabel) {\textbf{\textit{Backend}}};
+  \node [backend,below=of BackendLabel,yshift=20pt] (IRCompiler) {IR Compiler};
+  \node [backend,below=of IRCompiler,yshift=15pt] (PMCompiler) {\begin{tabular}{l}Pattern\\Matching\\ Compiler\end{tabular}};
+  % Arrows
+  \draw [->] ([xshift=5pt]IRCompiler.south west)  -- ([xshift=5pt]PMCompiler.north west) {};
+  \draw [->] ([xshift=-5pt]PMCompiler.north east) -- ([xshift=-5pt]IRCompiler.south east) {};
+  % Frame
+  \node [draw,rectangle,thick,minimum width=125pt,minimum height=140pt,fit=(BackendLabel)(IRCompiler)(PMCompiler),yshift=4pt] (Backend) {};
+  % Arrows
+  \draw [->,thick] (Frontend.east)                -- (Backend.west) {};
+
+  %% Lambda backend
+  \node [below=of Backend,yshift=-5pt] (LambdaBackendLabel) {\textbf{\textit{Lambda Backend}}};
+  \node [backend,below=of LambdaBackendLabel,yshift=20pt] (IR2Lambda) {IR to Lambda};
+  \node [backend,below=of IR2Lambda,yshift=10pt] (OCamlBackend) {OCaml backend};
+  % Arrows
+  \draw [->] (IR2Lambda.south) -- (OCamlBackend.north) {};
+  % Frame
+  \node [draw,rectangle,thick,minimum width=125pt,minimum height=100pt,fit=(LambdaBackendLabel)(IR2Lambda)(OCamlBackend)] (LambdaBackend) {};
+  % Arrow
+  \draw [->,thick] (Backend.south) -- (LambdaBackend.north) {};
+
+  %% Binary
+  \node [draw,rectangle,below=of Source,yshift=-96pt] (Binary) {Binary};
+  \draw [->,thick] (LambdaBackend.west)  -- (Binary.east) {};
+\end{tikzpicture}
+\caption{Links compiler pipeline.}\label{fig:compiler-pipeline}
+\end{figure}
+
+\subsection{Handler desugaring}
+
+\newcommand{\desugar}{\mathcal{D}}
+\newcommand{\vecc}{\overline}
+\renewcommand{\vec}{\overline}
+
+\begin{figure}
+Handler
+\hspace{-1cm}
+\[
+\begin{eqs}
+\linksify{handler h$\vecc{(p)}$} &\equiv& \linksify{handler[m] h$\vecc{(p)}$}, \text{ where \linksify{m} is fresh.}
+\vspace{5mm} \\
+\desugar \left( \linksify{handler[m] h$\vecc{(p)}$ \{ $\vec{c}$ \}} \right) &=& 
+\begin{cases} 
+  \linksify{fun h(m)() \{ handle(m) \{ $\desugar \left( \vec{c} \right)$ \} \}} &\hspace{-2mm}\text{if } |\vecc{(p)}| = 0\\
+  \linksify{fun h$\vecc{(p)}$(m)() \{ handle(m) \{ $\desugar_{\vecc{(p)}} \left( \vec{c} \right)$ \}$\vecc{(p)}$ \}} & \hspace{-2mm}\text{otherwise}
+\end{cases}
+\end{eqs}
+\]
+Handler cases
+\[
+\begin{eqs}
+\desugar_{\vecc{(p)}} \left( \vec{c} \right) &=& \desugar_{\vecc{(p)}} \left( c_1 \right) \cdots \desugar_{\vecc{(p)}} \left( c_n \right)
+\vspace{5mm} \\
+\desugar_{\vecc{(p)}} \left(\linksify{case $q$ -> $M$} \right) &=&  
+\begin{cases}
+  \linksify{case $q$ -> $\desugar \left( M \right)$}                      & \text{if } |\vecc{(p)}| = 0\\
+  \linksify{case $q$ -> fun$\vecc{(p)}$ \{ $\desugar \left( M \right)$ \}} & \text{otherwise}
+\end{cases}
+\end{eqs}
+\]
+\caption{Desugaring handlers \citep{Hillerstrom2016a}.}
+\label{fig:handlers-desugaring}
+\end{figure}
+
+We provide syntactic sugar to make it more convenient to program with
+handlers. The function $\desugar$ is a source-to-source translation
+that elaborates the sugar. Figure~\ref{fig:handlers-desugaring} shows
+the cases for handlers only: $\desugar$ is a homomorphism on the other
+syntax constructors.  Crucially, handlers are desugared into a
+function, that returns a thunk. This is important to ensure that
+handlers compose smoothly. For the same reason a parameterised handler
+desugars into a curried function, where the parameters precede the
+computation argument \lstinline$m$. The parameters are passed around
+by enclosing each operation clause by a function. Thus, the initial
+parameter values are applied directly to the \lstinline$handle$
+expression.
+
+\section{The Links intermediate representation}
+\label{sec:lambe-eff-row}
+
+In this section, we present a type and effect system and a small-step
+operational semantics for \Calc (pronounced ``lambda-eff-row''), a
+Church-style row-polymorphic call-by-value calculus for effect
+handlers.
+%
+This core calculus captures the essence of the Links IR.
+%
+We prove that the operational semantics is sound with respect to the
+type and effect system.
+
+A key advantage of row polymorphism is that it integrates rather
+smoothly with Hindley-Milner type inference. We concern ourselves only
+with the explicitly-typed core language, as the treatment of type
+inference is quite standard.
+
+The design of \Calc is inspired by the $\lambda$-calculi of
+\citet{Kammar2013}, \citet{Pretnar2015}, and \citet{Lindley2012}.
+%
+As in the work of \citet{Kammar2013}, each handler can have its own
+effect signature. As in the work of \citet{Pretnar2015}, the
+underlying formalism is fine-grain call-by-value~\citep{LevyPT03},
+which names each intermediate computation like in A-normal
+form~\citep{Flanagan1993}, but unlike A-normal form is closed under
+$\beta$-reduction. As in the work of \citet{Lindley2012}, the effect
+system is based on row polymorphism.
+
+\subsection{Types}
+The grammars of types, kinds, label sets, and type and kind
+environments are given in Figure~\ref{fig:types-syntax}.
+
+\begin{figure}
+\begin{syntax}
+\slab{Value types}    &A,B  &::= & A \to C
+                               \mid  \forall \alpha^K.C \\
+                             &&\mid& \Record{R} \mid [R]
+                               \mid  \alpha \\
+\slab{Computation types} 
+                      &C,D  &::= & A \eff E \\
+\slab{Effect types}   &E    &::= & \{R\}\\
+\slab{Row types}      &R    &::= & \ell : P;R \mid \rho \mid \cdot \\
+\slab{Presence types} &P    &::= & \Pre{A} \mid \Abs \mid \theta\\
+\slab{Handler types}  &F    &::= & C \Rightarrow D \\
+\slab{Types}          &T    &::= & A \mid C \mid E \mid R \mid P \mid F \\
+\slab{Kinds}          &K    &::= & \Type \mid \Row_\mathcal{L} \mid \Presence\\
+                      &     &\mid& \Comp \mid \Effect \mid \Handler \\
+\slab{Label sets}     &\mathcal{L} &::=& \emptyset \mid \{\ell\} \uplus \mathcal{L}\\
+\slab{Type environments} &\Gamma &::=& \cdot \mid \Gamma, x:A \\
+\slab{Kind environments} &\Delta &::=& \cdot \mid \Delta, \alpha:K \\
+\end{syntax}
+\caption{Types, Effects, Kinds, and Environments}
+\label{fig:types-syntax}
+\end{figure}
+
+\paragraph{Value Types}
+The function type $A \to C$ represents functions that map values of
+type $A$ to computations of type $C$.  The polymorphic type
+$\forall \alpha^K .\, C$ is parameterised by a type variable $\alpha$
+of kind $K$. The record type $\Record{R}$ represents records with
+fields constrained by row $R$. Dually, the variant type $[R]$
+represents tagged sums constrained by row $R$. The handler type
+$C \Rightarrow D$ represents handlers that transform computations of
+type $C$ into computations of type $D$.
+
+\paragraph{Computation Types}
+A computation type $A \eff E$ is given by a value type $A$ and an
+effect $E$, which specifies the operations that the computation may
+perform.
+
+\paragraph{Row Types}
+Effect types, records and variants are defined in terms of rows.
+A row type embodies a collection of distinct labels, each of which is
+annotated with a presence type. A presence type indicates whether a
+label is \emph{present} with some type $A$ ($\Pre{A}$), \emph{absent}
+($\Abs$) or \emph{polymorphic} in its presence ($\theta$).
+
+Row types are either \emph{closed} or \emph{open}. A closed row type
+ends in~$\cdot$, whilst an open row type ends with a \emph{row
+  variable} $\rho$. Furthermore, a closed row term can have only the
+labels explicitly mentioned in its type. Conversely, the row variable
+in an open row can be instantiated with additional labels. We identify
+rows up to reordering of labels. For instance, we consider the
+following two rows equivalent:
+\[ \ell_1 : P_1; \cdots; \ell_n : P_n \equiv \ell_n : P_n; \cdots ; \ell_1 : P_1. \]
+The unit and empty type are definable in terms of row types. We define
+the unit type as the empty, closed record, that is,
+$\Record{\cdot}$. Similarly, we define the empty type as the empty,
+closed variant $[\cdot]$. Usually, we usually omit the $\cdot$ for
+closed rows.
+
+\paragraph{Handler Types}
+A handler type $C \Rightarrow D$ is given by an input computation type
+$C$ and an output computation type $D$.
+
+\paragraph{Kinds}
+We have six kinds: $\Type$, $\Comp$, $\Effect$, $\Row_\mathcal{L}$,
+$\Presence$, $\Handler$, which classify value types, computation
+types, effect types, row types, presence types, and handler types,
+respectively. Row kinds are annotated with a set of labels
+$\mathcal{L}$. The kind of a complete row is
+$Row_{\mathcal{\emptyset}}$. More generally, the kind
+$Row_{\mathcal{L}}$ denotes a partial row that cannot mention the
+labels in $\mathcal{L}$.
+%
+
+\paragraph{Type Variables}
+We let $\alpha$, $\rho$ and $\theta$ range over type variables. By
+convention we use $\alpha$ for value type variables or for type
+variables of unspecified kind, $\rho$ for type variables of row kind,
+and $\theta$ for type variables of presence kind.
+
+\paragraph{Type and Kind Environments}
+Type environments map term variables to their types and kind
+environments map type variables to their kinds.
+
+\subsection{Terms}
+\begin{figure}
+\begin{syntax}
+\slab{Values}        &V,W  &::= & x
+                             \mid \lambda x^A .\, M \mid \Lambda \alpha^K .\, M  \\
+                     &     &\mid& \Record{} \mid \Record{\ell = V;W} \mid (\ell\, V)^R \\
+                     &     &    &\\
+\slab{Computations}  &M,N  &::= & V\,W \mid V\,A\\
+                     &     &\mid& \Let\; \Record{\ell=x;y} = V \; \In \; N\\
+                     &     &\mid& \Case\; V \{\ell\; x \mapsto M; y \mapsto N\} \mid \Absurd^C V\\
+                     &     &\mid& \Return\; V \\
+                     &     &\mid& \Let \; x \revto M \; \In \; N\\
+                     &     &\mid& (\Do \; \ell \; V)^E \\
+                     &     &\mid& \Handle \; M \; \With \; H\\
+                     &     &    &\\
+\slab{Handlers}      &H    &::= & \{ \Return \; x \mapsto M \} \\
+                     &     &\mid& \{ \ell \; x \; k \mapsto M \} \uplus H \\
+\end{syntax}
+
+\caption{Term Syntax}
+\label{fig:term-syntax}
+\end{figure}
+The terms are given in Figure~\ref{fig:term-syntax}. We let $x,y,z,k$
+range over term variables. By convention, we use $k$ to denote
+continuation names.
+
+The syntax partitions terms into values, computations and
+handlers. 
+%
+Value terms comprise variables ($x$), lambda abstraction
+($\lambda x^A . \, M$), type abstraction ($\Lambda \alpha^K . \, M$),
+and the introduction forms for records and variants. Records are
+introduced using the empty record $\Record{}$ and record extension
+$\Record{\ell = V; W}$, whilst variants are introduced using injection
+$(\ell\, V)^R$, which injects a field with label $\ell$ and value $V$
+into a row whose type is $R$. We include the row type annotation in
+order to support bottom-up type reconstruction.
+
+All elimination forms are computation terms. Abstraction and type
+abstraction are eliminated using application ($V\,W$) and type
+application ($V\,A$) respectively.
+%
+The record eliminator
+$(\Let \; \Record{\ell=x;y} = V \; \In \; N)$ splits a record $V$
+into $x$, the value associated with $\ell$, and $y$, the rest of the
+record. Non-empty variants are eliminated using the case construct
+($\Case\; V\; \{\ell\; x \mapsto M; y \mapsto N\}$), which evaluates
+the computation $M$ if the tag of $V$ matches $\ell$. Otherwise it
+falls through to $y$ and evaluates $N$.  The elimination form for
+empty variants is ($\Absurd^C\; V$). A trivial computation
+$(\Return\;V)$ returns value $V$. The expression
+$(\Let \; x \revto M \; \In \; N)$ evaluates $M$ and binds the result
+value to $x$ in $N$.
+
+The construct $(\Do \; \ell \; V)^E$ invokes an operation $\ell$ with
+value argument $V$. The handle construct $(\Handle \; M \; \With \;
+H)$ runs a computation $M$ with handler definition $H$. A handler
+definition $H$ consists of a return clause $\Return \; x \mapsto M$
+and a possibly empty set of operation clauses $\{\ell_i \; x_i \; k_i
+\mapsto M_i\}_i$. The return clause defines how to handle the final
+return value of the handled computation, which is bound to $x$ in $M$.
+%
+The $i$-th operation clause binds the operation parameter to $x_i$ and
+the continuation $k_i$ in $M_i$.
+
+We write $Id(M)$ for $\Handle \;M\; \With \; \{\Return\;x \mapsto
+x\}$.
+%
+We write $H(\Return)$ for the return clause of $H$ and $H(\ell)$ for
+the set of either zero or one operation clauses in $H$ that handle the
+operation $\ell$. We write $dom(H)$ for the set of operations handled
+by $H$.
+%
+As our calculus is Church-style, we annotate various term forms with
+type or kind information (term abstraction, type abstraction,
+injection, operations, and empty cases); we sometimes omit these
+annotations.
+
+\subsection{Static Semantics}
+\label{sec:typing}
+The kinding rules are given in Figure~\ref{fig:kinding} and the typing
+rules are given in Figure~\ref{fig:typing}.
+
+The kinding judgement $\Delta \vdash T : K$ states that type $T$ has
+kind $K$ in kind environment $\Delta$.
+%
+The value typing judgement $\typv{\Delta;\Gamma}{V : A}$ states that
+value term $V$ has type $A$ under kind environment $\Delta$ and type
+environment $\Gamma$. The computation typing judgement
+$\typ{\Delta;\Gamma}{M : C}$ states that term $M$ has computation type
+$C$ under kind environment $\Delta$ and type environment $\Gamma$.
+%
+The handler typing judgement $\Delta;\Gamma \vdash H : C \Rightarrow
+D$ states that handler $H$ has type $C \Rightarrow D$ under kind
+environment $\Delta$ and type environment $\Gamma$.
+%
+In the typing judgements, we implicitly assume that $\Gamma$, $A$,
+$C$, and $D$, are well-kinded with respect to $\Delta$. We define the
+functions $FTV(\Gamma)$ to be the set of free type variables in
+$\Gamma$.
+
+The kinding and typing rules are mostly straightforward. The
+interesting typing rules are \tylab{Handle} and the two handler
+rules. The \tylab{Handle} rule states that $\Handle\; M\; \With\; H$
+produces a computation of type $D$ given that the computation $M$ has
+type $C$, and that $H$ is a handler that transforms a computation of
+type $C$ into another computation of type $D$.
+
+The \tylab{Handler} rule is crucial. The effect rows on the
+computation type $C$ and the output computation type $D$ must share
+the same suffix $R$. This means that the effect row of $D$ must
+explicitly mention each of the operations $\ell_i$, whether that be to
+say that an $\ell_i$ is present with a given type signature, absent,
+or polymorphic in its presence. The row $R$ describes the operations
+that are forwarded. It may include a row-variable, in which case an
+arbitrary number of effects may be forwarded by the handler.
+%
+The typing of the return clause is straightforward. In the typing of
+each operation clause, the continuation returns the output computation
+type $D$. Thus, we are here defining \emph{deep}
+handlers~\cite{Kammar2013} in which the handler is implicitly wrapped
+around the continuation, such that any subsequent operations are
+handled uniformly by the same handler.
+%
+% The Links implementation also supports \emph{shallow}
+% handlers~\cite{Kammar2013}, in which the continuation is instead
+% annotated with the input effect and one has to explicitly reinvoke the
+% handler after applying the continuation inside an operation clause.
+
+\begin{figure}
+\begin{mathpar}
+% alpha : K
+  \inferrule*[Lab=\klab{TyVar}]
+    { }
+    {\Delta, \alpha : K \vdash \alpha : K}
+
+% Computation
+    \inferrule*[Lab=\klab{Comp}]
+    { \Delta \vdash A : \Type \\
+      \Delta \vdash E : \Effect \\
+    }
+    {\Delta \vdash A \eff E : \Comp}
+
+% A -E-> B, A : Type, E : Row, B : Type
+  \inferrule*[Lab=\klab{Fun}]
+    { \Delta \vdash A : \Type \\
+      \Delta \vdash C : \Comp  \\
+    }
+    {\Delta \vdash A \to C : \Type}
+
+% forall alpha : K . A : Type
+  \inferrule*[Lab=\klab{Forall}]
+    { \Delta, \alpha : K \vdash C : \Comp}
+    {\Delta \vdash \forall \alpha^K . \, C : \Type}
+
+% Record
+  \inferrule*[Lab=\klab{Record}]
+    { \Delta \vdash R : \Row_\emptyset}
+    {\Delta \vdash \Record{R} : \Type}
+
+% Variant
+  \inferrule*[Lab=\klab{Variant}]
+    { \Delta \vdash R : \Row_\emptyset}
+    {\Delta \vdash [R] : \Type}
+
+% Effect
+  \inferrule*[Lab=\klab{Effect}]
+    { \Delta \vdash R : \Row_\emptyset}
+    {\Delta \vdash \{R\} : \Effect}
+
+
+% Present
+  \inferrule*[Lab=\klab{Present}]
+    {\Delta \vdash A : \Type}
+    {\Delta \vdash \Pre{A} : \Presence}
+
+% Absent
+  \inferrule*[Lab=\klab{Absent}]
+    { }
+    {\Delta \vdash \Abs : \Presence}
+
+% Empty row
+  \inferrule*[Lab=\klab{EmptyRow}]
+    { }
+    {\Delta \vdash \cdot : \Row_\mathcal{L}}
+
+% Extend row
+  \inferrule*[Lab=\klab{ExtendRow}]
+    { \Delta \vdash P : \Presence \\
+      \Delta \vdash R : \Row_{\mathcal{L} \uplus \{\ell\}}
+    }
+    {\Delta \vdash \ell : P;R : \Row_\mathcal{L}}
+
+% Handler
+  \inferrule*[Lab=\klab{Handler}]
+    { \Delta \vdash C : \Comp \\
+      \Delta \vdash D : \Comp
+    }
+    {\Delta \vdash C \Rightarrow D : \Handler}
+\end{mathpar}
+
+\caption{Kinding Rules}
+\label{fig:kinding}
+\end{figure}
+
+\begin{figure*}
+Values
+\begin{mathpar}
+% Variable
+  \inferrule*[Lab=\tylab{Var}]
+    {x : A \in \Gamma}
+    {\typv{\Delta;\Gamma}{x : A}}
+
+% Abstraction
+  \inferrule*[Lab=\tylab{Lam}]
+    {\typ{\Delta;\Gamma, x : A}{M : C}}
+    {\typv{\Delta;\Gamma}{\lambda x^A .\, M : A \to C}}
+
+% Polymorphic abstraction
+  \inferrule*[Lab=\tylab{PolyLam}]
+    {\typv{\Delta,\alpha : K;\Gamma}{M : C} \\
+     \alpha \notin FTV(\Gamma)
+    }
+    {\typv{\Delta;\Gamma}{\Lambda \alpha^K .\, M : \forall \alpha^K . \,C}}
+\\
+% unit : ()
+  \inferrule*[Lab=\tylab{Unit}]
+    { }
+    {\typv{\Delta;\Gamma}{\Record{} : \Record{}}}
+
+% Extension
+  \inferrule*[Lab=\tylab{Extend}]
+    { \typv{\Delta;\Gamma}{V : A} \\
+      \typv{\Delta;\Gamma}{W : \Record{\ell:\Abs;R}}
+    }
+    {\typv{\Delta;\Gamma}{\Record{\ell=V;W} : \Record{\ell:\Pre{A};R}}}
+
+% Inject
+  \inferrule*[Lab=\tylab{Inject}]
+    {\typv{\Delta;\Gamma}{V : A}}
+    {\typv{\Delta;\Gamma}{(\ell\,V)^R : [\ell : \Pre{A}; R]}}
+\end{mathpar}
+Computations
+\begin{mathpar}
+% Application
+  \inferrule*[Lab=\tylab{App}]
+    {\typv{\Delta;\Gamma}{V : A \to C} \\
+     \typv{\Delta;\Gamma}{W : B}
+    }
+    {\typ{\Delta;\Gamma}{V\,W : C}}
+
+% Polymorphic application
+  \inferrule*[Lab=\tylab{PolyApp}]
+    {\typv{\Delta;\Gamma}{V : \forall \alpha^K . \, C} \\
+     \Delta \vdash A : K
+    }
+    {\typ{\Delta;\Gamma}{V\,A : C[A/\alpha]}}
+
+% Split
+  \inferrule*[Lab=\tylab{Split}]
+    {\typv{\Delta;\Gamma}{V : \Record{\ell : \Pre{A};R}} \\\\
+     \typ{\Delta;\Gamma, x : A, y : \Record{\ell : \Abs; R}}{N : C}
+    }
+    {\typ{\Delta;\Gamma}{\Let \; \Record{\ell =x;y} = V\; \In \; N : C}}
+
+% Case
+  \inferrule*[Lab=\tylab{Case}]
+    { \typv{\Delta;\Gamma}{V : [\ell : \Pre{A};R]}  \\\\
+      \typ{\Delta;\Gamma,x:A}{M : C} \\\\
+      \typ{\Delta;\Gamma,y:[\ell : \Abs;R]}{N : C}
+    }
+    {\typ{\Delta;\Gamma}{\Case \; V \{\ell\; x \mapsto M;y \mapsto N \} : C}}
+
+% Absurd
+  \inferrule*[Lab=\tylab{Absurd}]
+    {\typv{\Delta;\Gamma}{V : []}}
+    {\typ{\Delta;\Gamma}{\Absurd^C \; V : C}}
+
+% Return
+  \inferrule*[Lab=\tylab{Return}]
+    {\typv{\Delta;\Gamma}{V : A}}
+    {\typc{\Delta;\Gamma}{\Return \; V : A}{E}}
+\\
+% Let 
+  \inferrule*[Lab=\tylab{Let}]
+    {\typc{\Delta;\Gamma}{M : A}{E} \\
+     \typ{\Delta;\Gamma, x : A}{N : C}
+    }
+    {\typ{\Delta;\Gamma}{\Let \; x \revto M\; \In \; N : C}}
+
+% Do 
+  \inferrule*[Lab=\tylab{Do}]
+    {\typv{\Delta;\Gamma}{V : A} \\
+     E = \{\ell : A \to B; R\}
+    }
+    {\typc{\Delta;\Gamma}{(\Do \; \ell \; V)^E : B}{E}}
+
+% Open Handle
+  \inferrule*[Lab=\tylab{Handle}]
+    {\typv{\Delta;\Gamma}{M : C} \\
+     \Delta;\Gamma \vdash H : C \Rightarrow D}
+    {\typv{\Delta;\Gamma}{\Handle \; M \; \With \; H : D}}
+\end{mathpar}
+
+Handlers
+\begin{mathpar}
+% Open handler
+%\mprset{flushleft}
+  \inferrule*[Lab=\tylab{Handler}]
+    {
+      C = A \eff \{(\ell_i : A_i \to B_i)_i; R\} \\
+      D = B \eff \{(\ell_i : P_i)_i;         R\} \\
+      H = \{\Return \; x \mapsto M\} \uplus \{\ell_i \; y \; k \mapsto N_i\}_i \\\\
+      [\typv{\Delta;\Gamma,y : A_i, k : B_i \to D}{N_i : D}]_i \\
+       \typv{\Delta;\Gamma, x : A}{M : D} \\
+    }
+    {{\Delta;\Gamma} \vdash {H : C \Rightarrow D}}
+\end{mathpar}
+
+\caption{Typing Rules}
+\label{fig:typing}
+\end{figure*}
+
+\subsection{Operational Semantics}
+\label{sec:small-step}
+
+\begin{figure*}
+
+\begin{reductions}
+\semlab{App}   & (\lambda x^A . \, M) V &\reducesto& M[V/x] \\
+\semlab{TyApp} & (\Lambda \alpha^K . \, M) A &\reducesto& M[A/\alpha] \\
+\semlab{Split} & \Let \; \Record{\ell = x;y} = \Record{\ell = V;W} \; \In \; N &\reducesto& N[V/x,W/y] \\
+\semlab{Case$_1$} &
+  \Case \; (\ell\, V)^R \{ \ell \; x \mapsto M; y \mapsto N\} &\reducesto& M[V/x] \\
+\semlab{Case$_2$} &
+  \Case \; (\ell\, V)^R \{ \ell' \; x \mapsto M; y \mapsto N\} &\reducesto& N[(\ell\, V)^R/y], \hfill\quad \text{if } \ell \neq \ell' \\
+\semlab{Let} &
+  \Let \; x \revto \Return \; V \; \In \; N &\reducesto& N[V/x] \\
+\semlab{Handle-Ret} &
+  \Handle \; (\Return \; V) \; \With \; H &\reducesto& N[V/x], \hfill\quad \text{where } \{ \Return \; x \mapsto N \} \in H \\
+\semlab{Handle-Op} &
+  \Handle \; \mathcal{E}[\Do \; \ell \; V] \; \With \; H
+    &\reducesto& N[V/x, \lambda y . \, \Handle \; \mathcal{E}[\Return \; y] \; \With \; H/k],\qquad \\
+  \multicolumn{4}{@{}r@{}}
+      {\text{where } \ell \notin BL(\mathcal{E}) \text{ and } \{ \ell \; x \; k \mapsto M \} \in H} \\
+\semlab{Lift} &
+  M &\reducesto& N, \hfill \text{if }\mathcal{E}[M] \reducesto \mathcal{E}[N] \\
+\end{reductions}
+\begin{syntax}
+\slab{Evaluation contexts} &  \mathcal{E} &::=& [\,] \mid \Let \; x \revto \mathcal{E} \; \In \; N \mid \Handle \; \mathcal{E} \; \With \; H
+\end{syntax}
+
+\caption{Small-Step Operational Semantics}
+\label{fig:small-step}
+\end{figure*}
+We give a small-step operational semantics for \Calc. Figure
+\ref{fig:small-step} displays the operational rules. The reduction
+relation $\reducesto$ is defined on computation terms. The statement
+$M \reducesto M'$ reads: term $M$ reduces to term $M'$ in a single
+step. Most of the rules are standard. We use evaluation contexts to
+focus on the active expression. The interesting rules are the handler
+rules.
+
+We write $BL(\mathcal{E})$ for the set of operation labels bound by
+$\mathcal{E}$.
+\begin{equations}
+BL([~])                            &=& \emptyset \\
+BL(\Let\;x \revto \mathcal{E}\;\In\;N)    &=& BL(\mathcal{E}) \\
+BL(\Handle\;\mathcal{E}\;\With\;H) &=& BL(\mathcal{E}) \cup dom(H) \\
+\end{equations}
+
+The rule \semlab{Handle-Ret} invokes the return clause of a
+handler. The rule \semlab{Handle-op} handles an operation by invoking
+the appropriate operation clause. The constraint $\ell \notin
+BL(\mathcal{E})$ ensures that no inner handler inside the evaluation
+context is able to handle the operation: thus a handler is able to
+reach past any other inner handlers that do not handle $\ell$. In our
+abstract machine semantics we realise this behaviour using explicit
+forwarding operations, but more efficient implementations are
+perfectly feasible.
+
+\paragraph{Remark}
+The attentive reader may have noticed that the two rules \semlab{Let}
+and \semlab{Handle-Ret} are strikingly similar. Indeed, we could omit
+let bindings altogether since any let binding
+\[
+\Let\; x \revto M \;\In\; N
+\]
+may be simulated by a trivial handler:
+\[
+\Handle\; M \; \With\; \{ \Return\; x \to N \}
+\]
+Nevertheless, we elect to keep let bindings in \Calc. As we discuss in
+Section~\ref{sec:abstract-machine}, one reason for doing so is in
+order to facilitate more efficient implementations.
+
+We write $R^+$ for the transitive closure of relation $R$.
+%
+Subject reduction and type soundness for $\Calc$ are standard.
+
+\begin{theorem}[Subject Reduction]
+If $\typc{\Delta;\Gamma}{M : A}{E}$ and $M \reducesto M'$, then
+$\typc{\Delta;\Gamma}{M' : A}{E}$.
+\end{theorem}
+
+There are two ways in which a computation can terminate. It can either
+successfully return a value, or it can get stuck on an unhandled
+operation.
+\begin{definition}
+We say that computation term $N$ is normal with respect to effect $E$,
+if $N$ is either of the form $\Return\;V$, or
+$\mathcal{E}[\Do\;\ell\;W]$, where $\ell \in E$ and $\ell \notin
+BL(\mathcal{E})$.
+\end{definition}
+If $N$ is normal with respect to the empty effect $\{\cdot\}$, then
+$N$ has the form $\Return\;V$.
+
+\begin{theorem}[Type Soundness]
+If $\typc{}{M : A}{E}$, then there exists $\typc{}{N : A}{E}$, such that
+$M \reducesto^+ N \not\reducesto$, and $N$ is normal with respect to
+effect $E$.
+\end{theorem}
+
+\section{Translating Links ANF into Lambda}
+\label{sec:translation}
+
+\section{Run-time representation}
+By using the OCaml backend we naturally inherit the OCaml
+run-time. OCaml implements effect handlers as heap-managed stack data
+structures, and as a consequence composition of handlers gives rise to
+$n$-element stacks at run-time. For example, the composition
+\lstinline[mathescape]!randomResult(maybeResult($\cdot$))! is
+represented as a two-element stack. Thus, an invocation of an abstract
+operation amounts to performing a dynamic lookup for a suitable
+handler in a stack.
+
+Since the primary use of handlers in OCaml is to express concurrency,
+OCaml handlers are affine; continuations can only be resumed at most
+once, and multiple invocations of a continuation causes a run-time
+error. Multi-shot handlers can be simulated by manually cloning
+continuations using \lstinline$Obj.clone_continuation$. The cost of
+cloning is linear in the size of the handler stack. However, cloning
+is a fragile abstraction; if the handler stack contains at least one
+multi-shot handler, then every affine handler in the stack must be
+demoted to a multi-shot handler to be safe, because a multi-shot
+handler may consume a linear continuation more than
+once. Consequently, multi-shot handlers in OCaml break modularity.
+
+In the Links compiler we use the cloning capability under the hood to implement
+multi-shot handlers. For example, our encoding of \lstinline$allResults$
+amounts to the following in plain OCaml:
+% \kc{$Obj.clone$ was too generic and I plan to use $Obj.clone\_continuation$ to
+% be less ambiguous.}
+\begin{lstlisting}[style=ocaml]
+let all_results m = match m () with
+ | x -> [x]
+ | effect Choose k -> 
+   let k' arg = 
+     continue (Obj.clone_continuation k) arg 
+   in k' true @ k' false
+\end{lstlisting}
+OCaml provides a unified syntax for pattern-matching on regular, effect, and
+exception patterns. The keyword \lstinline[style=ocaml]$effect$ begins an
+operation-clause. Essentially, we create a local function \lstinline$k'$, which
+wraps the actual continuation \lstinline$k$. An invocation of \lstinline$k'$
+passes its argument to a fresh copy of the actual continuation. The
+\lstinline$continue$ function is provided by the standard library; given a
+continuation and a value, it invokes the continuation with that particular
+value. By default we implement every handler as a multi-shot handler.
+
+\begin{figure}
+\centering
+\begin{tikzpicture}
+  \drawstruct{(4.5,2)}
+  \structcell{\lstinline$do Choose$}  \coordinate (DoChoose) at (currentcell.west);
+  \structcell{$\cdots$}
+  \structcell{\lstinline$do Fail$} \coordinate (DoFail) at (currentcell.east);
+  \structcell{\lstinline$Return-clause$}
+  \structcell{\lstinline[keywordstyle=\footnotesize]$Exception handler$}
+  \structcell{\lstinline$Choose-clause$} \coordinate (HandleChoose1) at (currentcell.west); \coordinate (HandleChoose2) at (currentcell.east);
+  \structcell{$\cdot$} \coordinate (H1) at (currentcell.west);
+
+  \drawstruct{(0,0)}
+  \structcell{$\cdots$} \coordinate (H2) at (currentcell.east);
+  \structcell{\lstinline$Return-clause$}
+  \structcell{\lstinline[keywordstyle=\footnotesize]$Exception handler$}
+  \structcell{\lstinline$Fail-clause$}
+  \structcell{$\bot$}
+
+%  \draw[<-] (H2) .. controls ([yshift=0cm] H2) and ([xshift=-10cm,yshift=4cm] H1) .. (H1);
+  \draw (H2) edge[out=-20,in=-175,<-] (H1);
+  \draw (DoChoose) edge[out=175,in=-180,->] (HandleChoose1);
+  \draw (DoFail) edge[xshift=0.5cm,out=0,in=-360,->] (HandleChoose2);
+\end{tikzpicture}
+\caption{Representation of \lstinline$maybeResult(randomResult(drunkToss))$ at runtime.}\label{fig:rtstack}
+\end{figure}
+
+%%
+%% Concurrent programming with handlers
+%%
+\chapter{A reconstruction of the Links concurrency model with handlers}
+\label{ch:programming}
+
+% In this chapter we explore the admissibility of building an entire
+% concurrency model with effect handlers. As a starting point we attempt
+% to reconstruct the built-in concurrency model of Links, therefore we
+% begin with a tour of the Links model in
+% Section~\ref{sec:links-model}. Afterwards in
+% Section~\ref{sec:links-model-handlers} we demonstrate a possible
+% encoding of the concurrency model using algebraic effects and
+% handlers. In the subsequent Sections~\ref{sec:thread-model} and
+% \ref{sec:???} we explore further developments of the model.
+%
+% We will now attempt to reconstruct the concurrency of model of Links
+% using effect handlers. We will do this reconstruction in several steps:
+% first we consider how to design the process abstraction. Afterwards we
+% consider the problem of scheduling processes. Thereafter we consider
+% how to implement communication between processes.
+
+In this chapter we explore an implementation of the concurrency model
+of Links using effect handlers. Our construction of the concurrency
+model spans multiple sections: in
+Section~\ref{sec:links-model-handlers-process} we discuss a process
+abstraction that is somewhat faithful to the built-in process
+abstraction of Links in the sense that our new abstraction also tracks
+the effects of processes. Then in
+Section~\ref{sec:links-model-handlers-scheduler} we define an
+interface for spawning and suspending processes. In addition, we
+implement a basic process scheduler that we subsequently refine with
+more sophisticated features. In
+Section~\ref{sec:links-model-handlers-communication} we consider how
+to enable communication amongst processes.
+
+\section{Process abstraction}
 \label{sec:links-model-handlers-process}
 
 Initially, we choose to represent process identifiers as integers:
@@ -1152,14 +1984,14 @@ links> makeProcess(fun() { if (do Choose) print("True")
 \end{lstlisting}
 %
 
-\subsection{Spawning, suspending, and scheduling processes}
+\section{Spawning, suspending, and scheduling processes}
 \label{sec:links-model-handlers-scheduler}
 
 \todo{Introduce fibers}
 Though, the caveat is that cooperative multi-tasking does not
 immediately provide preemptive concurrency. 
 
-\subsubsection{Concurrency operations}
+\subsection{Concurrency operations}
 
 We require an interface to spawn and suspend processes. We define an
 operation \lstinline$Spawn$ that takes a nullary function with an
@@ -1181,7 +2013,7 @@ This settles the interface for fibers. Next, we need to give a
 concrete implementation of fibers through an interpretation of
 \lstinline$Spawn$ and \lstinline$Yield$.
 
-\subsubsection{A basic round-robin scheduler}
+\subsection{A basic round-robin scheduler}
 
 An interpretation of \lstinline$Spawn$ and \lstinline$Yield$ amounts
 to scheduling processes. Our programs will be running in the a single
@@ -1275,7 +2107,7 @@ Under the \lstinline$basicRoundrobin$ scheduler a parent and its child
 process are indistinguishable because the scheduler assigns both of
 them the \lstinline$0$ identifier.
 
-\subsubsection{Unique processes}
+\subsection{Unique processes}
 
 The scheduler \lstinline$basicRoundrobin$ neatly demonstrates that the
 essence of the scheduling is fairly simple: variations on enqueuing
@@ -1285,66 +2117,66 @@ processes we need to be able to uniquely identify processes.
 As a first attempt at making processes unique we might consider a
 parameterised version of basic round-robin scheduler that carries the
 identifier of the executing process, that is
-%
-\snippet{wrongRoundrobin.links}
-%
-%This scheduler follows the same pattern as \lstinline$basicRoundrobin$
-The handler takes a parameter \lstinline$pid$ which is supposed to be
-identifier of the executing process. When the executing process spawns
-a new child process that child process gets assigned the identifier
-\lstinline$pid+1$. The parent process gets suspended before control is
-transferred to the child process. 
+% %
+% \snippet{wrongRoundrobin.links}
+% %
+% %This scheduler follows the same pattern as \lstinline$basicRoundrobin$
+% The handler takes a parameter \lstinline$pid$ which is supposed to be
+% identifier of the executing process. When the executing process spawns
+% a new child process that child process gets assigned the identifier
+% \lstinline$pid+1$. The parent process gets suspended before control is
+% transferred to the child process. 
 
-Since the handler is parameterised the resumption function
-\lstinline$resume$ becomes a curried function that carries over the
-values of the handler parameter to a subsequent invocation of the
-handler. An invocation of \lstinline$resume(child)(pid)$ orchestrates
-the initial return of control to the parent process. First the process
-handle \lstinline$child$ gets passed to the parent process. Afterwards
-it installs parent identifier \lstinline$pid$ as the identifier of the
-executing process.
+% Since the handler is parameterised the resumption function
+% \lstinline$resume$ becomes a curried function that carries over the
+% values of the handler parameter to a subsequent invocation of the
+% handler. An invocation of \lstinline$resume(child)(pid)$ orchestrates
+% the initial return of control to the parent process. First the process
+% handle \lstinline$child$ gets passed to the parent process. Afterwards
+% it installs parent identifier \lstinline$pid$ as the identifier of the
+% executing process.
 
-Let us try out this scheduler on the previous example. We plug
-everything together as before, except that the scheduler now takes the
-identifier of the root process, which we will define to be \lstinline$0$:
-%
-\begin{lstlisting}
-run -<- evalState(emptyQueue()) 
-    -<- wrongRoundrobin(0) -< spawnLoneChild(2);
-\end{lstlisting}
-%
-Compiling and running the program yields a promising
-result:
-%
-\begin{lstlisting}[style=terminal]
-$ ./links -c wrong_concur_model1.links -o wrong_model1
-$ ./wrong_model1
-Spawned P#1
-Spawned P#2
-\end{lstlisting}
-Whilst this is the result we desire the model is not correct. The following example illustrates the problem with the model:
-%
-\snippet{spawnSiblings.links}
-%
-The difference from the previous program \lstinline$spawnLoneChild$ is
-that each child gets a sibling. Substituting \lstinline$spawnSiblings$
-for \lstinline$spawnLoneChild$ above yields:
-%
-\begin{lstlisting}[style=terminal]
-$ ./links -c wrong_concur_model2.links -o wrong_model2
-$ ./wrong_model2
-Spawned P#1
-Spawned P#2
-Spawned P#1
-Spawned P#2
-Spawned P#2
-Spawned P#2
-\end{lstlisting}
-%
-This is definitely not what we wanted. The scheduler
-\lstinline$wrongRoundrobin$ fails to capture the hierarchical
-structure properly.
-\todo{Condense the above to just a few lines? Change process identifier to process name?}
+% Let us try out this scheduler on the previous example. We plug
+% everything together as before, except that the scheduler now takes the
+% identifier of the root process, which we will define to be \lstinline$0$:
+% %
+% \begin{lstlisting}
+% run -<- evalState(emptyQueue()) 
+%     -<- wrongRoundrobin(0) -< spawnLoneChild(2);
+% \end{lstlisting}
+% %
+% Compiling and running the program yields a promising
+% result:
+% %
+% \begin{lstlisting}[style=terminal]
+% $ ./links -c wrong_concur_model1.links -o wrong_model1
+% $ ./wrong_model1
+% Spawned P#1
+% Spawned P#2
+% \end{lstlisting}
+% Whilst this is the result we desire the model is not correct. The following example illustrates the problem with the model:
+% %
+% \snippet{spawnSiblings.links}
+% %
+% The difference from the previous program \lstinline$spawnLoneChild$ is
+% that each child gets a sibling. Substituting \lstinline$spawnSiblings$
+% for \lstinline$spawnLoneChild$ above yields:
+% %
+% \begin{lstlisting}[style=terminal]
+% $ ./links -c wrong_concur_model2.links -o wrong_model2
+% $ ./wrong_model2
+% Spawned P#1
+% Spawned P#2
+% Spawned P#1
+% Spawned P#2
+% Spawned P#2
+% Spawned P#2
+% \end{lstlisting}
+% %
+% This is definitely not what we wanted. The scheduler
+% \lstinline$wrongRoundrobin$ fails to capture the hierarchical
+% structure properly.
+% \todo{Condense the above to just a few lines? Change process identifier to process name?}
 
 In order to obtain a robust unique identifier generation scheme we
 have to detach the identifier generation from the state of the
@@ -1411,7 +2243,7 @@ Spawned P#6
 %
 As we see every process gets a unique name.
 
-\subsubsection{Self-referral}
+\subsection{Self-referral}
 
 We now consider a final refinement of the round-robin scheduler:
 process self-referral. We introduce a new operation \lstinline$Myself$:
@@ -1480,7 +2312,7 @@ From the perspective of computations the initial process is no longer
 a special case. Every process gets handled uniformly by this
 scheduler. 
 
-\subsection{Handling communication}
+\section{Handling communication}
 \label{sec:links-model-handlers-communication}
 
 In this section we will augment the implementation of the concurrency
@@ -1489,7 +2321,7 @@ concurrency model is an instance of a message-passing model, thus we
 need at least a primitive for sending messages and another for
 receiving them.
 
-\subsubsection{Sending and receiving}
+\subsection{Sending and receiving}
 
 The built-in concurrency model of Links implements both blocking send
 and receive. We encode these as two abstract operations
@@ -1535,7 +2367,7 @@ there are no messages then the function invokes itself in order to
 retry. However, before retrying the function yields in order to let
 another process run.
 
-\subsubsection{Facilitating communication}
+\subsection{Facilitating communication}
 
 In the sieve example we do not know the precise number of processes,
 and hence the number of mailboxes, that we need ahead of
@@ -1585,23 +2417,39 @@ queue \lstinline$q$ in the dictionary.
 
 The dual operation \lstinline$dequeueMessage$ dequeues a message from
 a mailbox. We let the function return a \lstinline$Maybe$-value to
-accommodate for the special case where a mailbox is empty:
+accommodate for the special case when a mailbox is empty:
 %
 \snippet{dequeueMessage.links}
 %
+We attempt to look up the message queue associated with
+\lstinline$pid$. If no such queue has been constructed yet, then there
+are no messages to dequeue hence we simply return
+\lstinline$Nothing$. However, if a queue has already been constructed
+then there are two cases to consider:
+\begin{enumerate}
+  \item The queue is empty: we simply return \lstinline$Nothing$
+  \item The queue is non-empty: we dequeue a message. The
+    \lstinline$dequeue$ function returns a message and the modified
+    queue. We modify the dictionary by rebinding \lstinline$pid$ to
+    point to the modified queue.
+\end{enumerate}
 
+Using the two functions \lstinline$enqueueMessage$ and
+\lstinline$dequeueMessage$ we give an interpretation of the operations
+\lstinline$Send$ and \lstinline$Recv$:
 %
 \lstinputlisting{snippets/communication.links}
 %
+The implementation is straightforward.
+\todo{Implement amendments}
 
-
-\subsection{Sieve of Eratosthenes example revisited}
+\section{Sieve of Eratosthenes example revisited}
 \label{sec:links-model-handlers-example}
 
-We need to make a few changes to sieve example in order to adapt it to
-our new concurrency implementation. The changes are only
-syntactical. For example, we changes the \lstinline$generator$
-function as follows:
+We need to make a few changes to sieve example from
+Section~\ref{sec:sieve-example} in order to adapt it to our new
+concurrency implementation. The changes are only syntactical. For
+example, we changes the \lstinline$generator$ function as follows:
 %
 \lstinputlisting[linebackgroundcolor={\lstcolorlines{1,2,3,4}}]{snippets/generator.links}
 %
@@ -1634,8 +2482,19 @@ $ ./concur_model
 5
 7
 \end{lstlisting}
-The resulting program yields the same output as the program we
-described in Section~\ref{??}.
+The resulting program yields the same output as the original program
+we described in Section~\ref{sec:sieve-example}.
+
+\section{Limitations of the implementation}
+\label{sec:limitations}
+
+\todo{Syntactical limitations}
+\todo{Computations must be thunks}
+\todo{Abstract process identifiers}
+
+\section{Extensions}
+\todo{Synchronous send and receive}
+\todo{MPI example}
 % \section{Pipeline parallelism}
 % \label{sec:prime}
 
@@ -1771,168 +2630,6 @@ described in Section~\ref{??}.
 % \end{figure}
 
 %%
-%% Compiling handlers
-%%
-\chapter{Compiling effect handlers}
-
-\section{Translating Links ANF into Lambda}
-\label{sec:translation}
-
-\begin{figure}
-\tikzset{my rectangle/.style={
-        draw=black,
-        thick, 
-        rectangle, 
-        minimum width={width("OCaml frontend")+2pt}}
-}
-\centering
-\begin{tikzpicture}[node distance=5pt,every node/.style={draw, minimum width=100pt, outer sep=0pt}]
-
-  \node(A)          {OCaml frontend};
-  \node(B)[right=of A,xshift=40pt] {Links frontend};
-
-  \node(C)[inner sep=0pt,yshift=-50pt,fit={(A) (B)},label=center:Lambda] {};
-
-  \node[above=of C,draw=none,yshift=-2pt] {\footnotesize{\textit{\textbf{OCaml backend}}}};
-
-  \node(D)[yshift=-90pt]          {Byte code};
-  \node(E)[right=of D,xshift=40pt] {Flambda};
-
-  \node(G)[below=of E,yshift=-10pt] {Clambda};
-  \node(H)[below=of G,yshift=-10pt] {Native backends};
-
-  \node(F)[fit=(G)(H),inner sep=0,left=of G.north west,anchor=north east,xshift=-40pt]          {Custom backends};
-
-
-  \node(Z)[fit=(C)(H),inner sep=20pt] {};
-
-  \draw[->] (A.south) to ([xshift=50pt]C.north west);
-  \draw[->] (B.south) to ([xshift=-50pt]C.north east);
-
-  \draw[->] ([xshift=-72pt]C.south) to (D.north);
-
-  \draw[->] (D) to (F);
-
-  \draw[->] ([xshift=72pt]C.south) to (E.north);
-  \draw[->] (E) to (G);
-  \draw[->] (G) to (H);
-%  \node(C)[below=of B] {C};
-%  \node(D)[below=of C] {D};
-
-%  \node(Z)[fit=(A)(D),right=of A.north east,anchor=north west, inner sep=0] {Z};
-
-% % Frontends
-% \node [my rectangle] (OCaml frontend) at (0,0) {OCaml frontend};
-% \node [my rectangle] (Links frontend) at (6,0) {Links frontend};
-
-% % OCaml backend
-% \node [my rectangle,minimum width=270pt] (Lambda) at (3,-2) {Lambda};
-% %\node[rectangle,draw=black,ultra thick,minimum height=+5.0cm,minimum width=+4.0cm,fit ={(Parser.north) (Typechecker.south)}] (Frontend) {};
-\end{tikzpicture}
-\caption{OCaml backend}\label{fig:infra-diagram}
-\end{figure}
-
-We reuse most of the previous Links infrastructure. The Links frontend
-is type-checked and translated into a small, typed intermediate
-language in \emph{A-normal form} (ANF) \citep{Flanagan1993}. The Links
-interpreter implements a generalised CEK machine
-\citep{Hillerstrom2016a}, which interprets ANF code.
-
-%
-
-Our compilation strategy is to translate the Links ANF language into the OCaml
-\emph{Lambda} language, which is a small, untyped lambda calculus. The OCaml
-backend exposes a hierarchy of intermediate representations (IRs), where the
-top representation is known as Lambda. As shown in the Figure
-\ref{fig:infra-diagram}, the Lambda IR offers two different compilation
-options: byte code and native code. Therefore by targeting Lambda rather than
-a lower level IR, we achieve maximum flexibility as a translation into byte
-code, in principle, enables us to take advantage of custom backends such as
-\texttt{js\_of\_ocaml} to produce efficient JavaScript.
-
-%
-
-There are several semantic differences between Links and OCaml, e.g. Links
-employs structural typing, whilst OCaml predominantly employs nominal typing.
-In particular, Links employs row typing for effects, records, and variants,
-whereas OCaml only supports row typing for the latter. Exhibiting a faithful
-translation from Links to OCaml amounts to a lot of value boxing. Thus, we
-target Lambda for greater flexibility and control.  We effectively subvert
-OCaml's typechecker by targeting Lambda, however the translation is safe as
-Links programs are already typechecked.
-
-\begin{figure}
-\centering
-\begin{tikzpicture}
-  \drawstruct{(4.5,2)}
-  \structcell{\lstinline$do Choose$}  \coordinate (DoChoose) at (currentcell.west);
-  \structcell{$\cdots$}
-  \structcell{\lstinline$do Fail$} \coordinate (DoFail) at (currentcell.east);
-  \structcell{\lstinline$Return-clause$}
-  \structcell{\lstinline[keywordstyle=\footnotesize]$Exception handler$}
-  \structcell{\lstinline$Choose-clause$} \coordinate (HandleChoose1) at (currentcell.west); \coordinate (HandleChoose2) at (currentcell.east);
-  \structcell{$\cdot$} \coordinate (H1) at (currentcell.west);
-
-  \drawstruct{(0,0)}
-  \structcell{$\cdots$} \coordinate (H2) at (currentcell.east);
-  \structcell{\lstinline$Return-clause$}
-  \structcell{\lstinline[keywordstyle=\footnotesize]$Exception handler$}
-  \structcell{\lstinline$Fail-clause$}
-  \structcell{$\bot$}
-
-%  \draw[<-] (H2) .. controls ([yshift=0cm] H2) and ([xshift=-10cm,yshift=4cm] H1) .. (H1);
-  \draw (H2) edge[out=-20,in=-175,<-] (H1);
-  \draw (DoChoose) edge[out=175,in=-180,->] (HandleChoose1);
-  \draw (DoFail) edge[xshift=0.5cm,out=0,in=-360,->] (HandleChoose2);
-\end{tikzpicture}
-\caption{Representation of \lstinline$maybeResult(randomResult(drunkToss))$ at runtime.}\label{fig:rtstack}
-\end{figure}
-
-\section{Runtime Representation}
-By using the OCaml backend we naturally inherit the OCaml
-run-time. OCaml implements effect handlers as heap-managed stack data
-structures, and as a consequence composition of handlers gives rise to
-$n$-element stacks at run-time. For example, the composition
-\lstinline[mathescape]!randomResult(maybeResult($\cdot$))! is
-represented as a two-element stack. Thus, an invocation of an abstract
-operation amounts to performing a dynamic lookup for a suitable
-handler in a stack.
-
-Since the primary use of handlers in OCaml is to express concurrency,
-OCaml handlers are affine; continuations can only be resumed at most
-once, and multiple invocations of a continuation causes a run-time
-error. Multi-shot handlers can be simulated by manually cloning
-continuations using \lstinline$Obj.clone_continuation$. The cost of
-cloning is linear in the size of the handler stack. However, cloning
-is a fragile abstraction; if the handler stack contains at least one
-multi-shot handler, then every affine handler in the stack must be
-demoted to a multi-shot handler to be safe, because a multi-shot
-handler may consume a linear continuation more than
-once. Consequently, multi-shot handlers in OCaml break modularity.
-
-In the Links compiler we use the cloning capability under the hood to implement
-multi-shot handlers. For example, our encoding of \lstinline$allResults$
-amounts to the following in plain OCaml:
-% \kc{$Obj.clone$ was too generic and I plan to use $Obj.clone\_continuation$ to
-% be less ambiguous.}
-\begin{lstlisting}[style=ocaml]
-let all_results m = match m () with
- | x -> [x]
- | effect Choose k -> 
-   let k' arg = 
-     continue (Obj.clone_continuation k) arg 
-   in k' true @ k' false
-\end{lstlisting}
-OCaml provides a unified syntax for pattern-matching on regular, effect, and
-exception patterns. The keyword \lstinline[style=ocaml]$effect$ begins an
-operation-clause. Essentially, we create a local function \lstinline$k'$, which
-wraps the actual continuation \lstinline$k$. An invocation of \lstinline$k'$
-passes its argument to a fresh copy of the actual continuation. The
-\lstinline$continue$ function is provided by the standard library; given a
-continuation and a value, it invokes the continuation with that particular
-value. By default we implement every handler as a multi-shot handler.
-
-%%
 %% Evaluation
 %%
 \chapter{Experiments}
@@ -1944,656 +2641,656 @@ value. By default we implement every handler as a multi-shot handler.
 %%
 %% Formalisation
 %%
-\chapter{A calculus of handlers and rows}
-\label{sec:lambe-eff-row}
+% \chapter{A calculus of handlers and rows}
+% \label{sec:lambe-eff-row}
 
-In this section, we present a type and effect system and a small-step
-operational semantics for \Calc (pronounced ``lambda-eff-row''), a
-Church-style row-polymorphic call-by-value calculus for effect
-handlers.
-%
-This core calculus captures the essence of the Links IR.
-%
-We prove that the operational semantics is sound with respect to the
-type and effect system.
+% In this section, we present a type and effect system and a small-step
+% operational semantics for \Calc (pronounced ``lambda-eff-row''), a
+% Church-style row-polymorphic call-by-value calculus for effect
+% handlers.
+% %
+% This core calculus captures the essence of the Links IR.
+% %
+% We prove that the operational semantics is sound with respect to the
+% type and effect system.
 
-A key advantage of row polymorphism is that it integrates rather
-smoothly with Hindley-Milner type inference. We concern ourselves only
-with the explicitly-typed core language, as the treatment of type
-inference is quite standard.
+% A key advantage of row polymorphism is that it integrates rather
+% smoothly with Hindley-Milner type inference. We concern ourselves only
+% with the explicitly-typed core language, as the treatment of type
+% inference is quite standard.
 
-The design of \Calc is inspired by the $\lambda$-calculi of
-\citet{Kammar2013}, \citet{Pretnar2015}, and \citet{Lindley2012}.
-%
-As in the work of \citet{Kammar2013}, each handler can have its own
-effect signature. As in the work of \citet{Pretnar2015}, the
-underlying formalism is fine-grain call-by-value~\cite{LevyPT03},
-which names each intermediate computation like in A-normal
-form~\cite{Flanagan1993}, but unlike A-normal form is closed under
-$\beta$-reduction. As in the work of \citet{Lindley2012}, the effect
-system is based on row polymorphism.
+% The design of \Calc is inspired by the $\lambda$-calculi of
+% \citet{Kammar2013}, \citet{Pretnar2015}, and \citet{Lindley2012}.
+% %
+% As in the work of \citet{Kammar2013}, each handler can have its own
+% effect signature. As in the work of \citet{Pretnar2015}, the
+% underlying formalism is fine-grain call-by-value~\cite{LevyPT03},
+% which names each intermediate computation like in A-normal
+% form~\cite{Flanagan1993}, but unlike A-normal form is closed under
+% $\beta$-reduction. As in the work of \citet{Lindley2012}, the effect
+% system is based on row polymorphism.
 
-\section{Types}
-The grammars of types, effects, kinds, and type and kind environments
-are given in Figure~\ref{fig:types-syntax}.
+% \section{Types}
+% The grammars of types, effects, kinds, and type and kind environments
+% are given in Figure~\ref{fig:types-syntax}.
 
-\begin{figure}
-Types
-\begin{syntax}
-\slab{Value types}    &A,B  &::= & %\Bool \mid \Int
-                                      A \to C
-                               \mid  \forall \alpha^K.C \\
-                             &&\mid& \Record{R} \mid [R]
-                               \mid  C \Rightarrow D \mid \alpha \\
-                               %% \mid  \Harrow{A}{E}{B}{E'} \mid \alpha \\
-\slab{Computation types} 
-                      &C,D  &::= & A \eff E \\
-\slab{Effect types}   &E    &::= & \{R\}\\
-\slab{Row types}      &R    &::= & \ell : P;R \mid \rho \mid \cdot \\
-\slab{Presence types} &P    &::= & \Pre{A} \mid \Abs \mid \theta\\
-%\slab{Labels}         &\ell &    &                \\
-\slab{Kinds}          &K    &::= & \Type \mid \Row_\mathcal{L} \mid \Presence\\
-\slab{Label sets}     &\mathcal{L} &::=& \emptyset \mid \{\ell\} \uplus \mathcal{L}\\
-%\slab{Type variables} &\alpha, \rho, \theta& \\
-\slab{Type environments} &\Gamma &::=& \cdot \mid \Gamma, x:A \\
-\slab{Kind environments} &\Delta &::=& \cdot \mid \Delta, \alpha:K \\
-\end{syntax}
-\caption{Types, effects, kinds, and environments}
-\label{fig:types-syntax}
-\end{figure}
+% \begin{figure}
+% Types
+% \begin{syntax}
+% \slab{Value types}    &A,B  &::= & %\Bool \mid \Int
+%                                       A \to C
+%                                \mid  \forall \alpha^K.C \\
+%                              &&\mid& \Record{R} \mid [R]
+%                                \mid  C \Rightarrow D \mid \alpha \\
+%                                %% \mid  \Harrow{A}{E}{B}{E'} \mid \alpha \\
+% \slab{Computation types} 
+%                       &C,D  &::= & A \eff E \\
+% \slab{Effect types}   &E    &::= & \{R\}\\
+% \slab{Row types}      &R    &::= & \ell : P;R \mid \rho \mid \cdot \\
+% \slab{Presence types} &P    &::= & \Pre{A} \mid \Abs \mid \theta\\
+% %\slab{Labels}         &\ell &    &                \\
+% \slab{Kinds}          &K    &::= & \Type \mid \Row_\mathcal{L} \mid \Presence\\
+% \slab{Label sets}     &\mathcal{L} &::=& \emptyset \mid \{\ell\} \uplus \mathcal{L}\\
+% %\slab{Type variables} &\alpha, \rho, \theta& \\
+% \slab{Type environments} &\Gamma &::=& \cdot \mid \Gamma, x:A \\
+% \slab{Kind environments} &\Delta &::=& \cdot \mid \Delta, \alpha:K \\
+% \end{syntax}
+% \caption{Types, effects, kinds, and environments}
+% \label{fig:types-syntax}
+% \end{figure}
 
-\paragraph{Value Types}
-%The base types are integers and booleans.
-The function type $A \to C$ takes an argument of type $A$ and returns
-a computation of type $C$.
-%% The effect signature enumerates the
-%% operations that the function may perform during evaluation.
-The polymorphic type $\forall \alpha^K .\, C$ is parameterised by a
-type variable $\alpha$ of kind $K$. The record type $\Record{R}$
-represents records with fields given by labels of row $R$. Dually, the
-variant type $[R]$ represents a sum of fields tagged by the labels of
-row $R$. The handler type $C \Rightarrow D$ transforms a computation
-of type $C$ into a computation of type $D$.
+% \paragraph{Value Types}
+% %The base types are integers and booleans.
+% The function type $A \to C$ takes an argument of type $A$ and returns
+% a computation of type $C$.
+% %% The effect signature enumerates the
+% %% operations that the function may perform during evaluation.
+% The polymorphic type $\forall \alpha^K .\, C$ is parameterised by a
+% type variable $\alpha$ of kind $K$. The record type $\Record{R}$
+% represents records with fields given by labels of row $R$. Dually, the
+% variant type $[R]$ represents a sum of fields tagged by the labels of
+% row $R$. The handler type $C \Rightarrow D$ transforms a computation
+% of type $C$ into a computation of type $D$.
 
-\paragraph{Computation Types}
-A computation type $A \eff E$ is given by a value type $A$ and an
-effect $E$, which specifies the operations that the computation may
-perform.
+% \paragraph{Computation Types}
+% A computation type $A \eff E$ is given by a value type $A$ and an
+% effect $E$, which specifies the operations that the computation may
+% perform.
 
-\paragraph{Row Types}
-Effect types, records and variants are defined in terms of rows.
-A row type embodies a collection of distinct labels, each of which is
-annotated with a presence type. A presence type indicates whether a
-label is \emph{present} with some type $A$ ($\Pre{A}$), \emph{absent}
-($\Abs$) or \emph{polymorphic} in its presence ($\theta$).
+% \paragraph{Row Types}
+% Effect types, records and variants are defined in terms of rows.
+% A row type embodies a collection of distinct labels, each of which is
+% annotated with a presence type. A presence type indicates whether a
+% label is \emph{present} with some type $A$ ($\Pre{A}$), \emph{absent}
+% ($\Abs$) or \emph{polymorphic} in its presence ($\theta$).
 
-Row types are either \emph{closed} or \emph{open}. A closed row type
-ends in~$\cdot$, whilst an open row type ends with a \emph{row
-  variable} $\rho$. Furthermore, a closed row term can have only the
-labels explicitly mentioned in its type. Conversely, the row variable
-in an open row can be instantiated with additional labels. We identify
-rows up to reordering of labels, for instance, we consider the
-following two rows equivalent:
-\[ \ell_1 : P_1; \cdots; \ell_n : P_n \equiv \ell_n : P_n; \cdots ; \ell_1 : P_1. \]
-The unit and empty type are definable in terms of row types. We define
-the unit type as the empty, closed record, that is,
-$\Record{\cdot}$. Similarly, we define the empty type as the empty,
-closed variant $[\cdot]$. Usually, we usually omit the $\cdot$ for
-closed rows.
+% Row types are either \emph{closed} or \emph{open}. A closed row type
+% ends in~$\cdot$, whilst an open row type ends with a \emph{row
+%   variable} $\rho$. Furthermore, a closed row term can have only the
+% labels explicitly mentioned in its type. Conversely, the row variable
+% in an open row can be instantiated with additional labels. We identify
+% rows up to reordering of labels, for instance, we consider the
+% following two rows equivalent:
+% \[ \ell_1 : P_1; \cdots; \ell_n : P_n \equiv \ell_n : P_n; \cdots ; \ell_1 : P_1. \]
+% The unit and empty type are definable in terms of row types. We define
+% the unit type as the empty, closed record, that is,
+% $\Record{\cdot}$. Similarly, we define the empty type as the empty,
+% closed variant $[\cdot]$. Usually, we usually omit the $\cdot$ for
+% closed rows.
 
-\paragraph{Kinds}
-We have three kinds: $Type$, $\emph{Row}_\mathcal{L}$ and $Presence$
-which classify value types, row types and presence types,
-respectively. Row kinds are annotated with a set of labels
-$\mathcal{L}$. The kind of a complete row is
-$Row_{\mathcal{\emptyset}}$. More generally, the kind
-$Row_{\mathcal{L}}$ denotes a partial row which cannot mention the
-labels in $\mathcal{L}$.
-%
+% \paragraph{Kinds}
+% We have three kinds: $Type$, $\emph{Row}_\mathcal{L}$ and $Presence$
+% which classify value types, row types and presence types,
+% respectively. Row kinds are annotated with a set of labels
+% $\mathcal{L}$. The kind of a complete row is
+% $Row_{\mathcal{\emptyset}}$. More generally, the kind
+% $Row_{\mathcal{L}}$ denotes a partial row which cannot mention the
+% labels in $\mathcal{L}$.
+% %
 
-\paragraph{Type Variables}
-We let $\alpha$, $\rho$ and $\theta$ range over type variables. By
-convention we use $\alpha$ for value type variables or for type
-variables of unspecified kind, $\rho$ for type variables of row kind,
-and $\theta$ for type variables of presence kind.
+% \paragraph{Type Variables}
+% We let $\alpha$, $\rho$ and $\theta$ range over type variables. By
+% convention we use $\alpha$ for value type variables or for type
+% variables of unspecified kind, $\rho$ for type variables of row kind,
+% and $\theta$ for type variables of presence kind.
 
-\paragraph{Type and Kind Environments}
-Type environments map term variables to their types and kind
-environments map type variables to their kinds.
+% \paragraph{Type and Kind Environments}
+% Type environments map term variables to their types and kind
+% environments map type variables to their kinds.
 
-\section{Terms}
-\begin{figure}
-\begin{syntax}
-                             % SL: no need for constants in the core calculus
-%\slab{Constants}     &c    &::= & n \mid \True \mid \False \\
-\slab{Values}        &V,W  &::= & x
-                             %\mid c
-                             \mid \lambda x^A .\, M \mid \Lambda \alpha^K .\, M  \\
-                     &     &\mid& \Record{} \mid \Record{\ell = V;W} \mid (\ell\, V)^R \\
-                     &     &    &\\
-\slab{Computations}  &M,N  &::= & V\,W \mid V\,A\\
-                     &     &\mid& \Let\; \Record{\ell=x;y} \revto V \; \In \; N\\
-                     &     &\mid& \Case\; V \{\ell\; x \mapsto M; y \mapsto N\} \mid \Absurd^C V\\
-                     &     &\mid& \Return\; V \\
-                     &     &\mid& \Let \; x \revto M \; \In \; N\\
-                     &     &\mid& (\Do \; \ell \; V)^E \\
-                     &     &\mid& \Handle \; M \; \With \; H\\
-                     &     &    &\\
-\slab{Handlers}      &H    &::= & \{ \Return \; x \mapsto M \} \\
-                     &     &\mid& \{ \ell \; x \; k \mapsto M \} \uplus H \\
-%% \slab{Integers}      &n    &      \\
-%% \slab{Variables}     &x,y,z,k &    & \\
-\end{syntax}
+% \section{Terms}
+% \begin{figure}
+% \begin{syntax}
+%                              % SL: no need for constants in the core calculus
+% %\slab{Constants}     &c    &::= & n \mid \True \mid \False \\
+% \slab{Values}        &V,W  &::= & x
+%                              %\mid c
+%                              \mid \lambda x^A .\, M \mid \Lambda \alpha^K .\, M  \\
+%                      &     &\mid& \Record{} \mid \Record{\ell = V;W} \mid (\ell\, V)^R \\
+%                      &     &    &\\
+% \slab{Computations}  &M,N  &::= & V\,W \mid V\,A\\
+%                      &     &\mid& \Let\; \Record{\ell=x;y} \revto V \; \In \; N\\
+%                      &     &\mid& \Case\; V \{\ell\; x \mapsto M; y \mapsto N\} \mid \Absurd^C V\\
+%                      &     &\mid& \Return\; V \\
+%                      &     &\mid& \Let \; x \revto M \; \In \; N\\
+%                      &     &\mid& (\Do \; \ell \; V)^E \\
+%                      &     &\mid& \Handle \; M \; \With \; H\\
+%                      &     &    &\\
+% \slab{Handlers}      &H    &::= & \{ \Return \; x \mapsto M \} \\
+%                      &     &\mid& \{ \ell \; x \; k \mapsto M \} \uplus H \\
+% %% \slab{Integers}      &n    &      \\
+% %% \slab{Variables}     &x,y,z,k &    & \\
+% \end{syntax}
 
-\caption{Term Syntax}
-\label{fig:term-syntax}
-\end{figure}
-The terms are given in Figure~\ref{fig:term-syntax}. We let $x,y,z,k$
-range over term variables. By convention, we use $k$ to denote
-continuation names. %We let $n$ range over integer constants.
+% \caption{Term Syntax}
+% \label{fig:term-syntax}
+% \end{figure}
+% The terms are given in Figure~\ref{fig:term-syntax}. We let $x,y,z,k$
+% range over term variables. By convention, we use $k$ to denote
+% continuation names. %We let $n$ range over integer constants.
 
-The syntax partitions terms into values, computations and
-handlers. 
-%
-Value terms comprise variables ($x$), %constants ($c$),
-lambda abstraction ($\lambda x^A . \, M$), type abstraction ($\Lambda
-\alpha^K . \, M$), and the introduction forms for records and
-variants. Records are introduced using the empty record $\Record{}$
-and record extension $\Record{\ell = V; W}$, whilst variants are
-introduced using injection $(\ell\, V)^R$ which injects a field with
-label $\ell$ and value $V$ into a row whose type is $R$. We include
-the row type annotation in order to support bottom-up type
-reconstruction.
+% The syntax partitions terms into values, computations and
+% handlers. 
+% %
+% Value terms comprise variables ($x$), %constants ($c$),
+% lambda abstraction ($\lambda x^A . \, M$), type abstraction ($\Lambda
+% \alpha^K . \, M$), and the introduction forms for records and
+% variants. Records are introduced using the empty record $\Record{}$
+% and record extension $\Record{\ell = V; W}$, whilst variants are
+% introduced using injection $(\ell\, V)^R$ which injects a field with
+% label $\ell$ and value $V$ into a row whose type is $R$. We include
+% the row type annotation in order to support bottom-up type
+% reconstruction.
 
-All elimination forms are computation terms. Abstraction and type
-abstraction are eliminated using application ($V\,W$) and type
-application ($V\,A$) respectively.
-%
-The record eliminator $(\Let \; \Record{\ell=x;y} \revto V \; \In \;
-N)$ splits a record $V$ into $x$, the value associated with $\ell$,
-and $y$, the rest of the record. Non-empty variants are eliminated
-using the case construct ($\Case\; V\; \{\ell\; x \mapsto M; y \mapsto
-N\}$), which evaluates the computation $M$ if the tag of $V$ matches
-$\ell$, otherwise it falls through to $y$ and evaluates $N$.  The
-elimination form for empty variants is ($\Absurd^C V$). A trivial
-computation $(\Return\;V)$ returns value $V$. The expression $(\Let \;
-x \revto M \; \In \; N)$ evaluates $M$ and binds the result value to
-$x$ in $N$.
+% All elimination forms are computation terms. Abstraction and type
+% abstraction are eliminated using application ($V\,W$) and type
+% application ($V\,A$) respectively.
+% %
+% The record eliminator $(\Let \; \Record{\ell=x;y} \revto V \; \In \;
+% N)$ splits a record $V$ into $x$, the value associated with $\ell$,
+% and $y$, the rest of the record. Non-empty variants are eliminated
+% using the case construct ($\Case\; V\; \{\ell\; x \mapsto M; y \mapsto
+% N\}$), which evaluates the computation $M$ if the tag of $V$ matches
+% $\ell$, otherwise it falls through to $y$ and evaluates $N$.  The
+% elimination form for empty variants is ($\Absurd^C V$). A trivial
+% computation $(\Return\;V)$ returns value $V$. The expression $(\Let \;
+% x \revto M \; \In \; N)$ evaluates $M$ and binds the result value to
+% $x$ in $N$.
 
-The construct $(\Do \; \ell \; V)^E$ invokes an operation $\ell$ with
-value argument $V$. The handle construct $(\Handle \; M \; \With \;
-H)$ runs a computation $M$ with handler definition $H$. A handler
-definition $H$ consists of a return clause $\Return \; x \mapsto M$
-and a possibly empty set of operation clauses $\{\ell_i \; x_i \; k_i
-\mapsto M_i\}_i$. The return clause defines how to handle the final
-return value of the handled computation, which is bound to $x$ in $M$.
-%
-The $i$-th operation clause binds the operation parameter to $x_i$ and
-a the continuation $k_i$ in $M_i$.
+% The construct $(\Do \; \ell \; V)^E$ invokes an operation $\ell$ with
+% value argument $V$. The handle construct $(\Handle \; M \; \With \;
+% H)$ runs a computation $M$ with handler definition $H$. A handler
+% definition $H$ consists of a return clause $\Return \; x \mapsto M$
+% and a possibly empty set of operation clauses $\{\ell_i \; x_i \; k_i
+% \mapsto M_i\}_i$. The return clause defines how to handle the final
+% return value of the handled computation, which is bound to $x$ in $M$.
+% %
+% The $i$-th operation clause binds the operation parameter to $x_i$ and
+% a the continuation $k_i$ in $M_i$.
 
-We write $Id(M)$ for $\Handle \;M\; \With \; \{\Return\;x \mapsto
-x\}$.
-%
-We write $H(\Return)$ for the return clause of $H$ and $H(\ell)$ for
-the set of either zero or one operation clauses in $H$ that handle the
-operation $\ell$. We write $dom(H)$ for the set of operations handled
-by $H$.
-%
-As our calculus is Church-style, we annotate various term forms with
-type or kind information (term abstraction, type abstraction,
-injection, operations, and empty cases); we sometimes omit these
-annotations.
+% We write $Id(M)$ for $\Handle \;M\; \With \; \{\Return\;x \mapsto
+% x\}$.
+% %
+% We write $H(\Return)$ for the return clause of $H$ and $H(\ell)$ for
+% the set of either zero or one operation clauses in $H$ that handle the
+% operation $\ell$. We write $dom(H)$ for the set of operations handled
+% by $H$.
+% %
+% As our calculus is Church-style, we annotate various term forms with
+% type or kind information (term abstraction, type abstraction,
+% injection, operations, and empty cases); we sometimes omit these
+% annotations.
 
-%% SL: possibly a bit draconian, but I think we can do without the
-%% detail here.
+% %% SL: possibly a bit draconian, but I think we can do without the
+% %% detail here.
 
-%% The terms of \Calc are written in a style reminiscent of
-%% \emph{A-normal form} (ANF). ANF is a direct style intermediate
-%% language in which every intermediate computation is let-bound
-%% \cite{Flanagan1993}. As a consequence application consist of a value
-%% applied to another value. For example, consider the Links expression
-%% \lstinline$f(g(42))$, we must let bind the argument of \lstinline$f$
-%% in order to bring the expression into ANF; we do not need to let bind
-%% the argument of \lstinline$g$, since it is already a value, thus we
-%% obtain the following ANF expression:
-%% \[
-%% \Let\; x \revto g\,42\; \In \; f\, x.
-%% \]
-%% However, ANF is not closed under $\beta$-reduction
-%% \cite{Sabry1996,Kennedy2007}, since function application can lead to
-%% nested \Let{}s. Consider the following example, which is adapted from
-%% \citet{Sabry1996}:
-%% \[ 
-%%   \Let\; x \revto (\lambda y . \, \Let\; z \revto f \, a \;\In \; M) \, b \; \In\; N
-%% \]
-%% which $\beta$-reduces to 
-%% \[
-%%   \Let\; x \revto (\Let\; z \revto f \, a \;\In \; M) \; \In\; N
-%% \]
-%% which is not in ANF, because $x$ is bound to a computation rather than
-%% a value. ANF can be recovered by adding a normalisation step
-%% \cite{Sabry1996}.  We simplify our presentation by permitting nested
-%% let-bindings and handlers to be applied directly to computations. The
-%% resulting calculus is closer to fine-grained
-%% call-by-value~\cite{LevyPT03}.
+% %% The terms of \Calc are written in a style reminiscent of
+% %% \emph{A-normal form} (ANF). ANF is a direct style intermediate
+% %% language in which every intermediate computation is let-bound
+% %% \cite{Flanagan1993}. As a consequence application consist of a value
+% %% applied to another value. For example, consider the Links expression
+% %% \lstinline$f(g(42))$, we must let bind the argument of \lstinline$f$
+% %% in order to bring the expression into ANF; we do not need to let bind
+% %% the argument of \lstinline$g$, since it is already a value, thus we
+% %% obtain the following ANF expression:
+% %% \[
+% %% \Let\; x \revto g\,42\; \In \; f\, x.
+% %% \]
+% %% However, ANF is not closed under $\beta$-reduction
+% %% \cite{Sabry1996,Kennedy2007}, since function application can lead to
+% %% nested \Let{}s. Consider the following example, which is adapted from
+% %% \citet{Sabry1996}:
+% %% \[ 
+% %%   \Let\; x \revto (\lambda y . \, \Let\; z \revto f \, a \;\In \; M) \, b \; \In\; N
+% %% \]
+% %% which $\beta$-reduces to 
+% %% \[
+% %%   \Let\; x \revto (\Let\; z \revto f \, a \;\In \; M) \; \In\; N
+% %% \]
+% %% which is not in ANF, because $x$ is bound to a computation rather than
+% %% a value. ANF can be recovered by adding a normalisation step
+% %% \cite{Sabry1996}.  We simplify our presentation by permitting nested
+% %% let-bindings and handlers to be applied directly to computations. The
+% %% resulting calculus is closer to fine-grained
+% %% call-by-value~\cite{LevyPT03}.
 
-%% ,
-%% therefore we say that \Calc-terms are in \emph{relaxed A-normal
-%%   form} (RANF).
+% %% ,
+% %% therefore we say that \Calc-terms are in \emph{relaxed A-normal
+% %%   form} (RANF).
 
-% As an example consider the translation of the Links expression \linksify{f(g(42),\{ var y = 1; h(y) \})} into its ANF. For clarity, we highlight the reducible term with a box:
-% \begin{align*}
-%             &  \fbox{\linksify{f(g(42),\{ var y = true; h(y) \})}}\\
-% \Rightarrow &\quad\Let \; x_1 \revto g \; 42 \; \In\\
-%             &\quad\quad\fbox{\linksify{f($x_1$,\{ var y = true; h(y) \})}}\\
-% \Rightarrow &\quad\Let \; x_1 \revto g \; 42 \; \In\\
-%             &\quad\quad\Let \; y \revto \Return \; \True \; \In\\
-%             &\quad\quad\quad\fbox{\linksify{f($x_1$,h($y$))}}\\
-% \Rightarrow &\quad\Let \; x_1 \revto g \; 42 \; \In\\
-%             &\quad\quad\Let \; y \revto \Return \; \True \; \In\\
-%             &\quad\quad\quad\Let \; x_2 \revto h \; y \; \In\\
-%             &\quad\quad\quad\quad(f \; x_1)\; x_2
-% \end{align*}
-% Accordingly, the function \linksify{f} is applied only to value terms. Every subexpression gets decomposed into a single value gradually. As a consequence every subexpression has been explicitly named, thus in this respect, ANF is similar to the predominant imperative Static Single Assignment form.
+% % As an example consider the translation of the Links expression \linksify{f(g(42),\{ var y = 1; h(y) \})} into its ANF. For clarity, we highlight the reducible term with a box:
+% % \begin{align*}
+% %             &  \fbox{\linksify{f(g(42),\{ var y = true; h(y) \})}}\\
+% % \Rightarrow &\quad\Let \; x_1 \revto g \; 42 \; \In\\
+% %             &\quad\quad\fbox{\linksify{f($x_1$,\{ var y = true; h(y) \})}}\\
+% % \Rightarrow &\quad\Let \; x_1 \revto g \; 42 \; \In\\
+% %             &\quad\quad\Let \; y \revto \Return \; \True \; \In\\
+% %             &\quad\quad\quad\fbox{\linksify{f($x_1$,h($y$))}}\\
+% % \Rightarrow &\quad\Let \; x_1 \revto g \; 42 \; \In\\
+% %             &\quad\quad\Let \; y \revto \Return \; \True \; \In\\
+% %             &\quad\quad\quad\Let \; x_2 \revto h \; y \; \In\\
+% %             &\quad\quad\quad\quad(f \; x_1)\; x_2
+% % \end{align*}
+% % Accordingly, the function \linksify{f} is applied only to value terms. Every subexpression gets decomposed into a single value gradually. As a consequence every subexpression has been explicitly named, thus in this respect, ANF is similar to the predominant imperative Static Single Assignment form.
 
-\section{Static Semantics}
-\label{sec:typing}
-The kinding rules are given in Figure~\ref{fig:kinding} and the typing
-rules are given in Figure~\ref{fig:typing}.
+% \section{Static Semantics}
+% \label{sec:typing}
+% The kinding rules are given in Figure~\ref{fig:kinding} and the typing
+% rules are given in Figure~\ref{fig:typing}.
 
-The kinding judgement $\Delta \vdash \alpha : K$ asserts that the type
-variable $\alpha$ has kind $K$ in kind environment $\Delta$. The value
-typing judgement $\typv{\Delta;\Gamma}{V : A}$ states that value term
-$V$ has type $A$ under kind environment $\Delta$ and type environment
-$\Gamma$. The computation typing judgement $\typc{\Delta;\Gamma}{M :
-  A}{E}$ states that the term $M$ has type $A$ and effects $E$ under
-kind environment $\Delta$ and type environment $\Gamma$. In typing
-judgements, we implicitly assume that $\Gamma$, $E$ and $A$ are
-well-kinded with respect to $\Delta$. We define the functions
-$FTV(\Gamma)$ and $FTV(E)$ to be the set of free type variables in
-$\Gamma$ and $E$, respectively.
-%
-%% We write $FTV(\Gamma,E)$ as shorthand for $FTV(\Gamma) \cup FTV(E)$.
+% The kinding judgement $\Delta \vdash \alpha : K$ asserts that the type
+% variable $\alpha$ has kind $K$ in kind environment $\Delta$. The value
+% typing judgement $\typv{\Delta;\Gamma}{V : A}$ states that value term
+% $V$ has type $A$ under kind environment $\Delta$ and type environment
+% $\Gamma$. The computation typing judgement $\typc{\Delta;\Gamma}{M :
+%   A}{E}$ states that the term $M$ has type $A$ and effects $E$ under
+% kind environment $\Delta$ and type environment $\Gamma$. In typing
+% judgements, we implicitly assume that $\Gamma$, $E$ and $A$ are
+% well-kinded with respect to $\Delta$. We define the functions
+% $FTV(\Gamma)$ and $FTV(E)$ to be the set of free type variables in
+% $\Gamma$ and $E$, respectively.
+% %
+% %% We write $FTV(\Gamma,E)$ as shorthand for $FTV(\Gamma) \cup FTV(E)$.
 
-The kind and typing rules are mostly straightforward. The interesting
-typing rules are \tylab{Handle} and the two handler rules. The
-\tylab{Handle} rule states that $\Handle\; M\; \With\; H$ produces a
-computation of type $B$ given that the computation $M$ is typeable
-under effect context $E$, and that $H$ is a handler which transforms a
-computation of type $A$ with effect signature $E$ into another
-computation of type $B$ with effect signature $E'$.
+% The kind and typing rules are mostly straightforward. The interesting
+% typing rules are \tylab{Handle} and the two handler rules. The
+% \tylab{Handle} rule states that $\Handle\; M\; \With\; H$ produces a
+% computation of type $B$ given that the computation $M$ is typeable
+% under effect context $E$, and that $H$ is a handler which transforms a
+% computation of type $A$ with effect signature $E$ into another
+% computation of type $B$ with effect signature $E'$.
 
-The \tylab{Handler} rule is crucial. The input effect $E$ and the
-output effect $E'$ must share the same suffix $R$. This means that
-$E'$ must explicitly mention each of the operations $\ell_i$, whether
-that be to say that an $\ell_i$ is present with a given type
-signature, absent, or polymorphic in its presence. The row $R$
-describes the operations that are forwarded. It may include a
-row-variable, in which case an arbitrary number of effects may be
-forwarded by the handler.
-%
-The typing of the return clause is straightforward. In the typing of
-each operation clause, the continuation returns the output computation
-type $D$. Thus, we are here defining \emph{deep}
-handlers~\cite{Kammar2013} in which the handler is implicitly wrapped
-around the continuation, such that any subsequent operations are
-handled uniformly by the same handler.
-%
-The Links implementation also supports \emph{shallow}
-handlers~\cite{Kammar2013}, in which the continuation is instead
-annotated with the input effect and one has to explicitly reinvoke the
-handler after applying the continuation inside an operation clause.
+% The \tylab{Handler} rule is crucial. The input effect $E$ and the
+% output effect $E'$ must share the same suffix $R$. This means that
+% $E'$ must explicitly mention each of the operations $\ell_i$, whether
+% that be to say that an $\ell_i$ is present with a given type
+% signature, absent, or polymorphic in its presence. The row $R$
+% describes the operations that are forwarded. It may include a
+% row-variable, in which case an arbitrary number of effects may be
+% forwarded by the handler.
+% %
+% The typing of the return clause is straightforward. In the typing of
+% each operation clause, the continuation returns the output computation
+% type $D$. Thus, we are here defining \emph{deep}
+% handlers~\cite{Kammar2013} in which the handler is implicitly wrapped
+% around the continuation, such that any subsequent operations are
+% handled uniformly by the same handler.
+% %
+% The Links implementation also supports \emph{shallow}
+% handlers~\cite{Kammar2013}, in which the continuation is instead
+% annotated with the input effect and one has to explicitly reinvoke the
+% handler after applying the continuation inside an operation clause.
 
-%% \todo{Insert a forward reference to discussion of shallow handlers
-%%   elsewhere.}
+% %% \todo{Insert a forward reference to discussion of shallow handlers
+% %%   elsewhere.}
 
-%% The \tylab{Deep} and \tylab{Shallow} rules for handlers describe how
-%% to type deep and shallow handlers, respectively. The two rules are
-%% similar, but differ crucially in their typing of the continuation
-%% parameter $k$. The different typing is due to their different
-%% behaviour. A deep handler wraps itself around continuations such that
-%% any subsequent operations are handled uniformly. Therefore the return
-%% type of a continuation type must match the input type of the
-%% \Return{} case, and in particular, its effect signature must be the
-%% same as the handler's output effect signature $E'$. Conversely, in a
-%% shallow handler the continuation is annotated with the input effect
-%% signature $E$ rather than the output effect signature. Moreover, the
-%% return type $A$ is the same as return type of the handled
-%% computation. Shallow handlers do not wrap themselves around the
-%% continuation, therefore the continuation must be applied explicitly to
-%% handler which has to handle the next operation
-%% invocation. Consequently, operations may be handled non-uniformly.
+% %% The \tylab{Deep} and \tylab{Shallow} rules for handlers describe how
+% %% to type deep and shallow handlers, respectively. The two rules are
+% %% similar, but differ crucially in their typing of the continuation
+% %% parameter $k$. The different typing is due to their different
+% %% behaviour. A deep handler wraps itself around continuations such that
+% %% any subsequent operations are handled uniformly. Therefore the return
+% %% type of a continuation type must match the input type of the
+% %% \Return{} case, and in particular, its effect signature must be the
+% %% same as the handler's output effect signature $E'$. Conversely, in a
+% %% shallow handler the continuation is annotated with the input effect
+% %% signature $E$ rather than the output effect signature. Moreover, the
+% %% return type $A$ is the same as return type of the handled
+% %% computation. Shallow handlers do not wrap themselves around the
+% %% continuation, therefore the continuation must be applied explicitly to
+% %% handler which has to handle the next operation
+% %% invocation. Consequently, operations may be handled non-uniformly.
 
-%% For both handler types the input effect signature is a disjoint union
-%% of operation signatures, that the handler directly interprets, and
-%% some set $E_f$. The metavariable $E_f$ can be instantiated with a row
-%% variable to include operations that are not explicitly mentioned by
-%% the handler.
+% %% For both handler types the input effect signature is a disjoint union
+% %% of operation signatures, that the handler directly interprets, and
+% %% some set $E_f$. The metavariable $E_f$ can be instantiated with a row
+% %% variable to include operations that are not explicitly mentioned by
+% %% the handler.
 
-\begin{figure}
-\begin{mathpar}
-% alpha : K
-  \inferrule*[Lab=\klab{TyVar}]
-    { }
-    {\Delta, \alpha : K \vdash \alpha : K}
+% \begin{figure}
+% \begin{mathpar}
+% % alpha : K
+%   \inferrule*[Lab=\klab{TyVar}]
+%     { }
+%     {\Delta, \alpha : K \vdash \alpha : K}
 
-% forall alpha : K . A : Type
-  \inferrule*[Lab=\klab{Forall}]
-    { \Delta, \alpha : K \vdash A : \Type \\
-      \Delta, \alpha : K \vdash R : \Row_\emptyset}
-    {\Delta \vdash (\forall \alpha^K . \, A \eff \{R\}) : \Type}
-%%
-%% % Int : Type
-%%   \inferrule*[Lab=\klab{Int}]
-%%     { }
-%%     {\Delta \vdash \Int : \Type}
-%%
-%% % Bool : Type
-%%   \inferrule*[Lab=\klab{Bool}]
-%%     { }
-%%     {\Delta \vdash \Bool : \Type}
+% % forall alpha : K . A : Type
+%   \inferrule*[Lab=\klab{Forall}]
+%     { \Delta, \alpha : K \vdash A : \Type \\
+%       \Delta, \alpha : K \vdash R : \Row_\emptyset}
+%     {\Delta \vdash (\forall \alpha^K . \, A \eff \{R\}) : \Type}
+% %%
+% %% % Int : Type
+% %%   \inferrule*[Lab=\klab{Int}]
+% %%     { }
+% %%     {\Delta \vdash \Int : \Type}
+% %%
+% %% % Bool : Type
+% %%   \inferrule*[Lab=\klab{Bool}]
+% %%     { }
+% %%     {\Delta \vdash \Bool : \Type}
 
-% A -E-> B, A : Type, E : Row, B : Type
-  \inferrule*[Lab=\klab{Fun}]
-    { \Delta \vdash A : \Type \\
-      \Delta \vdash R : \Row_\emptyset  \\
-      \Delta \vdash B : \Type
-    }
-    {\Delta \vdash (A \to B \eff \{R\}) : \Type}
-
-% Record
-  \inferrule*[Lab=\klab{Record}]
-    { \Delta \vdash R : \Row_\emptyset}
-    {\Delta \vdash \Record{R} : \Type}
-
-% Variant
-  \inferrule*[Lab=\klab{Variant}]
-    { \Delta \vdash R : \Row_\emptyset}
-    {\Delta \vdash [R] : \Type}
-
-% Present
-  \inferrule*[Lab=\klab{Present}]
-    {\Delta \vdash A : \Type}
-    {\Delta \vdash \Pre{A} : \Presence}
-
-% Absent
-  \inferrule*[Lab=\klab{Absent}]
-    { }
-    {\Delta \vdash \Abs : \Presence}
-
-% Empty row
-  \inferrule*[Lab=\klab{EmptyRow}]
-    { }
-    {\Delta \vdash \cdot : \Row_\mathcal{L}}
-
-% Extend row
-  \inferrule*[Lab=\klab{ExtendRow}]
-    { \Delta \vdash P : \Presence \\
-      \Delta \vdash R : \Row_{\mathcal{L} \uplus \{\ell\}}
-    }
-    {\Delta \vdash \ell : P;R : \Row_\mathcal{L}}
-\end{mathpar}
-
-\caption{Kinding Rules}
-\label{fig:kinding}
-\end{figure}
-
-\begin{figure*}
-Values
-\begin{mathpar}
-% Variable
-  \inferrule*[Lab=\tylab{Var}]
-    {x : A \in \Gamma}
-    {\typv{\Delta;\Gamma}{x : A}}
-%%
-%% % true : Bool
-%%   \inferrule*[Lab=\tylab{True}]
-%%     { }
-%%     {\typv{\Delta;\Gamma}{\True : \Bool}}
-%%
-%% % false : Bool
-%%   \inferrule*[Lab=\tylab{False}]
-%%     { }
-%%     {\typv{\Delta;\Gamma}{\False : \Bool}}
-%%
-%% % n : Int
-%%   \inferrule*[Lab=\tylab{Int}]
-%%     { n \in \mathbb{N} }
-%%     {\typv{\Delta;\Gamma}{n : \Int}}
-
-% Abstraction
-  \inferrule*[Lab=\tylab{Lam}]
-    {\typ{\Delta;\Gamma, x : A}{M : C}}
-    {\typv{\Delta;\Gamma}{\lambda x^A .\, M : A \to C}}
-
-% Polymorphic abstraction
-  \inferrule*[Lab=\tylab{PolyLam}]
-    {\typc{\Delta,\alpha : K;\Gamma}{M : A}{E} \\
-     \alpha \notin FTV(\Gamma)
-    }
-    {\typv{\Delta;\Gamma}{\Lambda \alpha^K .\, M : \forall \alpha^K . \,A \eff E}}
-\\
-% unit : ()
-  \inferrule*[Lab=\tylab{Unit}]
-    { }
-    {\typv{\Delta;\Gamma}{\Record{} : \Record{}}}
-
-% Extension
-  \inferrule*[Lab=\tylab{Extend}]
-    { \typv{\Delta;\Gamma}{V : A} \\
-      \typv{\Delta;\Gamma}{W : \Record{\ell:\Abs;R}}
-    }
-    {\typv{\Delta;\Gamma}{\Record{\ell=V;W} : \Record{\ell:\Pre{A};R}}}
-
-% Inject
-  \inferrule*[Lab=\tylab{Inject}]
-    {\typv{\Delta;\Gamma}{V : A}}
-    {\typv{\Delta;\Gamma}{(\ell\,V)^R : [\ell : \Pre{A}; R]}}
-\end{mathpar}
-Computations
-\begin{mathpar}
-% Application
-  \inferrule*[Lab=\tylab{App}]
-    {\typv{\Delta;\Gamma}{V : A \to C} \\
-     \typv{\Delta;\Gamma}{W : B}
-    }
-    {\typ{\Delta;\Gamma}{V\,W : C}}
-
-% Polymorphic application
-  \inferrule*[Lab=\tylab{PolyApp}]
-    {\typv{\Delta;\Gamma}{V : \forall \alpha^K . \, C} \\
-     \Delta \vdash A : K
-    }
-    {\typ{\Delta;\Gamma}{V\,A : C[A/\alpha]}}
-
-% Split
-  \inferrule*[Lab=\tylab{Split}]
-    {\typv{\Delta;\Gamma}{V : \Record{\ell : \Pre{A};R}} \\\\
-     \typ{\Delta;\Gamma, x : A, y : \Record{\ell : \Abs; R}}{N : C}
-    }
-    {\typ{\Delta;\Gamma}{\Let \; \Record{\ell =x;y} \revto V\; \In \; N : C}}
-
-% Case
-  \inferrule*[Lab=\tylab{Case}]
-    { \typv{\Delta;\Gamma}{V : [\ell : \Pre{A};R]}  \\\\
-      \typ{\Delta;\Gamma,x:A}{M : C} \\\\
-      \typ{\Delta;\Gamma,y:[\ell : \Abs;R]}{N : C}
-    }
-    {\typ{\Delta;\Gamma}{\Case \; V \{\ell\; x \mapsto M;y \mapsto N \} : C}}
-
-% Absurd
-  \inferrule*[Lab=\tylab{Absurd}]
-    {\typv{\Delta;\Gamma}{V : []}}
-    {\typ{\Delta;\Gamma}{\Absurd^C \; V : C}}
-
-% Return
-  \inferrule*[Lab=\tylab{Return}]
-    {\typv{\Delta;\Gamma}{V : A}}
-    {\typc{\Delta;\Gamma}{\Return \; V : A}{E}}
-
-% Let 
-  \inferrule*[Lab=\tylab{Let}]
-    {\typc{\Delta;\Gamma}{M : A}{E} \\
-     \typc{\Delta;\Gamma, x : A}{N : B}{E}
-    }
-    {\typc{\Delta;\Gamma}{\Let \; x \revto M\; \In \; N : B}{E}}
-\\
-% Do 
-  \inferrule*[Lab=\tylab{Do}]
-    {\typv{\Delta;\Gamma}{V : A} \\
-     E = \{\ell : A \to B; R\}
-    }
-    {\typc{\Delta;\Gamma}{(\Do \; \ell \; V)^E : B}{E}}
-
-% Open Handle
-  \inferrule*[Lab=\tylab{Handle}]
-    {\typv{\Delta;\Gamma}{M : C} \\
-     \Delta;\Gamma \vdash H : C \Rightarrow D}
-    {\typv{\Delta;\Gamma}{\Handle \; M \; \With \; H : D}}
-\end{mathpar}
-
-Handlers
-\begin{mathpar}
-% Closed handler
-% \mprset{flushleft}
-% \inferrule*[Lab=\tylab{Deep-Closed}]
-%     { E = \{\ell_i : A_i \to B_i\}_i \\\\
-%       H = \{\Return \; x \mapsto M\} \uplus \{\ell_i \; y_i \; k_i \mapsto N_i\}_i \\\\
-%       \left[\Delta;\Gamma,y_i : A_i, k_i : B_i \xrightarrow{E'} C \vdash_{E'} N_i : C\right]_i \\\\
-%       \Delta;\Gamma, x : A \vdash_{E'} M : C
+% % A -E-> B, A : Type, E : Row, B : Type
+%   \inferrule*[Lab=\klab{Fun}]
+%     { \Delta \vdash A : \Type \\
+%       \Delta \vdash R : \Row_\emptyset  \\
+%       \Delta \vdash B : \Type
 %     }
-%     {\Delta;\Gamma \vdash_{E'} H : (\Record{} \xrightarrow{E} A) \xrightarrow{E'} C}   
+%     {\Delta \vdash (A \to B \eff \{R\}) : \Type}
 
-% Open handler
-%\mprset{flushleft}
-  \inferrule*[Lab=\tylab{Handler}]
-    {
-      C = A \eff \{(\ell_i : A_i \to B_i)_i; R\} \\
-      D = B \eff \{(\ell_i : P_i)_i;         R\} \\
-      H = \{\Return \; x \mapsto M\} \uplus \{\ell_i \; y \; k \mapsto N_i\}_i \\\\
-      [\typv{\Delta;\Gamma,y : A_i, k : B_i \to D}{N_i : D}]_i \\
-       \typv{\Delta;\Gamma, x : A}{M : D} \\
-    }
-    {{\Delta;\Gamma} \vdash {H : C \Rightarrow D}}
+% % Record
+%   \inferrule*[Lab=\klab{Record}]
+%     { \Delta \vdash R : \Row_\emptyset}
+%     {\Delta \vdash \Record{R} : \Type}
 
-% Shallow closed handler
-% \inferrule*[Lab=\tylab{Shallow-Closed}]
-%     { E = \{\ell_i : A_i \to B_i\}_i \\\\
-%       H = \{\Return \; x \mapsto M\} \uplus \{\ell_i \; y_i \; k_i \mapsto N_i\}_i \\\\
-%       \left[\Delta;\Gamma,y_i : A_i, k_i : B_i \xrightarrow{E} A \vdash_{E'} N_i : C\right]_i \\\\
-%       \Delta;\Gamma, x : A \vdash_{E'} M : C
+% % Variant
+%   \inferrule*[Lab=\klab{Variant}]
+%     { \Delta \vdash R : \Row_\emptyset}
+%     {\Delta \vdash [R] : \Type}
+
+% % Present
+%   \inferrule*[Lab=\klab{Present}]
+%     {\Delta \vdash A : \Type}
+%     {\Delta \vdash \Pre{A} : \Presence}
+
+% % Absent
+%   \inferrule*[Lab=\klab{Absent}]
+%     { }
+%     {\Delta \vdash \Abs : \Presence}
+
+% % Empty row
+%   \inferrule*[Lab=\klab{EmptyRow}]
+%     { }
+%     {\Delta \vdash \cdot : \Row_\mathcal{L}}
+
+% % Extend row
+%   \inferrule*[Lab=\klab{ExtendRow}]
+%     { \Delta \vdash P : \Presence \\
+%       \Delta \vdash R : \Row_{\mathcal{L} \uplus \{\ell\}}
 %     }
-%     {\Delta;\Gamma \vdash_{E'} H : (\Record{} \xrightarrow{E} A) \xrightarrow{E'} C}   
+%     {\Delta \vdash \ell : P;R : \Row_\mathcal{L}}
+% \end{mathpar}
 
-%% SL: we should mention this rule later
+% \caption{Kinding Rules}
+% \label{fig:kinding}
+% \end{figure}
 
-%% % Shallow open handler
-%%   \inferrule*[Lab=\tylab{Shallow}]
-%%     { E = \{\ell_i : A_i \to B_i\}_i \uplus E_f \\\\
-%%       E' = E'' \uplus E_f \\\\
-%%       H = \{\Return \; x \mapsto M\} \uplus \{\ell_i \; y \; k \mapsto N_i\}_i \\\\
-%%       \left[\Delta;\Gamma,y : A_i, k : B_i \xrightarrow{E} A \vdash_{E'} N_i : C\right]_i \\\\
-%%       \Delta;\Gamma, x : A \vdash_{E'} M : C
-%%     }
-%%     {\Delta;\Gamma \vdash_{E'} H : A \harrow{E}{E'} C}
-\end{mathpar}
+% \begin{figure*}
+% Values
+% \begin{mathpar}
+% % Variable
+%   \inferrule*[Lab=\tylab{Var}]
+%     {x : A \in \Gamma}
+%     {\typv{\Delta;\Gamma}{x : A}}
+% %%
+% %% % true : Bool
+% %%   \inferrule*[Lab=\tylab{True}]
+% %%     { }
+% %%     {\typv{\Delta;\Gamma}{\True : \Bool}}
+% %%
+% %% % false : Bool
+% %%   \inferrule*[Lab=\tylab{False}]
+% %%     { }
+% %%     {\typv{\Delta;\Gamma}{\False : \Bool}}
+% %%
+% %% % n : Int
+% %%   \inferrule*[Lab=\tylab{Int}]
+% %%     { n \in \mathbb{N} }
+% %%     {\typv{\Delta;\Gamma}{n : \Int}}
 
-\caption{Typing Rules}
-\label{fig:typing}
-\end{figure*}
+% % Abstraction
+%   \inferrule*[Lab=\tylab{Lam}]
+%     {\typ{\Delta;\Gamma, x : A}{M : C}}
+%     {\typv{\Delta;\Gamma}{\lambda x^A .\, M : A \to C}}
 
-\section{Operational Semantics}
-\label{sec:small-step}
+% % Polymorphic abstraction
+%   \inferrule*[Lab=\tylab{PolyLam}]
+%     {\typc{\Delta,\alpha : K;\Gamma}{M : A}{E} \\
+%      \alpha \notin FTV(\Gamma)
+%     }
+%     {\typv{\Delta;\Gamma}{\Lambda \alpha^K .\, M : \forall \alpha^K . \,A \eff E}}
+% \\
+% % unit : ()
+%   \inferrule*[Lab=\tylab{Unit}]
+%     { }
+%     {\typv{\Delta;\Gamma}{\Record{} : \Record{}}}
 
-\begin{figure*}
+% % Extension
+%   \inferrule*[Lab=\tylab{Extend}]
+%     { \typv{\Delta;\Gamma}{V : A} \\
+%       \typv{\Delta;\Gamma}{W : \Record{\ell:\Abs;R}}
+%     }
+%     {\typv{\Delta;\Gamma}{\Record{\ell=V;W} : \Record{\ell:\Pre{A};R}}}
 
-\begin{reductions}
-\semlab{App}   & (\lambda x^A . \, M) V &\reducesto& M[V/x] \\
-\semlab{TyApp} & (\Lambda \alpha^K . \, M) A &\reducesto& M[A/\alpha] \\
-\semlab{Split} & \Let \; \Record{\ell = x;y} \revto \Record{\ell = V;W} \; \In \; N &\reducesto& N[V/x,W/y] \\
-\semlab{Case$_1$} &
-  \Case \; (\ell\, V)^R \{ \ell \; x \mapsto M; y \mapsto N\} &\reducesto& M[V/x] \\
-\semlab{Case$_2$} &
-  \Case \; (\ell\, V)^R \{ \ell' \; x \mapsto M; y \mapsto N\} &\reducesto& N[(\ell\, V)^R/y], \hfill\quad \text{if } \ell \neq \ell' \\
-\semlab{Let} &
-  \Let \; x \revto \Return \; V \; \In \; N &\reducesto& N[V/x] \\
-\semlab{Handle-Ret} &
-  \Handle \; (\Return \; V) \; \With \; H &\reducesto& M[V/x], \hfill\quad \text{where } \{ \Return \; x \mapsto M \} \in H \\
-\semlab{Handle-Op} &
-  \Handle \; \mathcal{E}[\Do \; \ell \; V] \; \With \; H
-    &\reducesto& M[V/x, \lambda y . \, \Handle \; \mathcal{E}[\Return \; y] \; \With \; H/k],\qquad \\
-  \multicolumn{4}{@{}r@{}}
-      {\text{where } \ell \notin BL(\mathcal{E}) \text{ and } \{ \ell \; x \; k \mapsto M \} \in H} \\
-\end{reductions}
-\begin{syntax}
-\slab{Evaluation contexts} &  \mathcal{E} &::=& [\,] \mid \Let \; x \revto \mathcal{E} \; \In \; N \mid \Handle \; \mathcal{E} \; \With \; H
-\end{syntax}
-\[
-% Evaluation context lift
-\inferrule*[Lab=\semlab{Lift}]
-  { M \reducesto N }
-  { \mathcal{E}[M] \reducesto \mathcal{E}[N]}
-\]
+% % Inject
+%   \inferrule*[Lab=\tylab{Inject}]
+%     {\typv{\Delta;\Gamma}{V : A}}
+%     {\typv{\Delta;\Gamma}{(\ell\,V)^R : [\ell : \Pre{A}; R]}}
+% \end{mathpar}
+% Computations
+% \begin{mathpar}
+% % Application
+%   \inferrule*[Lab=\tylab{App}]
+%     {\typv{\Delta;\Gamma}{V : A \to C} \\
+%      \typv{\Delta;\Gamma}{W : B}
+%     }
+%     {\typ{\Delta;\Gamma}{V\,W : C}}
 
-\caption{Small-step Operational Semantics}
-\label{fig:small-step}
-\end{figure*}
-We give a small-step operational semantics for \Calc. Figure
-\ref{fig:small-step} displays the operational rules. The reduction
-relation $\reducesto$ is defined on computation terms. The statement $M
-\reducesto M'$ reads: term $M$ reduces to term $M'$ in a single
-step. Most of the rules are standard. We use
-%% \emph{delimited
-%%   computation contexts} and
-\emph{evaluation contexts} to simplify the evaluation rules, by
-allowing us to focus on an active expression. The interesting rules
-are the handler rules.
+% % Polymorphic application
+%   \inferrule*[Lab=\tylab{PolyApp}]
+%     {\typv{\Delta;\Gamma}{V : \forall \alpha^K . \, C} \\
+%      \Delta \vdash A : K
+%     }
+%     {\typ{\Delta;\Gamma}{V\,A : C[A/\alpha]}}
 
-We write $BL(\mathcal{E})$ for the set of operation labels bound by
-$\mathcal{E}$.
-\begin{equations}
-BL([~])                            &=& \emptyset \\
-BL(\Let\;x \revto \mathcal{E}\;\In\;N)    &=& BL(\mathcal{E}) \\
-BL(\Handle\;\mathcal{E}\;\With\;H) &=& BL(\mathcal{E}) \cup dom(H) \\
-\end{equations}
+% % Split
+%   \inferrule*[Lab=\tylab{Split}]
+%     {\typv{\Delta;\Gamma}{V : \Record{\ell : \Pre{A};R}} \\\\
+%      \typ{\Delta;\Gamma, x : A, y : \Record{\ell : \Abs; R}}{N : C}
+%     }
+%     {\typ{\Delta;\Gamma}{\Let \; \Record{\ell =x;y} \revto V\; \In \; N : C}}
 
-The rule \semlab{Handle-Ret} invokes the return clause of a
-handler. The rule \semlab{Handle-op} handles an operation by invoking
-the appropriate operation clause. The constraint $\ell \notin
-BL(\mathcal{E})$ ensures that no inner handler inside the evaluation
-context is able to handle the operation: thus a handler is able to
-reach past any other inner handlers that do not handle $\ell$. In our
-abstract machine semantics we realise this behaviour using explicit
-forwarding operations, but more efficient implementations are
-perfectly feasible.
+% % Case
+%   \inferrule*[Lab=\tylab{Case}]
+%     { \typv{\Delta;\Gamma}{V : [\ell : \Pre{A};R]}  \\\\
+%       \typ{\Delta;\Gamma,x:A}{M : C} \\\\
+%       \typ{\Delta;\Gamma,y:[\ell : \Abs;R]}{N : C}
+%     }
+%     {\typ{\Delta;\Gamma}{\Case \; V \{\ell\; x \mapsto M;y \mapsto N \} : C}}
+
+% % Absurd
+%   \inferrule*[Lab=\tylab{Absurd}]
+%     {\typv{\Delta;\Gamma}{V : []}}
+%     {\typ{\Delta;\Gamma}{\Absurd^C \; V : C}}
+
+% % Return
+%   \inferrule*[Lab=\tylab{Return}]
+%     {\typv{\Delta;\Gamma}{V : A}}
+%     {\typc{\Delta;\Gamma}{\Return \; V : A}{E}}
+
+% % Let 
+%   \inferrule*[Lab=\tylab{Let}]
+%     {\typc{\Delta;\Gamma}{M : A}{E} \\
+%      \typc{\Delta;\Gamma, x : A}{N : B}{E}
+%     }
+%     {\typc{\Delta;\Gamma}{\Let \; x \revto M\; \In \; N : B}{E}}
+% \\
+% % Do 
+%   \inferrule*[Lab=\tylab{Do}]
+%     {\typv{\Delta;\Gamma}{V : A} \\
+%      E = \{\ell : A \to B; R\}
+%     }
+%     {\typc{\Delta;\Gamma}{(\Do \; \ell \; V)^E : B}{E}}
+
+% % Open Handle
+%   \inferrule*[Lab=\tylab{Handle}]
+%     {\typv{\Delta;\Gamma}{M : C} \\
+%      \Delta;\Gamma \vdash H : C \Rightarrow D}
+%     {\typv{\Delta;\Gamma}{\Handle \; M \; \With \; H : D}}
+% \end{mathpar}
+
+% Handlers
+% \begin{mathpar}
+% % Closed handler
+% % \mprset{flushleft}
+% % \inferrule*[Lab=\tylab{Deep-Closed}]
+% %     { E = \{\ell_i : A_i \to B_i\}_i \\\\
+% %       H = \{\Return \; x \mapsto M\} \uplus \{\ell_i \; y_i \; k_i \mapsto N_i\}_i \\\\
+% %       \left[\Delta;\Gamma,y_i : A_i, k_i : B_i \xrightarrow{E'} C \vdash_{E'} N_i : C\right]_i \\\\
+% %       \Delta;\Gamma, x : A \vdash_{E'} M : C
+% %     }
+% %     {\Delta;\Gamma \vdash_{E'} H : (\Record{} \xrightarrow{E} A) \xrightarrow{E'} C}   
+
+% % Open handler
+% %\mprset{flushleft}
+%   \inferrule*[Lab=\tylab{Handler}]
+%     {
+%       C = A \eff \{(\ell_i : A_i \to B_i)_i; R\} \\
+%       D = B \eff \{(\ell_i : P_i)_i;         R\} \\
+%       H = \{\Return \; x \mapsto M\} \uplus \{\ell_i \; y \; k \mapsto N_i\}_i \\\\
+%       [\typv{\Delta;\Gamma,y : A_i, k : B_i \to D}{N_i : D}]_i \\
+%        \typv{\Delta;\Gamma, x : A}{M : D} \\
+%     }
+%     {{\Delta;\Gamma} \vdash {H : C \Rightarrow D}}
+
+% % Shallow closed handler
+% % \inferrule*[Lab=\tylab{Shallow-Closed}]
+% %     { E = \{\ell_i : A_i \to B_i\}_i \\\\
+% %       H = \{\Return \; x \mapsto M\} \uplus \{\ell_i \; y_i \; k_i \mapsto N_i\}_i \\\\
+% %       \left[\Delta;\Gamma,y_i : A_i, k_i : B_i \xrightarrow{E} A \vdash_{E'} N_i : C\right]_i \\\\
+% %       \Delta;\Gamma, x : A \vdash_{E'} M : C
+% %     }
+% %     {\Delta;\Gamma \vdash_{E'} H : (\Record{} \xrightarrow{E} A) \xrightarrow{E'} C}   
+
+% %% SL: we should mention this rule later
+
+% %% % Shallow open handler
+% %%   \inferrule*[Lab=\tylab{Shallow}]
+% %%     { E = \{\ell_i : A_i \to B_i\}_i \uplus E_f \\\\
+% %%       E' = E'' \uplus E_f \\\\
+% %%       H = \{\Return \; x \mapsto M\} \uplus \{\ell_i \; y \; k \mapsto N_i\}_i \\\\
+% %%       \left[\Delta;\Gamma,y : A_i, k : B_i \xrightarrow{E} A \vdash_{E'} N_i : C\right]_i \\\\
+% %%       \Delta;\Gamma, x : A \vdash_{E'} M : C
+% %%     }
+% %%     {\Delta;\Gamma \vdash_{E'} H : A \harrow{E}{E'} C}
+% \end{mathpar}
+
+% \caption{Typing Rules}
+% \label{fig:typing}
+% \end{figure*}
+
+% \section{Operational Semantics}
+% \label{sec:small-step}
+
+% \begin{figure*}
+
+% \begin{reductions}
+% \semlab{App}   & (\lambda x^A . \, M) V &\reducesto& M[V/x] \\
+% \semlab{TyApp} & (\Lambda \alpha^K . \, M) A &\reducesto& M[A/\alpha] \\
+% \semlab{Split} & \Let \; \Record{\ell = x;y} \revto \Record{\ell = V;W} \; \In \; N &\reducesto& N[V/x,W/y] \\
+% \semlab{Case$_1$} &
+%   \Case \; (\ell\, V)^R \{ \ell \; x \mapsto M; y \mapsto N\} &\reducesto& M[V/x] \\
+% \semlab{Case$_2$} &
+%   \Case \; (\ell\, V)^R \{ \ell' \; x \mapsto M; y \mapsto N\} &\reducesto& N[(\ell\, V)^R/y], \hfill\quad \text{if } \ell \neq \ell' \\
+% \semlab{Let} &
+%   \Let \; x \revto \Return \; V \; \In \; N &\reducesto& N[V/x] \\
+% \semlab{Handle-Ret} &
+%   \Handle \; (\Return \; V) \; \With \; H &\reducesto& M[V/x], \hfill\quad \text{where } \{ \Return \; x \mapsto M \} \in H \\
+% \semlab{Handle-Op} &
+%   \Handle \; \mathcal{E}[\Do \; \ell \; V] \; \With \; H
+%     &\reducesto& M[V/x, \lambda y . \, \Handle \; \mathcal{E}[\Return \; y] \; \With \; H/k],\qquad \\
+%   \multicolumn{4}{@{}r@{}}
+%       {\text{where } \ell \notin BL(\mathcal{E}) \text{ and } \{ \ell \; x \; k \mapsto M \} \in H} \\
+% \end{reductions}
+% \begin{syntax}
+% \slab{Evaluation contexts} &  \mathcal{E} &::=& [\,] \mid \Let \; x \revto \mathcal{E} \; \In \; N \mid \Handle \; \mathcal{E} \; \With \; H
+% \end{syntax}
+% \[
+% % Evaluation context lift
+% \inferrule*[Lab=\semlab{Lift}]
+%   { M \reducesto N }
+%   { \mathcal{E}[M] \reducesto \mathcal{E}[N]}
+% \]
+
+% \caption{Small-step Operational Semantics}
+% \label{fig:small-step}
+% \end{figure*}
+% We give a small-step operational semantics for \Calc. Figure
+% \ref{fig:small-step} displays the operational rules. The reduction
+% relation $\reducesto$ is defined on computation terms. The statement $M
+% \reducesto M'$ reads: term $M$ reduces to term $M'$ in a single
+% step. Most of the rules are standard. We use
+% %% \emph{delimited
+% %%   computation contexts} and
+% \emph{evaluation contexts} to simplify the evaluation rules, by
+% allowing us to focus on an active expression. The interesting rules
+% are the handler rules.
+
+% We write $BL(\mathcal{E})$ for the set of operation labels bound by
+% $\mathcal{E}$.
+% \begin{equations}
+% BL([~])                            &=& \emptyset \\
+% BL(\Let\;x \revto \mathcal{E}\;\In\;N)    &=& BL(\mathcal{E}) \\
+% BL(\Handle\;\mathcal{E}\;\With\;H) &=& BL(\mathcal{E}) \cup dom(H) \\
+% \end{equations}
+
+% The rule \semlab{Handle-Ret} invokes the return clause of a
+% handler. The rule \semlab{Handle-op} handles an operation by invoking
+% the appropriate operation clause. The constraint $\ell \notin
+% BL(\mathcal{E})$ ensures that no inner handler inside the evaluation
+% context is able to handle the operation: thus a handler is able to
+% reach past any other inner handlers that do not handle $\ell$. In our
+% abstract machine semantics we realise this behaviour using explicit
+% forwarding operations, but more efficient implementations are
+% perfectly feasible.
 
 
-We write $R^+$ for the transitive closure of relation $R$.
-%
-Subject reduction and type soundness for $\Calc$ are standard.
+% We write $R^+$ for the transitive closure of relation $R$.
+% %
+% Subject reduction and type soundness for $\Calc$ are standard.
 
-\begin{theorem}[Subject Reduction]
-If $\typc{\Delta;\Gamma}{M : A}{E}$ and $M \reducesto M'$, then
-$\typc{\Delta;\Gamma}{M' : A}{E}$.
-\end{theorem}
+% \begin{theorem}[Subject Reduction]
+% If $\typc{\Delta;\Gamma}{M : A}{E}$ and $M \reducesto M'$, then
+% $\typc{\Delta;\Gamma}{M' : A}{E}$.
+% \end{theorem}
 
-There are two ways in which a computation can terminate. It can either
-successfully return a value, or it can get stuck on an unhandled
-operation.
-\begin{definition}
-We say that computation term $N$ is normal with respect to effect $E$,
-if $N$ is either of the form $\Return\;V$, or
-$\mathcal{E}[\Do\;\ell\;W]$, where $\ell \in E$ and $\ell \notin
-BL(\mathcal{E})$.
-\end{definition}
-If $N$ is normal with respect to the empty effect $\{\cdot\}$, then
-$N$ has the form $\Return\;V$.
+% There are two ways in which a computation can terminate. It can either
+% successfully return a value, or it can get stuck on an unhandled
+% operation.
+% \begin{definition}
+% We say that computation term $N$ is normal with respect to effect $E$,
+% if $N$ is either of the form $\Return\;V$, or
+% $\mathcal{E}[\Do\;\ell\;W]$, where $\ell \in E$ and $\ell \notin
+% BL(\mathcal{E})$.
+% \end{definition}
+% If $N$ is normal with respect to the empty effect $\{\cdot\}$, then
+% $N$ has the form $\Return\;V$.
 
-\begin{theorem}[Type Soundness]
-If $\typc{}{M : A}{E}$, then there exists $\typc{}{N : A}{E}$, such that
-$M \reducesto^+ N \not\reducesto$, and $N$ is normal with respect to
-effect $E$.
-\end{theorem}
+% \begin{theorem}[Type Soundness]
+% If $\typc{}{M : A}{E}$, then there exists $\typc{}{N : A}{E}$, such that
+% $M \reducesto^+ N \not\reducesto$, and $N$ is normal with respect to
+% effect $E$.
+% \end{theorem}
 
 %%
 %% Conclusions and future work
@@ -2628,7 +3325,7 @@ effect $E$.
 
 %% If you want the bibliography single-spaced (which is allowed), uncomment
 %% the next line.
-\nocite{*}
+%\nocite{*}
 \singlespace
 %\printbibliography[heading=bibintoc]
 \bibliographystyle{abbrvnat}

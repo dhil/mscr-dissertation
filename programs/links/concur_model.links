@@ -348,7 +348,7 @@ fun dequeueMessage(pid) {
     case Nothing -> Nothing
     case Just(q) ->
       switch (dequeue(q)) {
-        case (Nothing, q) -> Nothing
+        case (Nothing, _) -> Nothing
         case (msg    , q) ->
           put(dictModify(pid, q, get())); msg
       }
