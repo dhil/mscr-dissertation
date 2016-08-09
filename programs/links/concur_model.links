@@ -236,7 +236,7 @@ fun psend(proc, msg) { do Send(proc, msg); yield() }
 #end
 
 #snippet:psendOp.links
-op proc $! msg { psend(proc, msg) }
+op proc !! msg { psend(proc, msg) }
 #end
 
 #snippet:precv.links
@@ -326,7 +326,9 @@ fun dictModify(k, x, dict) {
 typename Mailbox(a::Type) = Dictionary(Pid, Queue(a));
 
 #snippet:enqueueMessage.links
-sig enqueueMessage : (Pid, a) {Get:Dictionary(Pid,Queue(a)),Put:(Dictionary(Pid,Queue(a))) {}-> ()|_}~> ()
+sig enqueueMessage :
+  (Pid, a) {Get: Dictionary(Pid,Queue(a))
+           ,Put:(Dictionary(Pid,Queue(a))) {}-> ()|_}~> ()
 fun enqueueMessage(pid, msg) {
   var dict = get();
   var q = switch (dictLookup(pid, dict)) {
@@ -338,14 +340,17 @@ fun enqueueMessage(pid, msg) {
 #end
 
 #snippet:dequeueMessage.links
-sig dequeueMessage : (Pid) {Get:Dictionary(Pid,Queue(a)),Put:(Dictionary(Pid,Queue(a))) {}-> ()|_}~> Maybe(a)
+sig dequeueMessage :
+  (Pid) {Get: Dictionary(Pid,Queue(a))
+        ,Put:(Dictionary(Pid,Queue(a))) {}-> ()|_}~> Maybe(a)
 fun dequeueMessage(pid) {
   switch (dictLookup(pid, get())) {
     case Nothing -> Nothing
     case Just(q) ->
       switch (dequeue(q)) {
         case (Nothing, q) -> Nothing
-        case (msg    , q) -> put(dictModify(pid, q, get())); msg
+        case (msg    , q) ->
+          put(dictModify(pid, q, get())); msg
       }
   }
 }
@@ -407,7 +412,7 @@ fun hello2(depth)() {
 fun stop(process) {
   switch (process) {
     case Nothing    -> ()
-    case Just(proc) -> proc $! Stop
+    case Just(proc) -> proc !! Stop
   }
 }
 
@@ -438,7 +443,7 @@ fun sieve() {
              case Just(pid) -> pid
              case Nothing   -> pspawn(sieve)
            };
-         neighbour $! Candidate(prime);
+         neighbour !! Candidate(prime);
          loop(Just(neighbour))
        }
     }
@@ -457,8 +462,8 @@ fun foreach(xs, action) {
 #snippet:generator.links
 fun generator(n)() {
   var first = pspawn(sieve);
-  foreach([2..n], fun(p) { first $! Candidate(p) });
-  first $! Stop
+  foreach([2..n], fun(p) { first !! Candidate(p) });
+  first !! Stop
 }
 #end
 

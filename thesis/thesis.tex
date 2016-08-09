@@ -1564,11 +1564,28 @@ interface:
   of type \lstinline$a$ to a given dictionary. If the key is already
   bound, then that binding is overwritten.
 \end{itemize}
-
+We use this data structure to implement a function
+\lstinline$enqueueMessage$ that appends some given message,
+\lstinline$msg$, to the message queue of some given identifier,
+\lstinline$pid$. We will use a state interpretation to maintain a
+collection of mailboxes, i.e.
 %
 \snippet{enqueueMessage.links}
 %
+First we retrieve the dictionary using the state operation
+\lstinline$get$. Afterwards, we attempt to look up the message queue
+associated with \lstinline$pid$. If no such queue exists, then we
+create a new empty queue and append the message \lstinline$msg$ onto
+it. Thus, we delay construction of a mailbox until we have some data
+to put inside of it. 
+%
+Alternatively, if a queue already exists then we simply append the new
+message onto that queue. Finally, we bind \lstinline$pid$ to the new
+queue \lstinline$q$ in the dictionary.
 
+The dual operation \lstinline$dequeueMessage$ dequeues a message from
+a mailbox. We let the function return a \lstinline$Maybe$-value to
+accommodate for the special case where a mailbox is empty:
 %
 \snippet{dequeueMessage.links}
 %
