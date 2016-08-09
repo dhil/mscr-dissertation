@@ -1091,7 +1091,81 @@ simply be stored on the stack.
 \chapter{Compiling effect handlers}
 
 \section{Compilation strategy}
-\label{sec:translation}
+\label{sec:compilation-strategy}
+
+\begin{figure}
+\centering
+\tikzset{frontend/.style={
+        draw=black,  
+        rectangle, 
+        minimum width={width("Lambda Compiler")}}
+}
+
+\tikzset{backend/.style={
+        draw=black,  
+        rectangle, 
+        minimum width={width("Lambda Compiler")}}
+}
+
+\tikzset{exterior/.style={
+        draw=black,
+        rectangle,
+        minimum width={width("Interpreter")}}
+}
+\begin{tikzpicture}
+  %% Frontend
+  \node (FrontendLabel) {\textbf{\textit{Frontend}}};
+  \node [frontend, below=of FrontendLabel,yshift=20pt] (Parser) {Parser};
+  \node [frontend, below=of Parser,yshift=10pt]   (EDesugar) {Early desugar};
+  \node [frontend, below=of EDesugar,yshift=10pt] (Typechecker) {Type checker};
+  % Arrows
+  \draw [->] (Parser.south)   -- (EDesugar.north)    {};
+  \draw [->] (EDesugar.south) -- (Typechecker.north) {};
+  % Frame
+  \node [draw,rectangle,thick,minimum width=125pt,minimum
+height=140pt,fit=(FrontendLabel)(Parser)(Typechecker)] (Frontend) {};  
+
+  %% Source
+  \node [exterior,left=of Frontend] (Source) {Source};
+  % Arrow from Source to box
+  \draw [->,thick] (Source.east) -- (Frontend.west) {};
+
+  %% Links backend
+  \node [right=of FrontendLabel,xshift=70pt] (BackendLabel) {\textbf{\textit{Backend}}};
+  \node [backend,below=of BackendLabel,yshift=20pt] (IRCompiler) {IR Compiler};
+  \node [backend,below=of IRCompiler,yshift=15pt] (PMCompiler) {\begin{tabular}{l}Pattern\\Matching\\ Compiler\end{tabular}};
+  % Arrows
+  \draw [->] ([xshift=5pt]IRCompiler.south west)  -- ([xshift=5pt]PMCompiler.north west) {};
+  \draw [->] ([xshift=-5pt]PMCompiler.north east) -- ([xshift=-5pt]IRCompiler.south east) {};
+  % Frame
+  \node [draw,rectangle,thick,minimum width=125pt,minimum height=140pt,fit=(BackendLabel)(IRCompiler)(PMCompiler),yshift=4pt] (Backend) {};
+  % Arrows
+  \draw [->,thick] (Frontend.east)                -- (Backend.west) {};
+
+  %% Interpreter
+  \node [exterior,right=of Backend] (Interpreter) {Interpreter};
+  % Arrow
+  \draw [->,thick] (Backend.east) -- (Interpreter.west) {};  
+
+  %% Lambda backend
+  \node [below=of Backend,yshift=-5pt] (LambdaBackendLabel) {\textbf{\textit{Native backend}}};
+  \node [backend,below=of LambdaBackendLabel,yshift=20pt] (IR2Lambda) {IR to Lambda};
+  \node [backend,below=of IR2Lambda,yshift=10pt] (OCamlBackend) {OCaml backend};
+  % Arrows
+  \draw [->] (IR2Lambda.south) -- (OCamlBackend.north) {};
+  % Frame
+  \node [draw,rectangle,thick,minimum width=125pt,minimum height=100pt,fit=(LambdaBackendLabel)(IR2Lambda)(OCamlBackend)] (LambdaBackend) {};
+  % Arrow
+  \draw [->,thick] (Backend.south) -- (LambdaBackend.north) {};
+
+  %% Binary
+  %\node [draw,rectangle,below=of Source,yshift=-96pt] (Binary) {Binary};
+  %\draw [->,thick] (LambdaBackend.west)  -- (Binary.east) {};
+  \node [exterior,right=of LambdaBackend] (Binary) {Binary};
+  \draw [->,thick] (LambdaBackend.east)  -- (Binary.west) {};
+\end{tikzpicture}
+\caption{Links compiler pipeline.}\label{fig:compiler-pipeline}
+\end{figure}
 
 \begin{figure}
 \tikzset{my rectangle/.style={
@@ -1147,11 +1221,13 @@ simply be stored on the stack.
 \caption{OCaml backend \citep{Hillerstrom2016b}.}\label{fig:infra-diagram}
 \end{figure}
 
-We reuse most of the previous Links infrastructure. The Links frontend
-is type-checked and translated into a small, typed intermediate
-language in \emph{A-normal form} (ANF) \citep{Flanagan1993}. The Links
-interpreter implements a generalised CEK machine
-\citep{Hillerstrom2016a}, which interprets ANF code.
+We reuse most of the previous Links infrastructure. We extend the
+compiler infrastructure with a native backend as shown in
+Figure~\ref{fig:compiler-pipeline}. The Links frontend is type-checked
+and translated into a small, typed intermediate language in
+\emph{A-normal form} (ANF) \citep{Flanagan1993}. The Links interpreter
+implements a generalised CEK machine \citep{Hillerstrom2016a}, which
+interprets ANF code.
 
 %
 
@@ -1167,76 +1243,15 @@ code, in principle, enables us to take advantage of custom backends such as
 
 %
 
-There are several semantic differences between Links and OCaml, e.g. Links
-employs structural typing, whilst OCaml predominantly employs nominal typing.
-In particular, Links employs row typing for effects, records, and variants,
-whereas OCaml only supports row typing for the latter. Exhibiting a faithful
-translation from Links to OCaml amounts to a lot of value boxing. Thus, we
-target Lambda for greater flexibility and control.  We effectively subvert
-OCaml's typechecker by targeting Lambda, however the translation is safe as
+There are several semantic differences between Links and OCaml,
+e.g. Links employs structural typing, whilst OCaml predominantly
+employs nominal typing.  In particular, Links employs row typing for
+effects, records, and variants, whereas OCaml only supports row typing
+for the latter. Exhibiting a faithful translation from Links to OCaml
+amounts to a lot of value boxing \citep{Hol09}. Thus, we target Lambda
+for greater flexibility and control.  We effectively subvert OCaml's
+typechecker by targeting Lambda, however the translation is safe as
 Links programs are already typechecked.
-
-\subsection{Compiler overview}
-\begin{figure}
-%\centering
-\tikzset{frontend/.style={
-        draw=black,  
-        rectangle, 
-        minimum width={width("Lambda Compiler")+10pt}}
-}
-
-\tikzset{backend/.style={
-        draw=black,  
-        rectangle, 
-        minimum width={width("Lambda Compiler")+10pt}}
-}
-\begin{tikzpicture}
-  %% Frontend
-  \node (FrontendLabel) {\textbf{\textit{Frontend}}};
-  \node [frontend, below=of FrontendLabel,yshift=20pt] (Parser) {Parser};
-  \node [frontend, below=of Parser,yshift=10pt]   (EDesugar) {Early desugar};
-  \node [frontend, below=of EDesugar,yshift=10pt] (Typechecker) {Type checker};
-  % Arrows
-  \draw [->] (Parser.south)   -- (EDesugar.north)    {};
-  \draw [->] (EDesugar.south) -- (Typechecker.north) {};
-  % Frame
-  \node [draw,rectangle,thick,minimum width=125pt,minimum
-height=140pt,fit=(FrontendLabel)(Parser)(Typechecker)] (Frontend) {};  
-
-  %% Source
-  \node [draw,rectangle,left=of Frontend] (Source) {Source};
-  % Arrow from Source to box
-  \draw [->,thick] (Source.east) -- (Frontend.west) {};
-
-  %% Links backend
-  \node [right=of FrontendLabel,xshift=70pt] (BackendLabel) {\textbf{\textit{Backend}}};
-  \node [backend,below=of BackendLabel,yshift=20pt] (IRCompiler) {IR Compiler};
-  \node [backend,below=of IRCompiler,yshift=15pt] (PMCompiler) {\begin{tabular}{l}Pattern\\Matching\\ Compiler\end{tabular}};
-  % Arrows
-  \draw [->] ([xshift=5pt]IRCompiler.south west)  -- ([xshift=5pt]PMCompiler.north west) {};
-  \draw [->] ([xshift=-5pt]PMCompiler.north east) -- ([xshift=-5pt]IRCompiler.south east) {};
-  % Frame
-  \node [draw,rectangle,thick,minimum width=125pt,minimum height=140pt,fit=(BackendLabel)(IRCompiler)(PMCompiler),yshift=4pt] (Backend) {};
-  % Arrows
-  \draw [->,thick] (Frontend.east)                -- (Backend.west) {};
-
-  %% Lambda backend
-  \node [below=of Backend,yshift=-5pt] (LambdaBackendLabel) {\textbf{\textit{Lambda Backend}}};
-  \node [backend,below=of LambdaBackendLabel,yshift=20pt] (IR2Lambda) {IR to Lambda};
-  \node [backend,below=of IR2Lambda,yshift=10pt] (OCamlBackend) {OCaml backend};
-  % Arrows
-  \draw [->] (IR2Lambda.south) -- (OCamlBackend.north) {};
-  % Frame
-  \node [draw,rectangle,thick,minimum width=125pt,minimum height=100pt,fit=(LambdaBackendLabel)(IR2Lambda)(OCamlBackend)] (LambdaBackend) {};
-  % Arrow
-  \draw [->,thick] (Backend.south) -- (LambdaBackend.north) {};
-
-  %% Binary
-  \node [draw,rectangle,below=of Source,yshift=-96pt] (Binary) {Binary};
-  \draw [->,thick] (LambdaBackend.west)  -- (Binary.east) {};
-\end{tikzpicture}
-\caption{Links compiler pipeline.}\label{fig:compiler-pipeline}
-\end{figure}
 
 \subsection{Handler desugaring}
 
@@ -1273,21 +1288,28 @@ Handler cases
 \caption{Desugaring handlers \citep{Hillerstrom2016a}.}
 \label{fig:handlers-desugaring}
 \end{figure}
+The frontend implementation of handlers is based on a mild syntactic
+extension to Links: the syntax is extended with \lstinline$do$ for
+invoking operations and \lstinline$handle(m) {...}$ for handling
+abstract computations \citep{Hillerstrom2015}.
 
-We provide syntactic sugar to make it more convenient to program with
-handlers. The function $\desugar$ is a source-to-source translation
-that elaborates the sugar. Figure~\ref{fig:handlers-desugaring} shows
-the cases for handlers only: $\desugar$ is a homomorphism on the other
-syntax constructors.  Crucially, handlers are desugared into a
-function, that returns a thunk. This is important to ensure that
-handlers compose smoothly. For the same reason a parameterised handler
-desugars into a curried function, where the parameters precede the
-computation argument \lstinline$m$. The parameters are passed around
-by enclosing each operation clause by a function. Thus, the initial
-parameter values are applied directly to the \lstinline$handle$
-expression.
+The keyword \lstinline$handler$ is really syntactic sugar which makes
+it more convenient to program with handlers. We have slightly
+generalised the desugaring of handlers to account for parameterised
+handlers with multiple parameters. The function $\desugar$ is a
+source-to-source translation that elaborates the
+sugar. Figure~\ref{fig:handlers-desugaring} shows the cases for
+handlers only: $\desugar$ is a homomorphism on the other syntax
+constructors \citep{Hillerstrom2016a}.  Crucially, handlers are
+desugared into a function, that returns a thunk. This is important to
+ensure that handlers compose smoothly. For the same reason a
+parameterised handler desugars into a curried function, where the
+parameters precede the computation argument \lstinline$m$. The
+parameters are passed around by enclosing each operation clause by a
+function. Thus, the initial parameter values are applied directly to
+the \lstinline$handle$ expression.
 
-\section{The Links intermediate representation}
+\section{A calculus of Rows and Handlers}
 \label{sec:lambe-eff-row}
 
 In this section, we present a type and effect system and a small-step
@@ -1300,10 +1322,10 @@ This core calculus captures the essence of the Links IR.
 We prove that the operational semantics is sound with respect to the
 type and effect system.
 
-A key advantage of row polymorphism is that it integrates rather
-smoothly with Hindley-Milner type inference. We concern ourselves only
-with the explicitly-typed core language, as the treatment of type
-inference is quite standard.
+% A key advantage of row polymorphism is that it integrates rather
+% smoothly with Hindley-Milner type inference. We concern ourselves only
+% with the explicitly-typed core language, as the treatment of type
+% inference is quite standard.
 
 The design of \Calc is inspired by the $\lambda$-calculi of
 \citet{Kammar2013}, \citet{Pretnar2015}, and \citet{Lindley2012}.
@@ -1339,11 +1361,11 @@ environments are given in Figure~\ref{fig:types-syntax}.
 \slab{Type environments} &\Gamma &::=& \cdot \mid \Gamma, x:A \\
 \slab{Kind environments} &\Delta &::=& \cdot \mid \Delta, \alpha:K \\
 \end{syntax}
-\caption{Types, Effects, Kinds, and Environments}
+\caption{Types, effects, kinds, and environments}
 \label{fig:types-syntax}
 \end{figure}
 
-\paragraph{Value Types}
+\paragraph{Value types}
 The function type $A \to C$ represents functions that map values of
 type $A$ to computations of type $C$.  The polymorphic type
 $\forall \alpha^K .\, C$ is parameterised by a type variable $\alpha$
@@ -1353,7 +1375,7 @@ represents tagged sums constrained by row $R$. The handler type
 $C \Rightarrow D$ represents handlers that transform computations of
 type $C$ into computations of type $D$.
 
-\paragraph{Computation Types}
+\paragraph{Computation types}
 A computation type $A \eff E$ is given by a value type $A$ and an
 effect $E$, which specifies the operations that the computation may
 perform.
@@ -1379,7 +1401,7 @@ $\Record{\cdot}$. Similarly, we define the empty type as the empty,
 closed variant $[\cdot]$. Usually, we usually omit the $\cdot$ for
 closed rows.
 
-\paragraph{Handler Types}
+\paragraph{Handler types}
 A handler type $C \Rightarrow D$ is given by an input computation type
 $C$ and an output computation type $D$.
 
@@ -1394,13 +1416,13 @@ $Row_{\mathcal{L}}$ denotes a partial row that cannot mention the
 labels in $\mathcal{L}$.
 %
 
-\paragraph{Type Variables}
+\paragraph{Type variables}
 We let $\alpha$, $\rho$ and $\theta$ range over type variables. By
 convention we use $\alpha$ for value type variables or for type
 variables of unspecified kind, $\rho$ for type variables of row kind,
 and $\theta$ for type variables of presence kind.
 
-\paragraph{Type and Kind Environments}
+\paragraph{Type and kind environments}
 Type environments map term variables to their types and kind
 environments map type variables to their kinds.
 
@@ -1423,7 +1445,7 @@ environments map type variables to their kinds.
                      &     &\mid& \{ \ell \; x \; k \mapsto M \} \uplus H \\
 \end{syntax}
 
-\caption{Term Syntax}
+\caption{Term syntax}
 \label{fig:term-syntax}
 \end{figure}
 The terms are given in Figure~\ref{fig:term-syntax}. We let $x,y,z,k$
@@ -1482,7 +1504,7 @@ type or kind information (term abstraction, type abstraction,
 injection, operations, and empty cases); we sometimes omit these
 annotations.
 
-\subsection{Static Semantics}
+\subsection{Static semantics}
 \label{sec:typing}
 The kinding rules are given in Figure~\ref{fig:kinding} and the typing
 rules are given in Figure~\ref{fig:typing}.
@@ -1524,7 +1546,7 @@ arbitrary number of effects may be forwarded by the handler.
 The typing of the return clause is straightforward. In the typing of
 each operation clause, the continuation returns the output computation
 type $D$. Thus, we are here defining \emph{deep}
-handlers~\cite{Kammar2013} in which the handler is implicitly wrapped
+handlers~\citep{Kammar2013} in which the handler is implicitly wrapped
 around the continuation, such that any subsequent operations are
 handled uniformly by the same handler.
 %
@@ -1605,7 +1627,7 @@ handled uniformly by the same handler.
     {\Delta \vdash C \Rightarrow D : \Handler}
 \end{mathpar}
 
-\caption{Kinding Rules}
+\caption{Kinding rules}
 \label{fig:kinding}
 \end{figure}
 
@@ -1727,7 +1749,7 @@ Handlers
 \label{fig:typing}
 \end{figure*}
 
-\subsection{Operational Semantics}
+\subsection{Operational semantics}
 \label{sec:small-step}
 
 \begin{figure*}
@@ -1763,9 +1785,9 @@ We give a small-step operational semantics for \Calc. Figure
 \ref{fig:small-step} displays the operational rules. The reduction
 relation $\reducesto$ is defined on computation terms. The statement
 $M \reducesto M'$ reads: term $M$ reduces to term $M'$ in a single
-step. Most of the rules are standard. We use evaluation contexts to
-focus on the active expression. The interesting rules are the handler
-rules.
+step. Most of the rules are standard. Substitution on terms is defined
+in the usual way. We use evaluation contexts to focus on the active
+expression. The interesting rules are the handler rules.
 
 We write $BL(\mathcal{E})$ for the set of operation labels bound by
 $\mathcal{E}$.
@@ -1777,30 +1799,30 @@ BL(\Handle\;\mathcal{E}\;\With\;H) &=& BL(\mathcal{E}) \cup dom(H) \\
 
 The rule \semlab{Handle-Ret} invokes the return clause of a
 handler. The rule \semlab{Handle-op} handles an operation by invoking
-the appropriate operation clause. The constraint $\ell \notin
-BL(\mathcal{E})$ ensures that no inner handler inside the evaluation
-context is able to handle the operation: thus a handler is able to
-reach past any other inner handlers that do not handle $\ell$. In our
-abstract machine semantics we realise this behaviour using explicit
-forwarding operations, but more efficient implementations are
-perfectly feasible.
+the appropriate operation clause. The constraint
+$\ell \notin BL(\mathcal{E})$ ensures that no inner handler inside the
+evaluation context is able to handle the operation: thus a handler is
+able to reach past any other inner handlers that do not handle $\ell$.
+% In our abstract machine semantics we realise this behaviour using
+% explicit forwarding operations, but more efficient implementations are
+% perfectly feasible.
 
-\paragraph{Remark}
-The attentive reader may have noticed that the two rules \semlab{Let}
-and \semlab{Handle-Ret} are strikingly similar. Indeed, we could omit
-let bindings altogether since any let binding
-\[
-\Let\; x \revto M \;\In\; N
-\]
-may be simulated by a trivial handler:
-\[
-\Handle\; M \; \With\; \{ \Return\; x \to N \}
-\]
-Nevertheless, we elect to keep let bindings in \Calc. As we discuss in
-Section~\ref{sec:abstract-machine}, one reason for doing so is in
-order to facilitate more efficient implementations.
+% \paragraph{Remark}
+% The attentive reader may have noticed that the two rules \semlab{Let}
+% and \semlab{Handle-Ret} are strikingly similar. Indeed, we could omit
+% let bindings altogether since any let binding
+% \[
+% \Let\; x \revto M \;\In\; N
+% \]
+% may be simulated by a trivial handler:
+% \[
+% \Handle\; M \; \With\; \{ \Return\; x \to N \}
+% \]
+% Nevertheless, we elect to keep let bindings in \Calc. As we discuss in
+% Section~\ref{sec:abstract-machine}, one reason for doing so is in
+% order to facilitate more efficient implementations.
 
-We write $R^+$ for the transitive closure of relation $R$.
+We write $\reducesto^+$ for the transitive closure of relation $\reducesto$.
 %
 Subject reduction and type soundness for $\Calc$ are standard.
 
@@ -1808,6 +1830,9 @@ Subject reduction and type soundness for $\Calc$ are standard.
 If $\typc{\Delta;\Gamma}{M : A}{E}$ and $M \reducesto M'$, then
 $\typc{\Delta;\Gamma}{M' : A}{E}$.
 \end{theorem}
+\begin{proof}
+By induction on the given typing derivation.
+\end{proof}
 
 There are two ways in which a computation can terminate. It can either
 successfully return a value, or it can get stuck on an unhandled
@@ -1826,11 +1851,53 @@ If $\typc{}{M : A}{E}$, then there exists $\typc{}{N : A}{E}$, such that
 $M \reducesto^+ N \not\reducesto$, and $N$ is normal with respect to
 effect $E$.
 \end{theorem}
+\begin{proof}
+By induction on the given typing derivation.
+\end{proof}
+
+\section{Lambda}
+\label{sec:lambda}
+
+\newcommand{\If}{\keyw{if}}
+\newcommand{\Then}{\keyw{then}}
+\newcommand{\Else}{\keyw{else}}
+\newcommand{\Fun}{\keyw{fun}}
+\newcommand{\Perform}{\keyw{perform}}
+\newcommand{\Resume}{\keyw{resume}}
+\newcommand{\Makeblock}{\keyw{makeblock}}
+
+\begin{figure}
+\begin{syntax}
+\slab{Terms}         &X,Y,Z  &::= & x\\
+                     &     &\mid& \If \; X \Then \; Y \Else \; Z\\
+                     &     &\mid& \Fun \; x \mapsto Y \\
+                     &     &\mid& X\,Y\\
+                     &     &\mid& P X\\
+                     &     &\mid& \Let \; x \revto X \; \In \; Y\\
+                     &     &    &\\
+\slab{Primitives}    &P    &::= & \Perform \\
+                     &     &\mid& \Resume \\
+                     &     &\mid& \Makeblock_z\\
+\slab{Integers}      &z    &\in & \mathbb{Z} 
+\end{syntax}
+\caption{Term syntax}\label{fig:lambda-terms}
+\end{figure}
+
+In this section we describe OCaml IR Lambda, which is an untyped
+lambda calculus. The Lambda IR is a fairly high-level language,
+however not every Lambda program is portable across different native
+targets \citep{Dolan2016}. It does not have a formally specified
+semantics. However, \citet{Dolan2016} gives definitional interpreter
+for a subset of the Lambda IR.
+
+A small fragment of Lambda suffices for our purposes.
+Figure~\ref{fig:lambda-terms} gives the term syntax of the subset of
+Lambda that we consider.
 
 \section{Translating Links ANF into Lambda}
 \label{sec:translation}
 
-\section{Run-time representation}
+\subsection{Run-time representation}
 By using the OCaml backend we naturally inherit the OCaml
 run-time. OCaml implements effect handlers as heap-managed stack data
 structures, and as a consequence composition of handlers gives rise to
