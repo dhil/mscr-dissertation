@@ -1875,32 +1875,32 @@ By induction on the given typing derivation.
 
 \begin{figure}
 \begin{syntax}
-\slab{Expressions}   &X,Y,Z  &::= & x\\
-                     &     &\mid& \If \; X \Then \; Y \Else \; Z\\
-                     &     &\mid& \Let \; x \revto X \; \In \; Y\\
-                     &     &\mid& \Fun \; x \mapsto Y \\
-                     &     &\mid& X\,Y\\
+\slab{Expressions}   &L,I,J  &::= & x\\
+                     &     &\mid& \If \; L \; \Then \; I \; \Else \; J\\
+                     &     &\mid& \Let \; x \revto L \; \In \; J\\
+                     &     &\mid& \Fun \; x \mapsto L \\
+                     &     &\mid& L\,J\\
                      &     &\mid& P\\
                      &     &    &\\
-\slab{Primitives}    &P    &::= & \Eq(X,Y)\\
+\slab{Primitives}    &P    &::= & \Eq(L,J)\\
                      &     &\mid& \Makeblock_i\\
                      &     &\mid& \Field_i\\
-                     &     &\mid& \Perform \; X \\
-                     &     &\mid& \Resume(S,X) \\
-                     &     &\mid& \Clone \; X\\
-                     &     &\mid& \Delegate(X,Y)\\
-\slab{Stacks}        &S    &::= & \Alloc (X,Y,Z)\\
+                     &     &\mid& \Perform \; L \\
+                     &     &\mid& \Resume(S,L) \\
+                     &     &\mid& \Clone \; L\\
+                     &     &\mid& \Delegate(L,J)\\
+\slab{Stacks}        &S    &::= & \Alloc (L,I,J)\\
 \slab{Integers}      &i    &\in & \mathbb{Z} 
 \end{syntax}
 \caption{Term syntax for Lambda.}\label{fig:lambda-terms}
 \end{figure}
 
 In this section we describe OCaml IR Lambda, which is an untyped
-lambda calculus. The Lambda IR is a fairly high-level language,
-however not every Lambda program is portable across different native
-targets \citep{Dolan2016}. It does not have a formally specified
-semantics. However, \citet{Dolan2016} gives definitional interpreter
-for a subset of the Lambda IR.
+call-by-value lambda calculus. The Lambda IR is a fairly high-level
+language, however not every Lambda program is portable across
+different native targets \citep{Dolan2016}. It does not have a
+formally specified semantics. However, \citet{Dolan2016} gives
+definitional interpreter for a subset of the Lambda IR.
 
 A small fragment of Lambda suffices for our purposes.
 Figure~\ref{fig:lambda-terms} gives the term syntax of the subset of
@@ -1910,11 +1910,11 @@ Lambda that we consider.
 The term syntax is given in Figure~\ref{fig:lambda-terms}. The term
 syntax comprises: \emph{expressions}, \emph{primitives}, and
 \emph{stacks}. Expressions comprise variables ($x$) and conditional
-expressions ($\If\; X \Then\; Y \Else\; Z$) which evaluate one of
-their branches depending on the evaluation of $X$. Let-bindings
-($\Let\; x \revto X\; \In \; Y$) are similar to those of \Calc. The
-expression ($\Fun \; x \mapsto Y$) is a lambda abstraction that binds
-the variable $x$ in the body $Y$. Expression application ($X\,Y$) is
+expressions ($\If\; L \; \Then\; I \Else\; J$) which evaluate one of
+their branches depending on the evaluation of $L$. Let-bindings
+($\Let\; x \revto L\; \In \; J$) are similar to those of \Calc. The
+expression ($\Fun \; x \mapsto L$) is a lambda abstraction that binds
+the variable $x$ in the body $L$. Expression application ($L\,J$) is
 the standard eliminator for lambda abstractions. Expressions also
 comprise primitives.
 
@@ -1924,12 +1924,35 @@ structural equality operator. The primitive $\Makeblock_i$ creates a
 contiguous block of memory with $i$ fields. The dual operation
 $\Field_i$ projects the $i$th field of a contiguous block.  The
 operations $\Perform$, $\Resume$, $\Clone$, and $\Delegate$ are all
-crucial to the implementation of handlers. The unary primitive
-$\Perform \; X$ invokes an abstract operation $X$, whilst the binary
-primitive $\Resume(S,X)$ evaluates the expression $X$ in a resumable
-context $S$. The $\Clone$ primitive copies an expression. Finally,
-$\Delegate(X,Y)$ forwards the operation $X$ with continuation $Y$ to
-another enclosing resumable context.
+crucial to the implementation of handlers. 
+
+\paragraph{Perform} The $\Perform(L)$ primitive invokes an abstract
+operation. The behaviour of $\Perform$ is only defined when $L$
+evaluates to a name of an abstract operation.
+
+\paragraph{Resume} The $\Resume(S,L)$ primitive evaluates the
+expression $L$ with a handler $S$. If an abstract operation is
+performed in $L$ then the run-time attempts to find a suitable
+operation clause in the handler $S$.
+
+\paragraph{Clone} The $\Clone(L)$ primitive (shallowly) copies an
+expression $L$.
+
+\paragraph{Delegate} The $\Delegate(L,J)$ primitive forwards an
+abstract operation name $L$ along with the continuation, $J$, of the
+abstract operation to another enclosing $\Resume$-block.
+
+\paragraph{Alloc\_stack} In Lambda handlers are represented as
+stacks. The $\Alloc(L,I,J)$ primitive allocates a new handler with
+return clause $L$, an exception clause $I$, and an operation clause
+$J$.
+
+% The unary primitive
+% $\Perform \; X$ invokes an abstract operation $X$, whilst the binary
+% primitive $\Resume(S,X)$ evaluates the expression $X$ in a resumable
+% context $S$. The $\Clone$ primitive copies an expression. Finally,
+% $\Delegate(X,Y)$ forwards the operation $X$ with continuation $Y$ to
+% another enclosing resumable context.
 
 \section{Translating Links into Lambda}
 \label{sec:translation}
@@ -1965,11 +1988,12 @@ Operation clause translation
 \begin{mathpar}
 \begin{eqs}
 %  \htrans{H} &=& \Fun \; x \mapsto \Fun \; k \mapsto \hptrans{H}^{x,k}\\
-  \hptrans{\{\ell \, x \, k \mapsto M\} \uplus H}^{z,k'} &=&  \If \; \Eq(\mathcal{N}(\ell), z) \; \Then \\
+  \hptrans{\{\ell \, x \, k \mapsto M\} \uplus H}^{z,k'} &=&  \If \; \Eq(\mathcal{N}(\ell), \Field_1 \; z) \; \Then \\
                                                        & & 
 \begin{eqs}
+ & &\Let \; x' \revto \Field_2 \; z \; \In \\
  & &\Let \; k'' \revto \Fun \; y \mapsto (\Clone\; k') y\\
- & &\In \; \mtrans{M}[k''/k]
+ & &\In \; \mtrans{M}[k''/k,x'/x]
 \end{eqs} \\
                                                             & & \Else \; \hptrans{H}^{z,k'}\\
   \hptrans{\emptyset}^{x,k}                             &=& \Delegate(x,k)
