@@ -1005,6 +1005,10 @@ As expected it the primes between $2$ and $10$ get printed.
 \chapter{Related work}
 \label{ch:related-work}
 
+Prior work focuses mainly on the design and expressiveness of handlers
+rather than performance. Nevertheless, some recent papers do address
+performance.
+
 \section{Implementations of effect handlers}
 Any signature of abstract operations can be understood as a free
 algebra and represented as a functor. In particular, every such
@@ -1926,26 +1930,25 @@ $\Field_i$ projects the $i$th field of a contiguous block.  The
 operations $\Perform$, $\Resume$, $\Clone$, and $\Delegate$ are all
 crucial to the implementation of handlers. 
 
-\paragraph{Perform} The $\Perform(L)$ primitive invokes an abstract
-operation. The behaviour of $\Perform$ is only defined when $L$
-evaluates to a name of an abstract operation.
+The $\Perform(L)$ primitive invokes an abstract operation. The
+behaviour of $\Perform$ is undefined when $L$ does not evaluate to a
+name of an operation.
 
-\paragraph{Resume} The $\Resume(S,L)$ primitive evaluates the
-expression $L$ with a handler $S$. If an abstract operation is
-performed in $L$ then the run-time attempts to find a suitable
-operation clause in the handler $S$.
+The $\Resume(S,L)$ primitive evaluates the expression $L$ with a
+handler $S$. If an abstract operation is performed in $L$ then the
+run-time attempts to look up a suitable operation clause in the
+handler $S$. To forward an unhandled operation we use the
+$\Delegate(L,J)$ primitive. It forwards an abstract operation name $L$
+along with the continuation, $J$, of the abstract operation to another
+enclosing $\Resume$-block.
 
-\paragraph{Clone} The $\Clone(L)$ primitive (shallowly) copies an
-expression $L$.
+The $\Clone(L)$ primitive makes a copy of an expression $L$. This
+primitive is paramount to the successful encoding of multi-shot
+handlers of Links as Lambda supports only linear handlers.
 
-\paragraph{Delegate} The $\Delegate(L,J)$ primitive forwards an
-abstract operation name $L$ along with the continuation, $J$, of the
-abstract operation to another enclosing $\Resume$-block.
-
-\paragraph{Alloc\_stack} In Lambda handlers are represented as
-stacks. The $\Alloc(L,I,J)$ primitive allocates a new handler with
-return clause $L$, an exception clause $I$, and an operation clause
-$J$.
+A handler in Lambda is represented as a stack. The $\Alloc(L,I,J)$
+primitive allocates a new handler on the heap with return clause $L$,
+an exception clause $I$, and an operation clause $J$.
 
 % The unary primitive
 % $\Perform \; X$ invokes an abstract operation $X$, whilst the binary
@@ -1979,7 +1982,7 @@ Handler stack allocation
  \begin{eqs}
    &&(\Fun \; \vtrans{x} \mapsto \mtrans{M}\\
    &&, \Error\\
-   &&, \Fun \;y \mapsto \Fun\; k \mapsto \hptrans{H}^{y,k})
+   &&, \Fun \;y \mapsto \Fun\; k \mapsto \hptrans{H,y,k})
  \end{eqs}
 \end{eqs}
 \end{mathpar}
@@ -1988,15 +1991,15 @@ Operation clause translation
 \begin{mathpar}
 \begin{eqs}
 %  \htrans{H} &=& \Fun \; x \mapsto \Fun \; k \mapsto \hptrans{H}^{x,k}\\
-  \hptrans{\{\ell \, x \, k \mapsto M\} \uplus H}^{z,k'} &=&  \If \; \Eq(\mathcal{N}(\ell), \Field_1 \; z) \; \Then \\
+  \hptrans{\{\ell \, x \, k \mapsto M\} \uplus H, z, k'} &=&  \If \; \Eq(\mathcal{N}(\ell), \Field_1 \; z) \; \Then \\
                                                        & & 
 \begin{eqs}
  & &\Let \; x' \revto \Field_2 \; z \; \In \\
  & &\Let \; k'' \revto \Fun \; y \mapsto (\Clone\; k') y\\
  & &\In \; \mtrans{M}[k''/k,x'/x]
 \end{eqs} \\
-                                                            & & \Else \; \hptrans{H}^{z,k'}\\
-  \hptrans{\emptyset}^{x,k}                             &=& \Delegate(x,k)
+                                                            & & \Else \; \hptrans{H,z,k'}\\
+  \hptrans{\emptyset, x, k}                                 &=& \Delegate(x,k)
 \end{eqs}
 \end{mathpar}
 
@@ -2154,13 +2157,19 @@ to enable communication amongst processes.
 \section{Process abstraction}
 \label{sec:links-model-handlers-process}
 
-Initially, we choose to represent process identifiers as integers:
+In Links each process has its own unique process identifier which
+makes the process uniquely identifiable. The built-in process type is
+an abstract type, but under the hood it is really just an integer that
+gets incremented each time a new process is spawned. We introduce a
+process identifier type, \lstinline$Pid$, which is a type alias for an
+integer:
 %
 \snippet{pidInt.links}
 %
-As for the process type we parameterise it by the effects that it may
-perform, thus we name it \lstinline$EProcess$ for \emph{effectful
-  process}:
+We define a process name type that contains a process
+identifier. Furthermore, we parameterise the process name type by the
+effects that actual process may perform, thus we name it
+\lstinline$EProcess$ for \emph{effectful process}:
 %
 \snippet{eprocess.links}
 %
@@ -2169,25 +2178,26 @@ The type is a simple alias for the singleton record type with an
 type is parameterised by a \emph{phantom} row \lstinline$e$ -- it is
 not mentioned in the definition of \lstinline$EProcess$ -- which we
 will use to track the effects of processes. We use a small trick to
-get effect tracking to work as desired. The trick is obvious: let the
-type and effect system do the work for us. We make essential use of a
-helper function to create processes:
+get effect tracking to work as desired. Though, the trick is quite
+obvious: let the type and effect system do the work for us. We achieve
+this by making essential use of a helper function to create process
+handles:
 %
 \snippet{makeProcess.links}
 %
-The trick lies in the type signature. First note that the function
-accepts as its first argument a nullary function that has effect row
-\lstinline$e$ and returns unit. We intent that this nullary function
-is the computation that the process will execute. Now, observe that
-the function wholly ignores the first argument. It only uses the
-second argument to construct a singleton record is structural
-compatible with an inhabitant of the type \lstinline$EProcess$. The
-type system captures the effect row on the first argument and uses it
-to construct a process type with an open row that mentions
-\lstinline$e$, i.e. \lstinline$EProcess({ |e})$. Because the process
-type mentions \lstinline$e$ it must, by row polymorphism, have the
-same effects as the ignored input function. We can try it out to see
-that it indeed works:
+The entire trick is in the type signature. First note that the
+function accepts as its first argument a nullary function that has
+effect row \lstinline$e$ and returns unit. We intend that this nullary
+function is the computation that the process will execute. Now,
+observe that \lstinline$makeProcessHandle$ wholly ignores its first
+argument. It uses only its second argument to construct an inhabitant
+of the type \lstinline$EProcess$. The type system captures the effect
+row on the first argument and uses it to construct a process type with
+an open row that mentions \lstinline$e$, i.e.
+\lstinline$EProcess({ |e})$. Because the process type mentions
+\lstinline$e$ it must, by row polymorphism, have the same effects as
+the ignored input function. We can try it out to see that it indeed
+works:
 %
 \begin{lstlisting}
 links> makeProcess(fun() { print("I am wild!") }, 1);
@@ -2201,9 +2211,10 @@ links> makeProcess(fun() { if (do Choose) print("True")
 \section{Spawning, suspending, and scheduling processes}
 \label{sec:links-model-handlers-scheduler}
 
-\todo{Introduce fibers}
-Though, the caveat is that cooperative multi-tasking does not
-immediately provide preemptive concurrency. 
+\todo{Introduce fibers} 
+%
+Though, the caveat is that cooperative
+multi-tasking does not provide preemptive concurrency.
 
 \subsection{Concurrency operations}
 
@@ -2214,12 +2225,11 @@ of type \lstinline$EProcess({ |e})$, i.e.
 %
 \snippet{pspawn.links}
 %
-We dub the function \lstinline$pspawn$ for \emph{process} spawn. As
-usual the operation is quite simple. Most of the work is concerned
-with getting the type signature right. The signature enforces any
-interpretation of \lstinline$pspawn$ to at least return a process
-handle. In a similar fashion we define an operation for suspending a
-computation:
+We dub the function \lstinline$pspawn$ for \emph{process spawn}. The
+function is quite simple. Most of the work is concerned with getting
+the type signature right. The signature enforces any interpretation of
+\lstinline$pspawn$ to at least return a process handle. In a similar
+fashion we define an operation for suspending a computation:
 %
 \snippet{yield.links}
 %

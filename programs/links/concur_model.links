@@ -61,8 +61,8 @@ fun makeExecutionUnit(f, id) {
 }
 
 #snippet:makeProcess.links
-sig makeProcess : (() -e-> (), Pid) -> EProcess({ |e})
-fun makeProcess(_, pid) { (id=pid) }
+sig makeProcessHandle : (() -e-> (), Pid) -> EProcess({ |e})
+fun makeProcessHandle(_, pid) { (id=pid) }
 #end
 
 sig getPid : (EProcess({ |e})) -> Pid
@@ -177,7 +177,7 @@ fun dequeueProcess() {
 # handler roundrobin(parent, numChildren) {
 #   case Spawn(f,k) ->
 #        var childPid = makeChildPid(parent, numChildren+1);
-#        var child = makeProcess(f, childPid);
+#        var child = makeProcessHandle(f, childPid);
 #        enqueueProcess(fun() { k(child)(parent, numChildren+1) });
 #        roundrobin(child, 0)(f)()
 #   case Yield(k)   ->
@@ -190,11 +190,11 @@ fun dequeueProcess() {
 
 #snippet:roundrobin.links
 fun roundrobin(m)() {
-  var root = makeProcess(m, freshName());
+  var root = makeProcessHandle(m, freshName());
   handler scheduler(activeProcess) {
     case Spawn(f,resume) ->
       var childPid = freshName();
-      var child = makeProcess(f, childPid);
+      var child = makeProcessHandle(f, childPid);
       enqueueProcess(fun() { resume(child)(activeProcess) });
       scheduler(child)(f)()
     case Yield(resume)   ->
@@ -226,7 +226,7 @@ op h -< m  { h(m) }
 
 fun run(m) { m() }
 
-#var dummy = run -<- evalState(emptyQueue()) -<- roundrobin(makeProcess(fun() { () }, "0"), 0) -< hello(4);
+#var dummy = run -<- evalState(emptyQueue()) -<- roundrobin(makeProcessHandle(fun() { () }, "0"), 0) -< hello(4);
 
 # Communication
 #snippet:psend.links
@@ -470,7 +470,7 @@ fun generator(n)() {
 #snippet:basicRoundrobin.links
 handler basicRoundrobin {
   case Spawn(f,resume) ->
-    var child = makeProcess(f, 0);
+    var child = makeProcessHandle(f, 0);
     enqueueProcess(fun() { resume(child) });
     basicRoundrobin(f)()
   case Yield(resume) ->
@@ -501,7 +501,7 @@ fun spawnLoneChild(n)() {
 #snippet:wrongRoundrobin.links
 handler wrongRoundrobin(pid) {
   case Spawn(f,resume) ->
-    var child = makeProcess(f, pid+1);
+    var child = makeProcessHandle(f, pid+1);
     enqueueProcess(fun() { resume(child)(pid) });
     wrongRoundrobin(pid+1)(f)()
   case Yield(resume) ->
@@ -539,10 +539,10 @@ fun spawnFamily(n)() {
 
 #snippet:uniqueRoundrobin.links
 fun upRoundrobin(m)() {
-  var root = makeProcess(m, freshName());
+  var root = makeProcessHandle(m, freshName());
   handler scheduler {
     case Spawn(f,resume) ->
-      var child = makeProcess(f, freshName());
+      var child = makeProcessHandle(f, freshName());
       enqueueProcess(fun() { resume(child) });
       scheduler(f)()
     case Yield(resume) ->
