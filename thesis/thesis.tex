@@ -13,6 +13,7 @@
 \usepackage{amsthm}           % Provides \newtheorem, \theoremstyle, etc.
 \usepackage{mathtools}
 \usepackage{mathpartir}       % Inference rules
+\usepackage{stmaryrd}         % semantic brackets
 \usepackage{array}
 \usepackage{float}            % Float control
 \usepackage{caption,subcaption}  % Sub figures support
@@ -1864,23 +1865,34 @@ By induction on the given typing derivation.
 \newcommand{\Fun}{\keyw{fun}}
 \newcommand{\Perform}{\keyw{perform}}
 \newcommand{\Resume}{\keyw{resume}}
+\newcommand{\Clone}{\keyw{clone}}
 \newcommand{\Makeblock}{\keyw{makeblock}}
+\newcommand{\Field}{\keyw{field}}
+\newcommand{\Eq}{\keyw{eq}}
+\newcommand{\Alloc}{\keyw{alloc\_stack}}
+\newcommand{\Error}{\keyw{error}}
+\newcommand{\Delegate}{\keyw{delegate}}
 
 \begin{figure}
 \begin{syntax}
-\slab{Terms}         &X,Y,Z  &::= & x\\
+\slab{Expressions}   &X,Y,Z  &::= & x\\
                      &     &\mid& \If \; X \Then \; Y \Else \; Z\\
+                     &     &\mid& \Let \; x \revto X \; \In \; Y\\
                      &     &\mid& \Fun \; x \mapsto Y \\
                      &     &\mid& X\,Y\\
-                     &     &\mid& P X\\
-                     &     &\mid& \Let \; x \revto X \; \In \; Y\\
+                     &     &\mid& P\\
                      &     &    &\\
-\slab{Primitives}    &P    &::= & \Perform \\
-                     &     &\mid& \Resume \\
-                     &     &\mid& \Makeblock_z\\
-\slab{Integers}      &z    &\in & \mathbb{Z} 
+\slab{Primitives}    &P    &::= & \Eq(X,Y)\\
+                     &     &\mid& \Makeblock_i\\
+                     &     &\mid& \Field_i\\
+                     &     &\mid& \Perform \; X \\
+                     &     &\mid& \Resume(S,X) \\
+                     &     &\mid& \Clone \; X\\
+                     &     &\mid& \Delegate(X,Y)\\
+\slab{Stacks}        &S    &::= & \Alloc (X,Y,Z)\\
+\slab{Integers}      &i    &\in & \mathbb{Z} 
 \end{syntax}
-\caption{Term syntax}\label{fig:lambda-terms}
+\caption{Term syntax for Lambda.}\label{fig:lambda-terms}
 \end{figure}
 
 In this section we describe OCaml IR Lambda, which is an untyped
@@ -1894,8 +1906,119 @@ A small fragment of Lambda suffices for our purposes.
 Figure~\ref{fig:lambda-terms} gives the term syntax of the subset of
 Lambda that we consider.
 
-\section{Translating Links ANF into Lambda}
+\subsection{Terms} 
+The term syntax is given in Figure~\ref{fig:lambda-terms}. The term
+syntax comprises: \emph{expressions}, \emph{primitives}, and
+\emph{stacks}. Expressions comprise variables ($x$) and conditional
+expressions ($\If\; X \Then\; Y \Else\; Z$) which evaluate one of
+their branches depending on the evaluation of $X$. Let-bindings
+($\Let\; x \revto X\; \In \; Y$) are similar to those of \Calc. The
+expression ($\Fun \; x \mapsto Y$) is a lambda abstraction that binds
+the variable $x$ in the body $Y$. Expression application ($X\,Y$) is
+the standard eliminator for lambda abstractions. Expressions also
+comprise primitives.
+
+The primitive category consists of operations which are given special
+support by the OCaml compiler.  The primitive $\Eq$ is a binary
+structural equality operator. The primitive $\Makeblock_i$ creates a
+contiguous block of memory with $i$ fields. The dual operation
+$\Field_i$ projects the $i$th field of a contiguous block.  The
+operations $\Perform$, $\Resume$, $\Clone$, and $\Delegate$ are all
+crucial to the implementation of handlers. The unary primitive
+$\Perform \; X$ invokes an abstract operation $X$, whilst the binary
+primitive $\Resume(S,X)$ evaluates the expression $X$ in a resumable
+context $S$. The $\Clone$ primitive copies an expression. Finally,
+$\Delegate(X,Y)$ forwards the operation $X$ with continuation $Y$ to
+another enclosing resumable context.
+
+\section{Translating Links into Lambda}
 \label{sec:translation}
+
+\newcommand{\trans}[1]{\llbracket #1 \rrbracket}
+\newcommand{\mtrans}[1]{\trans{#1}_\mathcal{M}}
+\newcommand{\vtrans}[1]{\trans{#1}_\mathcal{V}}
+\newcommand{\htrans}[1]{\trans{#1}_\mathcal{H}}
+\newcommand{\hptrans}[1]{\trans{#1}_{\mathcal{H}'}}
+
+\begin{figure}
+Handle translation
+\begin{mathpar}
+\begin{eqs}
+  \mtrans{\Handle\; M\; \With \; H} &=& \Resume(\htrans{H},\mtrans{M}) \\
+  %\mtrans{\{\Return\; x \mapsto M\} \uplus H} &=& \Alloc (\Fun \; \vtrans{x} \mapsto \mtrans{M}, \Error, \htrans{H})
+\end{eqs}
+\end{mathpar}
+
+Handler stack allocation
+\begin{mathpar}
+\begin{eqs}
+  \htrans{\{\Return\; x \mapsto M\} \uplus H} &=& \Alloc
+ \begin{eqs}
+   &&(\Fun \; \vtrans{x} \mapsto \mtrans{M}\\
+   &&, \Error\\
+   &&, \Fun \;y \mapsto \Fun\; k \mapsto \hptrans{H}^{y,k})
+ \end{eqs}
+\end{eqs}
+\end{mathpar}
+
+Operation clause translation
+\begin{mathpar}
+\begin{eqs}
+%  \htrans{H} &=& \Fun \; x \mapsto \Fun \; k \mapsto \hptrans{H}^{x,k}\\
+  \hptrans{\{\ell \, x \, k \mapsto M\} \uplus H}^{z,k'} &=&  \If \; \Eq(\mathcal{N}(\ell), z) \; \Then \\
+                                                       & & 
+\begin{eqs}
+ & &\Let \; k'' \revto \Fun \; y \mapsto (\Clone\; k') y\\
+ & &\In \; \mtrans{M}[k''/k]
+\end{eqs} \\
+                                                            & & \Else \; \hptrans{H}^{z,k'}\\
+  \hptrans{\emptyset}^{x,k}                             &=& \Delegate(x,k)
+\end{eqs}
+\end{mathpar}
+
+Operation invocation translation
+\begin{mathpar}
+\begin{eqs}
+  \mtrans{\Do (\ell \; V)^E} &=& \Perform \; \vtrans{(\ell \; V)^E}
+\end{eqs}
+\end{mathpar}
+\caption{Translation of Links handlers into Lambda terms.}\label{fig:translation}
+\end{figure}
+
+The translation from Links to Lambda consists of three mutual
+recursive translation functions: $\vtrans{\cdot}$ which translate a
+Links value into a Lambda term, $\mtrans{\cdot}$ which translates a
+Links computation term into a Lambda term, and $\htrans{\cdot}$ which
+translates a Links handler into Lambda term. The latter is the only
+interesting translation function as both $\vtrans{\cdot}$ and
+$\mtrans{\cdot}$ are homomorphisms on most other syntax constructors.
+Figure~\ref{fig:translation} shows the translation of handlers.
+
+The ($\Handle\; M \; \With\; H$) gets translated into a resumable
+context. The handler $H$ gets translated into a Lambda handler, which
+is allocated using the \Alloc\ primitive. We translate the
+return clause of $H$ independently of the operation clauses. In the
+exception component of \Alloc\ we place the \Error\ primitive. This is
+safe because Links does not have a distinct notion of exception as in
+OCaml, and thus there is no way we could ever raise an exception that
+would activate this component. In the operation clause component we
+create a curried function which first binds the operation label and
+then binds the continuation of the operation. We use an auxiliary
+translation function $\hptrans{\cdot}^{op,k}$, which carries the
+operation label and the continuation, to translate the operation
+clauses.
+
+An operation clause translate into a conditional expression that
+checks whether operation clause label is the same as the carried
+operation label. In case they are the same, then we follow the first
+branch and create a wrapper function, $k''$, around the
+continuation. This wrapper function clones the continuation $k'$
+before use, which effectively lets us reuse a linear continuation
+multiple times. If the two labels are not the same then we try another
+operation clause in the second branch. When there are no more
+operation clauses to translate then we insert a $\Delegate$ which
+forwards the operation label $x$ and the continuation $k$ to another
+enclosing handler.
 
 \subsection{Run-time representation}
 By using the OCaml backend we naturally inherit the OCaml
