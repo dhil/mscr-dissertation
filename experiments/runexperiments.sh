@@ -7,7 +7,7 @@ LINKS_EXPDIR="$LINKS_SRC_DIR/benchmarks"
 LINKS="$LINKS_SRC_DIR/links"
 CONFIG="$LINKS_SRC_DIR/measure.config"
 TIME="$HOME/.local/bin/time --verbose"
-REPETITIONS=10
+REPETITIONS=20
 export LINKS_LIB="$HOME/projects/links/compiler/lib"
 export OCAMLRUNPARAM="s=1G"
 
@@ -82,6 +82,28 @@ for f in $(ls -1 $LINKS_EXPDIR | grep --color=none ".links$"); do
         dump_env
         log "i:$i:" $LOGFILE
         run_and_log "$TIME $linksi" $LOGFILE
+        log "exit:$?" $LOGFILE
+    done
+done
+
+LOGFILE="$WD/$LOGFILENAME-ocamlopt"
+
+# OCaml
+for f in $(ls -1 $LINKS_EXPDIR | grep --color=none ".ml$"); do
+    dump_env
+    # Build
+    file="$LINKS_EXPDIR/$f"
+    target="$WD/$f.out"
+    log "[OCaml] Compiling program $file" $LOGFILE
+    ocamlc="ocamlopt $file -o $target"
+    log "build:$f" $LOGFILE
+    run_and_log "$ocamlc" "$LOGFILE"
+    log "exit:$?" $LOGFILE
+    log "Running $target $REPETITIONS times" $LOGFILE
+    for i in $(seq 1 $REPETITIONS); do
+        dump_env
+        log "i:$i:" $LOGFILE
+        run_and_log "$TIME $target" $LOGFILE
         log "exit:$?" $LOGFILE
     done
 done
