@@ -2862,6 +2862,82 @@ we described in Section~\ref{sec:sieve-example}.
 \section{Methodology}
 \label{sec:methodology}
 
+\section{State interpretation}
+\label{sec:state-eval}
+
+\begin{table}
+\centering
+\begin{tabular}{| l | r | r | r |}
+\cline{2-4}
+\multicolumn{1}{c|}{~} & \multicolumn{3}{c|}{\textbf{State implementation}} \\
+\cline{2-4}
+\multicolumn{1}{c|}{~}  & Handler & Monadic & Pure \\
+\hline
+  ocamlopt          & 0.0     & 0.0     & *0.0 \\
+\hline
+  Links interpreter & 0.0     & 0.0     & 0.0 \\
+\hline
+  Links compiler    & 0.0     & 0.0     & 0.0 \\
+\hline
+\end{tabular}
+\caption{Relative speed of state implementations. * is baseline.}\label{tbl:state-all}
+\end{table}
+
+\begin{table}
+\centering
+\begin{tabular}{|l | r | r | r |}
+\hline
+Compilation tool & ocamlopt & Links interpreter & Links compiler \\
+\hline
+Relative speed   & *0.0     & 0.0               & 0.0\\
+\hline
+\end{tabular}
+\caption{State handler comparison. * is baseline.}\label{fig:state-handler-all}
+\end{table}
+
+\begin{figure}
+\centering
+\includegraphics[scale=0.6]{plots/stateAll.pdf}
+\caption{Barplot}\label{fig:state-all}
+\end{figure}
+
+\section{Queens benchmark}
+\label{sec:queens-eval}
+
+\begin{table}
+\centering
+\begin{tabular}{| l | r | r | r | r |}
+\hline
+N  & 8 & 12 & 16 & 20 \\
+\hline
+  Links interpreter (ms) & 0.0 & 0.0 & 0.0 & 0.0\\
+\hline
+  Links compiler    (ms) & 0.0 & 0.0 & 0.0 & 0.0\\
+\hline
+\end{tabular}
+\caption{$N$-queens benchmark.}\label{tbl:queens}
+\end{table}
+
+\section{Sieve benchmark}
+\label{sec:concur-label}
+
+\begin{table}
+\centering
+\begin{tabular}{| l | r | r | r | r | r | r | r |}
+\hline
+N  & 101 & 201 & 401 & 601 & 801 & 1001 & 1201 \\
+\hline
+Number of process & 0 & 0 & 0 & 0 & 0 & 0 & 0 \\
+\hline
+  Links interpreter (ms) & 0.0 & 0.0 & 0.0 & 0.0  & 0.0  & 0.0  & 0.0\\
+\hline
+  Links compiler    (ms) & 0.0 & 0.0 & 0.0 & 0.0  & 0.0  & 0.0  & 0.0\\
+\hline
+\end{tabular}
+\caption{Relative speed of state implementations. * is baseline.}\label{tbl:sieve}
+\end{table}
+
+
 %%
 %% Formalisation
 %%
