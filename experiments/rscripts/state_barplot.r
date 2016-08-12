@@ -49,13 +49,13 @@ data <- data.frame(names, handler, monadic, pure)
 #data = data[,c(1,2,3,4)]
 print(data)
 
-data.m <- melt(data, id.vars='names', variable.name="Benchmark")
+data.m <- melt(data, id.vars='names', variable.name="State.impl")
 print(data.m)
 # plot everything
 plot1 <- ggplot(data.m, aes(names, value)) +   
-  geom_bar(aes(fill = Benchmark), position = "dodge", stat="identity") +
-  ylab("Normalised execution time") +
-  xlab("Compilation tool") + scale_linetype_discrete(name = "Fancy Title")
+  geom_bar(aes(fill = State.impl), position = "dodge", stat="identity") +
+  ylab("Relative speed") +
+  xlab("Compilation tool") 
 print(plot1)
 
 # Reshape
