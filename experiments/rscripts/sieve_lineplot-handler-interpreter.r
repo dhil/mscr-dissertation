@@ -34,11 +34,11 @@ SieveN = c(27,47,80,111,140,169) #c(101,201,401,601,801,1001)
 Compiler = myCData #c(1,2,3,4,5,6)
 Interpreter = myIData #c(10,20,30,40,50,60)
 Builtin     = myBData #c(11,22,33,44,55,66)
-names = c("Compiler/handlers", "Interpreter/built-in", "Interpreter/handlers")
-#names = c("Compiler", "Interpreter/built-in")
+#names = c("Compiler/handlers", "Interpreter/built-in", "Interpreter/handlers")
+names = c("Compiler/handlers", "Interpreter/built-in")
 
-myData <- data.frame(SieveN, Compiler, Builtin, Interpreter)
-#myData <- data.frame(SieveN, Compiler, Builtin)
+#myData <- data.frame(SieveN, Compiler, Builtin, Interpreter)
+myData <- data.frame(SieveN, Compiler, Builtin)
 
 print(myData)
 
@@ -46,7 +46,7 @@ data.m <- melt(myData, id.vars='SieveN', variable.name="impl")
 #print(data.m)
 
 # Plot
-pdf("/home/dhil/projects/mscr-dissertation/thesis/plots/sieve.pdf", width = 10, height = 7)
+pdf("/home/dhil/projects/mscr-dissertation/thesis/plots/sieve_compiler-interpreter.pdf", width = 10, height = 7)
 plot1 <- ggplot(data.m, aes(x=SieveN, y=value, colour=factor(impl, labels=names))) +
   geom_line(size=2) +
   geom_point(size=4) +
