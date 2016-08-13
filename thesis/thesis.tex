@@ -1094,6 +1094,7 @@ simply be stored on the stack.
 %% Compiling handlers
 %%
 \chapter{Compiling effect handlers}
+\label{ch:compiling}
 
 \section{Compilation strategy}
 \label{sec:compilation-strategy}
@@ -2122,7 +2123,7 @@ value. By default we implement every handler as a multi-shot handler.
 %% Concurrent programming with handlers
 %%
 \chapter{A reconstruction of the Links concurrency model with handlers}
-\label{ch:programming}
+\label{ch:concurrency}
 
 % In this chapter we explore the admissibility of building an entire
 % concurrency model with effect handlers. As a starting point we attempt
@@ -2861,50 +2862,216 @@ we described in Section~\ref{sec:sieve-example}.
 
 \section{Methodology}
 \label{sec:methodology}
+$n = 25$. Statistic: median. Our method is akin to the method of \cite{Harris2016}.
 
 \section{State interpretation}
 \label{sec:state-eval}
 
+State handling arises naturally in many applications. For example, our
+implementation of the concurrency model of Links in
+Chapter~\ref{ch:concurrency} makes extensive use of state and
+state-like interpretations. Ideally, we would want the state
+interpretation using handlers to be cost-free as it is the case with
+the \emph{state monad} in Haskell \citep{Kammar2013}. To achieve this
+in practice we would have to heavily optimise handlers --- something
+which the Links compiler does not do.
+
+Nevertheless, we will consider how well our compiler performs compared
+to the Links interpreter and OCaml compiler. We use the stateful
+counting benchmark of \cite{Kammar2013} to benchmark state
+interpretations. The benchmark is fairly simple; the following is a
+Links port of the benchmark:
+\begin{lstlisting}
+fun count() {
+    var i = get();
+    if (i == 0) { i }
+    else { put(i - 1); count() }
+}
+\end{lstlisting}
+
+We consider three different variations of this program: a handler
+variation (one program given above), a monadic variation which uses a
+state monad to interpret \lstinline$get$ and \lstinline$put$, and a
+``pure'' variation which implements state as a parameter to
+\lstinline$count$. The latter variation represents in some sense the
+``abstraction-free'' implementation of the counting program. We
+consider the monadic variation because it is (nowadays) a standard
+functional approach to handling state. Though, the Links compiler does
+not provide any special support for monads. For each implementation we
+instantiate the state parameter with $10000000$.
+
+%               names      Handler      Monadic        Pure
+% 1 Links interpreter 0.0002951489 0.0001298283 0.001687479
+% 2    Links compiler 0.0089798851 0.0369276219 0.231481481
+% 3          ocamlopt 0.0247770069 0.0753012048 1.000000000
 \begin{table}
 \centering
-\begin{tabular}{| l | r | r | r |}
+\begin{tabular}{| l || r | r | r |}
 \cline{2-4}
 \multicolumn{1}{c|}{~} & \multicolumn{3}{c|}{\textbf{State implementation}} \\
-\cline{2-4}
-\multicolumn{1}{c|}{~}  & Handler & Monadic & Pure \\
+\cline{1-4}
+\multicolumn{1}{|l||}{\textbf{Compilation tool}}  & Handler & Monadic & Pure \\
 \hline
-  ocamlopt          & 0.0     & 0.0     & *0.0 \\
+  Links interpreter & 0.0030   & 0.0001  & 0.0170 \\
 \hline
-  Links interpreter & 0.0     & 0.0     & 0.0 \\
+  Links compiler    & 0.0089   & 0.0370 & 0.2315 \\
 \hline
-  Links compiler    & 0.0     & 0.0     & 0.0 \\
+  ocamlopt          & 0.0250   & 0.0753  & *1.0000 \\
 \hline
 \end{tabular}
-\caption{Relative speed of state implementations. * is baseline.}\label{tbl:state-all}
+\caption{Comparison of state implementations. The component marked
+  with * is the baseline.}\label{tbl:state-all}
 \end{table}
 
-\begin{table}
-\centering
-\begin{tabular}{|l | r | r | r |}
-\hline
-Compilation tool & ocamlopt & Links interpreter & Links compiler \\
-\hline
-Relative speed   & *0.0     & 0.0               & 0.0\\
-\hline
-\end{tabular}
-\caption{State handler comparison. * is baseline.}\label{fig:state-handler-all}
-\end{table}
+Table~\ref{tbl:state-all} shows the speed of the different state
+implementation relative to the pure implementation compiled using the
+OCaml compiler (ocamlopt). Figure~\ref{fig:state-all} visualises the
+results as a bar plot. As expected the Links interpreter performs much
+worse than the Links and OCaml compilers. Though, it is interesting to
+note that the handler interpretation performs better than the monadic
+interpretation. This is because the monadic implementation involves a
+larger series of function calls than the handler implementation, and
+as noted in previous work \citep{Hillerstrom2015} function calls are
+rather expensive in the Links interpreter. More interestingly, we can
+see the Links compiler performs much worse than the OCaml compiler
+across all implementations. The low number for the handler
+implementation we can account for since the Links compiler compiles
+the handler as a multi-shot handler even though the state handler uses
+its continuation linearly, thus the handler unnecessarily copies its
+continuation before each invocation. However, we might reasonably
+expect that the performance of the pure state program should be
+similar for both the Links and OCaml compilers. The state program
+compiled by the Links compiler performs only at 23\% of the program
+compiled by the OCaml compiler. We explore the reason for this
+performance in Section~\ref{sec:state-recover}.
+
+It is interestingly to note that the OCaml handler is rather slow. The
+handler performs only at 2.5\% of the baseline program. In other
+words, the handler program is 97.5\% slower than the baseline. Thus we
+can note that the handler abstraction is rather expensive in OCaml.
 
 \begin{figure}
 \centering
 \includegraphics[scale=0.6]{plots/stateAll.pdf}
-\caption{Barplot}\label{fig:state-all}
+\caption{Bar plot of data from Table~\ref{tbl:state-all} (higher is
+  better).}\label{fig:state-all}
+\end{figure}
+
+% \begin{table}
+% \centering
+% \begin{tabular}{|l | r | r | r |}
+% \hline
+% Compilation tool & ocamlopt & Links interpreter & Links compiler \\
+% \hline
+% Relative speed   & *0.0     & 0.0               & 0.0\\
+% \hline
+% \end{tabular}
+% \caption{State handler comparison. * is baseline.}\label{fig:state-handler-all}
+% \end{table}
+
+\subsection{Recovering performance}
+\label{sec:state-recover}
+
+We noted that the state programs compiled using the Links compiler
+performed rather poorly compared to the baseline implementation in
+OCaml. In this section we will try to account for difference in
+performance. Moreover, we will demonstrate how we can equilibrise some
+of the performance.
+
+Given that the Links compiler conservatively implements the state
+handler as a multi-shot handler we can try to enforce linearisation of
+handlers in order to obtain some insight into how expensive it is to
+copy the continuation.
+
+However, linearisation does not explain the poor performance of the
+pure state program. The explanation is, again, that the Links compiler
+does not perform any optimisations. In particular, the polymorphic
+built-in comparison operators are translated into their generic
+counterparts in OCaml/Lambda. This means that the equality operator in
+the state program gets translated into the generic equality operator
+in OCaml instead of the more efficient, hardware supported integer
+comparison operator. Since the equality testing occurs 10000000 times
+in the state program the overhead in occurred by the generic operator
+is going to be significant. This claim is supported by the results
+shown in Table~\ref{tbl:state-all-recovered}. The ``Links
+compiler/lin+eq'' denotes a special version of the Links compiler in
+which we have hand-coded handlers linearisation and equality testing
+specialisation.
+
+%                   names      Handler      Monadic        Pure
+% 1        Links compiler 0.0089798851 0.0369276219 0.231481481
+% 2     Links interpreter 0.0002951489 0.0001298283 0.001687479
+% 3              ocamlopt 0.0247770069 0.0753012048 1.000000000
+% 4 Links compiler/lin+eq 0.0222024867 0.0437828371 1.190476190
+\begin{table}
+\centering
+\begin{tabular}{| l || r | r | r |}
+\cline{2-4}
+\multicolumn{1}{c|}{~} & \multicolumn{3}{c|}{\textbf{State implementation}} \\
+\cline{1-4}
+\multicolumn{1}{|l||}{\textbf{Compilation tool}}  & Handler & Monadic & Pure \\
+\hline
+  Links interpreter & 0.0030   & 0.0001  & 0.0017 \\
+\hline
+  Links compiler    & 0.0089   & 0.0370 & 0.2315 \\
+\hline
+  ocamlopt          & 0.0250   & 0.0753  & *1.0000 \\
+\hline
+  Links compiler/lin+eq & 0.0222 & 0.0438 & 1.1905 \\
+\hline
+\end{tabular}
+\caption{Comparison of state implementations. The component marked
+  with * is the baseline.}\label{tbl:state-all-recovered}
+\end{table}
+\begin{figure}
+\centering
+\includegraphics[scale=0.6]{plots/stateAll_recovered.pdf}
+\caption{Bar plot of data in Table~\ref{tbl:state-all-recovered} (higher is better).}\label{fig:state-all-recovered}
+\end{figure}
+
+Figure~\ref{fig:state-all-recovered} visualises the data. We achieve
+significant speed ups. In particular, the Links compiler out performs
+the OCaml compiler on the pure state program. The Links compiler
+achieves roughly 19\% performance than the OCaml compiler on that
+particular program. The explanation for this difference is rather
+subtle: it relates to the module system of OCaml and the lack of a
+module system in Links. Every OCaml source file constitutes a
+module. Furthermore, an accessible top-level function in one module
+can be invoked from another module in OCaml. In order to support
+cross-module invocation of functions OCaml maintains per module a
+global table which contains the callable top-level functions of that
+particular module. Since the function \lstinline$count$ in the state
+program is a global function it gets registered in the global table,
+which means the first invocation of \lstinline$count$ costs one look
+up in the global table in order to locate the function. In Links every
+function is resolved statically, because there is no concept of cross
+module function invocation. Therefore, we do not pay the initial look
+up cost.
+
+Unsurprisingly, linearisation speeds up the handler significantly. It
+almost brings it on par with the OCaml
+implementation. Figure~\ref{fig:statehandler-all} depicts a comparison
+of the different state handler implementations relative to the OCaml
+implementation. The figure includes an additional special version of
+the Links compiler (denoted ``Links compiler/lin'') which only
+performs linearisation of handlers. We see that linearisation accounts
+for a large chunk of the overall improvement. Even with both
+optimisations the performance is still about 12\% worse than the OCaml
+implementation. It is likely that we can close this gap by fine tuning
+the compiler.
+
+\begin{figure}[H]
+\centering
+\includegraphics[scale=0.6]{plots/statehandlerAll.pdf}
+\caption{Plot of handler data from Table~\ref{tbl:state-all-recovered}
+  with the addition of ``Compiler/lin'' (higher is
+  better).}\label{fig:statehandler-all}
 \end{figure}
 
 \section{Queens benchmark}
 \label{sec:queens-eval}
 
-\begin{table}
+\begin{table}[H]
 \centering
 \begin{tabular}{| l | r | r | r | r |}
 \hline
@@ -2918,25 +3085,107 @@ N  & 8 & 12 & 16 & 20 \\
 \caption{$N$-queens benchmark.}\label{tbl:queens}
 \end{table}
 
-\section{Sieve benchmark}
+\section{Concurrency implementation}
 \label{sec:concur-label}
 
-\begin{table}
+We encoded the concurrency model of Links using handlers in
+Chapter~\ref{ch:concurrency}. The motivation was to replace the
+built-in implementation. It is interesting to compare the handler
+encoding against the built-in implementation. Table~\ref{tbl:sieve}
+contains the data obtained by running the Sieve example
+(c.f. Sections~\ref{sec:sieve-example} and
+\ref{sec:links-model-handlers-example}) with different parameters. 
+%   SieveN Compiler Builtin Interpreter
+% 1     27       21      56         992
+% 2     47       38      65        2473
+% 3     80      103      95        9589
+% 4    111      231     136       24301
+% 5    140      409     186       48679
+% 6    169      658     247       84822
+\begin{table}[H]
+\centering
+\begin{tabular}{| l | r | r | r | r | r | r |}
+\hline
+N  & 101 & 201 & 401 & 601 & 801 & 1001\\
+\hline
+Number of process & 27 & 47 & 80 & 111 & 140 & 169\\
+\hline
+\hline
+  Interpreter/handlers (ms) & 992  & 2473 & 9589 & 24301  & 48679  & 84822\\
+\hline
+  Interpreter/built-in (ms) & 56 & 65 & 95 & 136 & 186 & 247\\
+\hline
+  Compiler    (ms) & 21 & 38 & 103 & 231  & 409  & 658\\
+\hline
+\end{tabular}
+\caption{Concurrency implementation scaling (lower is better).}\label{tbl:sieve}
+\end{table}
+The variable $N$ is the upper bound given to the generator process,
+the second row lists the number of concurrent processes that were
+spawned. Figure~\ref{fig:sieve-plot} displays a line plot of the
+data. As we might expect the interpreter with the handler
+implementation performs poorly compared to the built-in and the
+compiler
+implementations. Figure~\ref{fig:sieve-handler-interpreter-plot} zooms
+in on the two implementations. We see that compiler implementation
+does not scale as well as the built-in implementation. When we have
+about 80 processes running the compiler implementation starts
+performing worse than the other.
+
+The interpreter appears to scale surprisingly well. Needless to say,
+our compiled concurrency implementation should not really be
+out-performed by an interpreted version. If we enable the
+optimisations from Section~\ref{sec:state-recover} then we see that
+the compiled implementation performs better than the
+interpreter. Table~\ref{tbl:sieve-recovered} shows the data, and
+Figure~\ref{fig:sieve-recovered-plot} displays a visualisation of the
+data. In particular, it appears that the compiled implementation
+scales as nicely as the built-in implementation.
+
+\begin{figure}[H]
+\centering
+\includegraphics[scale=0.55]{plots/sieve.pdf}
+\caption{Concurrency implementation scaling (lower is better).}\label{fig:sieve-plot}
+\end{figure}
+
+\begin{figure}
+\centering
+\includegraphics[scale=0.55]{plots/sieve_compiler-interpreter.pdf}
+\caption{Compiler/handler vs Interpreter/built-in (lower is better).}\label{fig:sieve-handler-interpreter-plot}
+\end{figure}
+
+
+%   SieveN Compiler Builtin CompilerOpt
+% 1     27       21      56          17
+% 2     47       38      65          22
+% 3     80      103      95          36
+% 4    111      231     136          61
+% 5    140      409     186          99
+% 6    169      658     247         153
+\begin{table}[H]
 \centering
 \begin{tabular}{| l | r | r | r | r | r | r | r |}
 \hline
-N  & 101 & 201 & 401 & 601 & 801 & 1001 & 1201 \\
+N  & 101 & 201 & 401 & 601 & 801 & 1001 \\
 \hline
-Number of process & 0 & 0 & 0 & 0 & 0 & 0 & 0 \\
+Number of process & 27 & 47 & 80 & 111 & 140 & 169 \\
 \hline
-  Links interpreter (ms) & 0.0 & 0.0 & 0.0 & 0.0  & 0.0  & 0.0  & 0.0\\
 \hline
-  Links compiler    (ms) & 0.0 & 0.0 & 0.0 & 0.0  & 0.0  & 0.0  & 0.0\\
+  Interpreter/built-in (ms) & 56 & 65 & 95 & 136 & 186 & 247 \\
+\hline
+  Compiler    (ms) & 21 & 38 & 103 & 231  & 409  & 658  \\
+\hline 
+  Compiler/lin+eq (ms) & 17 & 22 & 36 & 61 & 99 & 153 \\
 \hline
 \end{tabular}
-\caption{Relative speed of state implementations. * is baseline.}\label{tbl:sieve}
+\caption{Concurrency implementation scaling with hand-coded optimisations.}\label{tbl:sieve-recovered}
 \end{table}
 
+\begin{figure}[H]
+\centering
+\includegraphics[scale=0.55]{plots/sieve_recovered.pdf}
+\caption{Line plot of data from Table~\ref{tbl:sieve-recovered}.}\label{fig:sieve-recovered-plot}
+\end{figure}
 
 %%
 %% Formalisation
