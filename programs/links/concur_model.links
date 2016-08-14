@@ -109,30 +109,40 @@ fun myself() {do Myself}
 #end
 
 # Process queue
+#snippet:queue.links
 typename Queue(a::Type) = ([a],[a]);
+#end
 
+#snippet:emptyQueue.links
 sig emptyQueue : () -> Queue(a)
 fun emptyQueue() { ([], []) }
+#end
 
+#snippet:isEmptyQueue.links
 sig isEmptyQueue : (Queue(a)) -> Bool
 fun isEmptyQueue(q) {
-    switch(q) {
-      case ([],[])   -> true
-      case otherwise -> false
-    }
+  switch(q) {
+    case ([],[])   -> true
+    case otherwise -> false
+  }
 }
+#end
 
+#snippet:enqueue.links
 sig enqueue : (Queue(a), a) -> Queue(a)
 fun enqueue((xs,ys), y) { (xs, y::ys) }
+#end
 
+#snippet:dequeue.links
 sig dequeue : (Queue(a)) ~> (Maybe(a), Queue(a))
 fun dequeue(q) {
-  switch (q) {
-    case (x :: xs, ys) -> (Just(x), (xs, ys))
+  switch (q) {  
     case ([], [])      -> (Nothing, q)
+    case (x :: xs, ys) -> (Just(x), (xs, ys))
     case ([], ys)      -> dequeue((reverse(ys), []))
   }
 }
+#end
 
 ## TODO: Implement the queue as a handler
 

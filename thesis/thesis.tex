@@ -94,7 +94,7 @@
   morekeywords={spawn, receive, typename, fun, op, var, if, this, true, false, else, case, switch, handle, handler, shallowhandler, do, sig, spawnAngel, spawnDemon, spawn},%
   sensitive=t, % 
   keywordstyle=\color{red},
-  emph={Comp,Player,Bool,Int,GTree,Cheat,Zero,Choose,Rand,Move,Winner,Take,Return,Get,Put,GameState,Alice,Bob,Fail,Nothing,Just,Maybe,Toss,Heads,Tails,Process,Buyer,Coffee,Pay,Cost,Candidate,Stop,PassingComet,CelebritySighting,Float,String,Pid,EProcess,Row,Spawn,Yield,Recv,Send,FreshName,Queue,Dictionary,Myself},
+  emph={Comp,Player,Bool,Int,GTree,Cheat,Zero,Choose,Rand,Move,Winner,Take,Return,Get,Put,GameState,Alice,Bob,Fail,Nothing,Just,Maybe,Toss,Heads,Tails,Process,Buyer,Coffee,Pay,Cost,Candidate,Stop,PassingComet,CelebritySighting,Float,String,Pid,EProcess,Row,Spawn,Yield,Recv,Send,FreshName,Queue,Dictionary,Myself,Type},
   emphstyle={\color{blue}},
   comment=[l]{\#},% 
   commentstyle={\itshape\color{darkgreen}},%
@@ -288,34 +288,48 @@
 
 %% Specify the abstract here.
 \abstract{%
-  \todo{Refine abstract} 
-%
-  Applications are comprised of \emph{effectful operations}, such as
-  raising exceptions, thread forking, writing and reading from files
-  or updating mutable state.  Often effectful operations have a
-  salient impact on the behaviour of an application. Yet in many
-  programming models such operations subsist as uncontrollable
-  side-effecting actions, that occur implicitly on ``the side'' during
-  run-time.
+  %
+  Algebraic effects and effect handlers have emerged as a modular
+  alternative to monads for handling computational
+  effects. Computational effects arise naturally in many different
+  applications.
+  
+  We present a compiler for Links that uses the Multicore OCaml
+  backend to provide a native implementation of handlers.
 
-%
-Algebraic effects combined with effect handlers provide an interface for controlling effectful operations.
+  We present a core calculus \Calc{} with row-polymorphic effects and
+  effect handlers based on a variation of A-normal form used in our
+  implementation. In addition, we give an operational semantics for
+  the calculus. Furthermore, we describe a translation from \Calc{} to
+  Lambda.
+%   \todo{Refine abstract} 
+% %
+%   Applications are comprised of \emph{effectful operations}, such as
+%   raising exceptions, thread forking, writing and reading from files
+%   or updating mutable state.  Often effectful operations have a
+%   salient impact on the behaviour of an application. Yet in many
+%   programming models such operations subsist as uncontrollable
+%   side-effecting actions, that occur implicitly on ``the side'' during
+%   run-time.
 
-% 
-  Many programs comprise effectful operations such as thread forking,
-  raising exceptions, writing and reading from files or updating some
-  mutable state.  have a salient impact on the behaviour of programs.
-  During run-time programs may perform several side-effecting
-  actions. Effects are a salient part of Programs Algebraic effects
-  combined with effect handlers provide a modular abstraction for
-  effectful programming.
-%
-Concurrency and parallelism 
-%%
-The key insight is to classify handlers according to their linearity.
-%%
+% %
+% Algebraic effects combined with effect handlers provide an interface for controlling effectful operations.
 
-We present a core calculus \Calc{} with row-polymorphic effects and affine handlers based on a variation of A-normal form used in our implementation. In addition, we give an operational semantics for the calculus, which we use to prove the soundness of the calculus.
+% % 
+%   Many programs comprise effectful operations such as thread forking,
+%   raising exceptions, writing and reading from files or updating some
+%   mutable state.  have a salient impact on the behaviour of programs.
+%   During run-time programs may perform several side-effecting
+%   actions. Effects are a salient part of Programs Algebraic effects
+%   combined with effect handlers provide a modular abstraction for
+%   effectful programming.
+% %
+% Concurrency and parallelism 
+% %%
+% The key insight is to classify handlers according to their linearity.
+% %%
+
+% We present a core calculus \Calc{} with row-polymorphic effects and affine handlers based on a variation of A-normal form used in our implementation. In addition, we give an operational semantics for the calculus, which we use to prove the soundness of the calculus.
 }
 
 %% Now we start with the actual document.
@@ -345,7 +359,24 @@ This work was supported in part by the EPSRC Centre for Doctoral Training in Per
 \end{acknowledgements}
 
 %% Next we need to have the declaration.
-\standarddeclaration
+%\standarddeclaration
+   \begin{declaration}
+     I declare that this thesis was composed by myself, that the work
+     contained herein is my own except where explicitly stated
+     otherwise in the text, and that this work has not been submitted
+     for any other degree or professional qualification except as
+     specified. Some of the material used in this thesis has been
+     published in the following papers:
+     \begin{itemize}
+     \item Daniel Hillerström and Sam Lindley, ``Liberating Effects
+       with Rows and Handlers'', to appear at Type-Driven Development
+       (TyDe), September 2016, Nara, Japan.
+     \item Daniel Hillerström, Sam Lindley, and KC Sivaramakrishnan,
+       ``Compiling Links Effect Handlers to the OCaml Backend'', to
+       appear at the ML Workshop, September 2016, Nara, Japan.
+     \end{itemize}     
+   \vspace{1in}\raggedleft({\em Daniel Hillerström})
+   \end{declaration}
 
 %% Finally, a dedication (this is optional -- uncomment the following line if
 %% you want one).
@@ -534,53 +565,130 @@ effect handlers in Links and OCaml, respectively.
 
 \section{Links primer}
 \label{sec:links-primer}
+In this section we provide a brief primer to the Links programming
+language. We will introduce Links by example, that is, we will
+implement a purely functional first-in-last-out queue in the style of
+\cite{Okasaki1998}. The example comprises most of the Links features
+that we use later in Chapter~\ref{ch:concurrency}.
 
-We omit the implementation of the process queue data
-structure. Instead we describe its interface:
-\begin{itemize}
-\item We assume a type constructor \lstinline$Queue(a)$ that
-  constructs a queue type whose elements have type \lstinline$a$.
-\item We assume a function
-  \lstinline$enqueue : (Queue(a), a) -> Queue(a)$ that given a queue
-  and an element appends the element onto a copy of the queue.
-\item Similarly, the function
-  \lstinline$dequeue : (Queue(a)) ~> (a, Queue(a))$ given a queue it
-  returns the head and a copy of the tail of the queue. An attempt to
-  dequeue the empty queue is considered an error.
-\end{itemize}
+We begin by defining a type constructor \lstinline$Queue(a)$ which
+classifies queues whose elements have type \lstinline$a$:
+%
+\snippet{queue.links}
+%
+The keyword \lstinline$typename$ is used to define type aliases. The
+notation \lstinline$a::Type$ denotes that the type variable
+\lstinline$a$ has kind \lstinline$Type$. Links has several kinds,
+however, we will only use the \lstinline$Type$ and \lstinline$Row$
+kinds. The type constructor \lstinline$Queue(a)$ constructs a pair of
+lists whose elements have type \lstinline$a$. The main idea is that
+the two lists respectively represent the front and back of the
+queue. We always insert elements into the back list, and remove
+elements from the front list.
 
-\section{Links with effect handlers}
-\label{sec:links-handlers}
+We define a useful function which creates an empty queue:
+%
+\snippet{emptyQueue.links}
+%
+The syntax of Links is loosely based on that of JavaScript. The
+\lstinline$fun$ keyword begins a function definition (like
+\lstinline$function$ in JavaScript). Just as in JavaScript functions
+are $n$-ary, but they can also be curried.  Unlike in JavaScript,
+functions are statically typed and the \lstinline$sig$ keyword begins
+a type signature. The type signature reads: \lstinline$emptyQueue$ is
+a nullary function that returns a type polymorphic queue. The empty
+queue is represented as pair of empty lists. The notation
+\lstinline$[]$ denotes the empty list.
 
-\begin{figure}
-  \centering
-  \begin{sequencediagram}
-    \newthread{A}{Program}{}
-    \newinst[5]{B}{maybeResult}{}
-    \newinst[2.5]{C}{randomResult}{}
-    \newinst[0.5]{D}{drunkToss}{}
-    \begin{call}[2]
-      {A}{\lstinline$maybeResult(randomResult(drunkToss))$}{B}{\lstinline$Just(Tails)$}
-      \begin{call}[3]
-        {B}{\lstinline$randomResult(drunkToss)()$}{C}{\lstinline$Tails$}
-        \begin{call}[2]
-          {C}{\lstinline$drunkToss()$}{D}{\lstinline$Tails$}
-          \begin{call}[2]
-            {D}{\lstinline$do Choose$}{C}{\lstinline$k(true)$}
-          \end{call}
-          \begin{call}[2]
-            {D}{\lstinline$do Choose$}{C}{\lstinline$k(false)$}
-          \end{call}
-        \end{call}
-      \end{call}
-    \end{call}
+Next we define another useful function which puts an element into a queue: 
+%
+\snippet{enqueue.links}
+%
+Here we \emph{pattern match} on the first argument of
+\lstinline$enqueue$ to bind the front list to \lstinline$xs$ and the
+back list to \lstinline$ys$. We cons the element \lstinline$y$ onto
+the back list by using the list cons operator \lstinline$::$.
 
-  \end{sequencediagram}
-  \caption{Sequence diagram.}\label{fig:sequence}
-\end{figure}
+Now that we can populate a queue we consider how to depopulate a
+queue. We will define a function \lstinline$dequeue$ that removes the
+head of a given queue. The definition of \lstinline$dequeue$ is a bit
+more involved than the definition of \lstinline$enqueue$, because we
+have consider the special case when the queue is empty. To deal with
+this case we use a standard functional programming pattern: represent
+the possibility of failure as a \lstinline$Maybe$-type. We can define
+the type as a \emph{variant}:
+%
+\begin{lstlisting}
+typename Maybe(a) = [|Nothing
+                     |Just:a
+                     |];
+\end{lstlisting}
+%
+The syntax \lstinline$[|...|]$ denotes a variant type in Links in
+which components of the variant type are delimited by the pipe symbol
+(\lstinline$|$). The \lstinline$Nothing$ and \lstinline$Just$ are data
+constructors. The idea is to tag a dequeued element by
+\lstinline$Just$ to inform the caller that an element was successfully
+removed. In case there are no elements in the queue we simply return
+\lstinline$Nothing$. The function \lstinline$dequeue$ is implemented
+as follows:
+%
+\snippet{dequeue.links}
+%
+The \lstinline$switch(q){...}$ construct pattern matches on the shape
+of the queue \lstinline$q$ through a list of clauses. The first clause
+considers the special case when the queue is empty. In this case we
+simply return \lstinline$Nothing$ and the unmodified queue. The second
+clause considers the case when the front list is non-empty. In this
+case remove the head of the front list and return it inside a
+\lstinline$Just$ along with the modified queue. The final clause
+considers the case when the front list is empty but the back list is
+(possibly) non-empty. In this case we swap the front and back list. In
+addition, the back list gets reversed to preserve the
+first-in-last-out semantics of the queue.
 
+\paragraph{Effect system} 
+The squiggly function arrow (\lstinline$~>$) is syntactic sugar for
+denoting that the computation has the \emph{wild} effect. The wild
+effect captures all intrinsic effects such as I/O, randomness,
+divergence, etc. To some extent it is analogous to the \emph{IO monad}
+of Haskell, though the wild effect is much stricter as without it
+general recursion is disallowed.
+\todo{Describe the effect system}
 
-\subsection{Affine and multi-shot effect handlers}
+\paragraph{Type inference} Often in Links we may omit type signatures
+altogether as Links has type inference. If we write
+\lstinline$fun just(x) { Just(x) }$ then we might expect the inferred
+type to be \lstinline$just : (a) -> Maybe(a)$. However, Links will
+infer the type \lstinline$just : (a) -> [|Just:a|e|]$, where
+\lstinline$e$ is a row variable that can be instantiated to contain
+additional labels. The reason for this behaviour is that Links employs
+\emph{structural typing} as opposed to \emph{nominal typing}. In the
+latter typing discipline any two terms have the same type if and only
+if they are constructed by the same constructor. By contrast, in the
+structural typing discipline any two terms have \emph{compatible}
+types if they have the same structure. For example, we can unify the
+given type and the inferred type above
+\[
+\text{\lstinline$Maybe(a)$} \backsim \text{\lstinline$[|Just:a|e|]$}
+\]
+by instantiating the row variable \lstinline$e$ to
+\lstinline$Nothing$.
+% We omit the implementation of the process queue data
+% structure. Instead we describe its interface:
+% \begin{itemize}
+% \item We assume a type constructor \lstinline$Queue(a)$ that
+%   constructs a queue type whose elements have type \lstinline$a$.
+% \item We assume a function
+%   \lstinline$enqueue : (Queue(a), a) -> Queue(a)$ that given a queue
+%   and an element appends the element onto a copy of the queue.
+% \item Similarly, the function
+%   \lstinline$dequeue : (Queue(a)) ~> (a, Queue(a))$ given a queue it
+%   returns the head and a copy of the tail of the queue. An attempt to
+%   dequeue the empty queue is considered an error.
+% \end{itemize}
+
+\section{Affine and multi-shot effect handlers}
 \label{sec:links-affine-multi}
 
 This section provides a short primer to effect handlers in Links. The
@@ -662,6 +770,32 @@ The type system prevents invocation of the continuation in the
 \lstinline$Fail$-clause, because the type \lstinline$Zero$ has zero
 inhabitants. Linear and exception handlers together constitute
 \emph{affine handlers}.
+
+\begin{figure}
+  \centering
+\begin{sequencediagram}
+    \newthread{A}{Program}{}
+    \newinst[5]{B}{maybeResult}{}
+    \newinst[2.5]{C}{randomResult}{}
+    \newinst[0.5]{D}{drunkToss}{}
+    \begin{call}[2]
+      {A}{\lstinline$maybeResult(randomResult(drunkToss))$}{B}{\lstinline$Just(Tails)$}
+      \begin{call}[3]
+        {B}{\lstinline$randomResult(drunkToss)()$}{C}{\lstinline$Tails$}
+        \begin{call}[2]
+          {C}{\lstinline$drunkToss()$}{D}{\lstinline$Tails$}
+          \begin{call}[2]
+            {D}{\lstinline$do Choose$}{C}{\lstinline$k(true)$}
+          \end{call}
+          \begin{call}[2]
+            {D}{\lstinline$do Choose$}{C}{\lstinline$k(false)$}
+          \end{call}
+        \end{call}
+      \end{call}
+    \end{call}
+  \end{sequencediagram}
+  \caption{Sequence diagram.}\label{fig:sequence}
+\end{figure}
 
 \section{The built-in concurrency model of Links}
 \label{sec:links-model}
@@ -1034,19 +1168,29 @@ of the library implementations of effect handlers include
 implementations based on free monads~\citep{Kammar2013, Kiselyov2013,
   Kiselyov2015, Brady2013, Wu2014}.
 
-\citet{Kammar2013} provide an implementation of effect handlers using
-a continuation monad, which completely avoids materialising any data
-constructors. \citet{Wu2015} explain how it works, by taking advantage
-of Haskell's fusion optimisations. This approach does appear to depend
-rather critically on the handlers being deep rather than shallow, and
-in Haskell it relies on them being type classes, and hence not really
-first class.
+% \citet{Kammar2013} provide an implementation of effect handlers using
+% a continuation monad, which completely avoids materialising any data
+% constructors. \citet{Wu2015} explain how it works, by taking advantage
+% of Haskell's fusion optimisations. This approach does appear to depend
+% rather critically on the handlers being deep rather than shallow, and
+% in Haskell it relies on them being type classes, and hence not really
+% first class.
+
+\citet{Kammar2013} take advantage of Haskell's aggressive
+fusion optimisations for an efficient Haskell library for handlers, as
+explained in detail by \citet{Wu2015}. \citet{Kiselyov2015} also
+optimise a different Haskell library for handlers, taking advantage of
+prior work on optimising monadic reflection~\citep{Ploeg2014}.
 
 The Idris effects library by \cite{Brady2013} takes advantage of
 dependent types to provide effect handlers for a form of effects
 corresponding to parameterised monads~\citep{Atkey09}.
 %
-In the effects library, effects are represented as lists of types.
+The implementation in Idris does not consider the performance effect
+handlers.
+
+Our work differs from these systems in that we compile effect handlers
+directly, rather than via library.
 
 We are aware of three languages that are specifically designed with
 effect handlers in mind.
