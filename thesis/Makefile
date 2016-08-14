@@ -26,7 +26,7 @@ $(BIBLIO).bbl: $(PAPER).aux $(BIBLIO).bib
 	$(TEXC) $(CFLAGS) $(PAPER)
 	$(BIBC) $(PAPER)
 
-$(PAPER).pdf: program_outputs snippets $(PAPER).aux $(BIBLIO).bbl 
+$(PAPER).pdf: snippets $(PAPER).aux $(BIBLIO).bbl 
 	$(TEXC) $(CFLAGS) $(PAPER)
 	$(TEXC) $(CFLAGS) $(PAPER)
 

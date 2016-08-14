@@ -487,31 +487,50 @@ between multiple agents. Conceptually,
 \section{Aims and objectives}
 Our main contributions are
 \begin{itemize}
-  \item A compiler for Links with effect handlers, that supports the
-    full abstraction provided by deep handlers making novel use of the
-    existing linear type system of Links to guide the code generator for
-    handlers.
-  \item A reconstruction of the message-passing concurrency model of
-    Links in terms of effect handlers. 
-  \item Novel applications of effect handlers in parallelism.
+\item A compiler for Links with effect handlers, that supports the
+  full abstraction provided by deep handlers.
+\item A reconstruction of the message-passing concurrency model of
+  Links using effect handlers.
+\item A formalisation of the implementation of effect handlers in
+  Links.
 \end{itemize}
 \section{Thesis outline}
+
+In Chapter~\ref{ch:background} we give a brief introduction to
+programming Links, effect handlers, and the concurrency model of
+Links. We also discuss related work.
+
+We discuss the compiler infrastructure and the compilation strategy in
+Chapter~\ref{ch:compiling} as well as our formalisation of the Links
+effect handlers implementation. The chapter describes the translation
+from the Links intermediate representation to the intermediate
+representation of OCaml.
+
+In Chapter~\ref{ch:concurrency} we demonstrate a reconstruction of the
+concurrency model of Links using effect handlers.
+
+We perform experiments with our compiler in order to measure its
+performance against the Links interpreter and the OCaml compiler in
+Chapter~\ref{ch:experiments}. We analyse and discuss the results of
+the experiments. In addition, we consider how one may improve the
+performance of our compiler.
+
+Finally in Chapter~\ref{ch:conclusions} we conclude and discuss future
+work.
+
 \section{Typographical conventions}
 
 %%
 %% Background
 %%
 
-\chapter{Links, OCaml, and effect handlers}
+\chapter{Background and related work}
 \label{ch:background}
 This chapter introduces algebraic effects and their
 handlers. Specifically, in Section~\ref{sec:theory-handlers}
 introduces the theory, while Sections~\ref{sec:links-handlers} and
 \ref{sec:ocaml-handlers} give an introduction to programming with
 effect handlers in Links and OCaml, respectively.
-
-\section{A theory of algebraic effects and handlers}
-\label{sec:theory-handlers}
 
 \section{Links primer}
 \label{sec:links-primer}
@@ -612,14 +631,11 @@ polymorphic in its presence.  The handler comprises two clauses:
     computation.
 \end{enumerate}
 We say that \lstinline$randomResult$ is a \emph{linear handler},
-because it invokes every continuation exactly once. One possible
-output of \lstinline$randomResult(toss)$ is
-%
-\lstinputlisting{outputs/randomResult.output}
-%
-Essentially, the handler interprets the computation \lstinline$toss$
-as modelling a \emph{fair} coin, that is the outcomes ought to be
-uniformly distributed.
+because it invokes every continuation exactly once.  Essentially, the
+handler interprets the computation \lstinline$toss$ as modelling a
+\emph{fair} coin, that is the composition
+\lstinline$randomResult(toss)$ produces a computation that outputs
+\lstinline$Heads$ and \lstinline$Tails$ uniformly.
 
 Alternatively, we may define a handler for \lstinline$Choose$ that
 invokes its continuation twice to enumerate every possible outcome:
@@ -630,10 +646,9 @@ Observe that the return value is lifted into a singleton list. The
 \lstinline$Choose$-clause concatenates the outcomes obtained by
 interpreting the operation as \lstinline$true$ and \lstinline$false$,
 respectively. We say that \lstinline$allResults$ is a \emph{multi-shot
-  handler}. The result obtained by \lstinline$allResults(toss)$ is
-%
-\lstinputlisting{outputs/allResults.output}
-%
+  handler}. The composition \lstinline$allResults(toss)$ produces a
+computation that yields a list of the possible outcomes,
+i.e. \lstinline$[Heads,Tails]$.
 
 Finally, we have handlers that do not invoke continuations. These are
 familiar \emph{exception handlers}. As an example consider the
@@ -894,13 +909,13 @@ bound on sequence being generated:
 %
 \begin{lstlisting}
 fun generator(n) {
-  var first = spawnAngel { sieve() };
+  var first = spawn { sieve() };
   foreach([2..n], fun(p) { first ! Candidate(p) });
   first ! Stop
 }
 \end{lstlisting}
 %
-The function spawns the first sieve as an angel process. The
+The function spawns the first sieve as a child process. The
 \lstinline$foreach$ function has type
 \lstinline$([a], (a) ~e~> ()) ~e~> ()$, that is it takes a list and an
 action as arguments. The action is applied to each element in the
@@ -929,7 +944,7 @@ fun sieve() {
           var neighbour =
             switch (neighbour) {
               case Just(pid) -> pid
-              case Nothing   -> spawnAngel { sieve() }
+              case Nothing   -> spawn { sieve() }
             };
           neighbour ! Candidate(number);
           loop(Just(neighbour))
@@ -991,25 +1006,25 @@ links> generator(10);
 () : ()
 \end{lstlisting}
 %
-As expected it the primes between $2$ and $10$ get printed.
+As expected the primes between $2$ and $10$ get printed.
 
 
-\section{OCaml with handlers}
-\label{sec:ocaml-handlers}
+% \section{OCaml with handlers}
+% \label{sec:ocaml-handlers}
 
-\subsection{Nominal typing}
+% \subsection{Nominal typing}
 
 %%
 %% Related work
 %%
-\chapter{Related work}
+\section{Related work}
 \label{ch:related-work}
 
 Prior work focuses mainly on the design and expressiveness of handlers
 rather than performance. Nevertheless, some recent papers do address
 performance.
 
-\section{Implementations of effect handlers}
+\subsection{Implementations of effect handlers}
 Any signature of abstract operations can be understood as a free
 algebra and represented as a functor. In particular, every such
 functor gives rise to a free monad. Thus, free monads provide a
@@ -1087,7 +1102,7 @@ invoked at most once. This design admits a particularly efficient
 implementation, as continuations need never be copied, so they can
 simply be stored on the stack.
 
-\section{Parallel programming models}
+\subsection{Parallel programming models}
 \todo{\cite{Marlow2013}}
 
 %%
@@ -3115,14 +3130,15 @@ Number of process & 27 & 47 & 80 & 111 & 140 & 169\\
 \hline
   Interpreter/built-in (ms) & 56 & 65 & 95 & 136 & 186 & 247\\
 \hline
-  Compiler    (ms) & 21 & 38 & 103 & 231  & 409  & 658\\
+  Compiler/handlers    (ms) & 21 & 38 & 103 & 231  & 409  & 658\\
 \hline
 \end{tabular}
 \caption{Concurrency implementation scaling (lower is better).}\label{tbl:sieve}
 \end{table}
 The variable $N$ is the upper bound given to the generator process,
 the second row lists the number of concurrent processes that were
-spawned. Figure~\ref{fig:sieve-plot} displays a line plot of the
+spawned. The execution times are given in
+milliseconds. Figure~\ref{fig:sieve-plot} displays a line plot of the
 data. As we might expect the interpreter with the handler
 implementation performs poorly compared to the built-in and the
 compiler
@@ -3173,9 +3189,9 @@ Number of process & 27 & 47 & 80 & 111 & 140 & 169 \\
 \hline
   Interpreter/built-in (ms) & 56 & 65 & 95 & 136 & 186 & 247 \\
 \hline
-  Compiler    (ms) & 21 & 38 & 103 & 231  & 409  & 658  \\
+  Compiler/handlers (ms) & 21 & 38 & 103 & 231  & 409  & 658  \\
 \hline 
-  Compiler/lin+eq (ms) & 17 & 22 & 36 & 61 & 99 & 153 \\
+  Compiler/handlers/lin+eq (ms) & 17 & 22 & 36 & 61 & 99 & 153 \\
 \hline
 \end{tabular}
 \caption{Concurrency implementation scaling with hand-coded optimisations.}\label{tbl:sieve-recovered}
@@ -3184,7 +3200,8 @@ Number of process & 27 & 47 & 80 & 111 & 140 & 169 \\
 \begin{figure}[H]
 \centering
 \includegraphics[scale=0.55]{plots/sieve_recovered.pdf}
-\caption{Line plot of data from Table~\ref{tbl:sieve-recovered}.}\label{fig:sieve-recovered-plot}
+\caption{Line plot of data from Table~\ref{tbl:sieve-recovered} (lower
+  is better).}\label{fig:sieve-recovered-plot}
 \end{figure}
 
 %%
@@ -3850,14 +3867,40 @@ Number of process & 27 & 47 & 80 & 111 & 140 & 169 \\
 \section{Critical evaluation}
 \label{sec:criticaleval}
 
-\section{Compiling effect handlers}
-\label{sec:conclude-compiling}
+% \section{Compiling effect handlers}
+% \label{sec:conclude-compiling}
 
-\section{Effect handler enabled concurrency}
-\label{sec:conclude-concurrency}
+% \section{Effect handler enabled concurrency}
+% \label{sec:conclude-concurrency}
 
 \section{Future work}
 \label{sec:futurework}
+
+We can view Links as an experimental frontend to OCaml with a more
+expressive type system. Thus we can use Links to try to answer
+research questions that are either hard or impossible to answer in
+OCaml presently.
+
+\subsection{Type and effect directed optimisations}
+\paragraph{Linearisation} \dots
+
+\paragraph{Handler resolution} \dots
+
+\subsection{Improve concurrency implementation}
+Heterogeneous mailboxes, abstract types to make it safe. Simulate
+preemptive.
+
+\subsection{Applications of multi-shot handlers in parallelism}
+Transactions. Distribution.
+
+\subsection{Shallow handlers}
+The implementation supports only deep handlers. For instance, with
+shallow handlers it is easier to express parallel pipes
+\citep{Kammar2013}.
+
+\subsection{Type signatures}
+The type signature for the scheduler \lstinline$roundrobin$ is
+enormous.
 
 %%
 %% Appendices
