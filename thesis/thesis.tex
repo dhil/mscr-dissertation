@@ -4042,6 +4042,23 @@ Number of process & 27 & 47 & 80 & 111 & 140 & 169 \\
 \chapter{Conclusions and future work}
 \label{ch:conclusions}
 
+We have presented a compiler for the functional programming Links with
+effect handlers. The compiler interfaces with the OCaml Multicore
+backend to generate native code. Specifically, we translate the
+intermediate representation of Links to the intermediate
+representation of OCaml known as Lambda. The Lambda intermediate
+language contains primitives to support compilation of linear effect
+handlers. Our translation demonstrates how to encode the multi-shot
+handlers of Links in Lambda using a cloning primitive to copy
+continuations prior to invocation.
+
+%
+
+The compiler does not provide any built-in support for the concurrency
+model of Links. We demonstrated how to implement the concurrency model
+using effect handlers. The implementation uses cooperative routines to
+provide concurrency.
+
 \section{Critical evaluation}
 \label{sec:criticaleval}
 
