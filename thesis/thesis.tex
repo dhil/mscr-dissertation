@@ -2869,16 +2869,50 @@ $ ./concur_model
 The resulting program yields the same output as the original program
 we described in Section~\ref{sec:sieve-example}.
 
-\section{Limitations of the implementation}
+\section{Shortcomings and limitations}
 \label{sec:limitations}
 
-\todo{Syntactical limitations}
-\todo{Computations must be thunks}
-\todo{Abstract process identifiers}
+Our implementation have some short comings and natural limitations. 
+%
+In our encoding we codify syntactic constructs like
+\lstinline$spawn { ... }$ and \lstinline$!$ as regular functions. An
+obvious implication of this is that our implementation is not
+backwards compatible. This is not a major issue for us since it was
+never our goal to stay backwards compatible. Nevertheless it is worth
+noting that using adapting this approach on an existing codebase is
+not free.
 
-\section{Extensions}
-\todo{Synchronous send and receive}
-\todo{MPI example}
+A further limitation of our implementation is that every concurrent
+computation must be given as a thunk to prevent premature evaluation
+of the concurrent computation, because \lstinline$spawn$ has been
+replaced by the function \lstinline$pspawn$. In the built-in
+implementation one can spawn an arbitrary piece of Links code because
+the interpreter has special support for \lstinline$spawn$ primitive.
+
+A shortcoming of our implementation is that process handles are simple
+aliases for integers thereby rendering the implementation unsafe as it
+becomes possible to manufacture process handles for non-existing
+processes. But this issue is orthogonal to the implementation of the
+concurrency model. The correct solution to this issue is to make
+\lstinline$EProcess$ an abstract type. However without a module system
+á la the ML module system it cumbersome to encode abstract types. Thus
+encoding \lstinline$EProcess$ as an abstract type in Links would
+obscure rather than clarify.
+
+\todo{Heterogeneous mailboxes}
+
+Perhaps the biggest advantage and disadvantage of our implementation
+is that it does not provide preemptive concurrency. On one hand it not
+being preemptive makes it considerably easier to reason about
+concurrent programs because in most cases we can predict the
+interleaving of processes. On the other hand it places a burden on the
+programmer to control the interleaving of processes. We can relieve
+the programmer from this burden to some extend by inserting yields
+into standard library functions. In addition, we can have the
+compiler silently insert yields into user functions. In order to do so
+successfully requires great care as we have to make sure that any
+yield the compiler inserts appears in a handled context.
+
 % \section{Pipeline parallelism}
 % \label{sec:prime}
 
