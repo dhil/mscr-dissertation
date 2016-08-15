@@ -374,8 +374,16 @@ This work was supported in part by the EPSRC Centre for Doctoral Training in Per
      \item Daniel Hillerström, Sam Lindley, and KC Sivaramakrishnan,
        ``Compiling Links Effect Handlers to the OCaml Backend'', to
        appear at the ML Workshop, September 2016, Nara, Japan.
-     \end{itemize}     
-   \vspace{1in}\raggedleft({\em Daniel Hillerström})
+     \end{itemize}
+     In addition, some of the material used in this thesis has
+     appeared in the following research competition:
+     \begin{itemize}
+     \item Daniel Hillerström, ``First-Class Message-Passing
+       Concurrency with Handlers'', to be presented at Student
+       Research Competition, International Conference on Functional
+       Programming (ICFP), September 2016, Nara, Japan.
+     \end{itemize}
+     \vspace{1in}\raggedleft({\em Daniel Hillerström})
    \end{declaration}
 
 %% Finally, a dedication (this is optional -- uncomment the following line if
@@ -881,6 +889,33 @@ diagram for evaluation of this composition.
     \lstinline$maybeResult(randomResult(drunkToss))$.}\label{fig:sequence}
 \end{figure}
 
+
+\section{State and parameterised handlers}
+\label{sec:parameterised-handlers}
+
+Most programs contain some sort of state. It is possible to describe
+state as an effect with operations for reading (\lstinline$Get : s$)
+and updating (\lstinline$Put : s {}-> ()$) a state of type
+\lstinline$s$. We implement them as follows:
+%
+\lstinputlisting{snippets/getput.links}
+%
+We use a parameterised handler to give an interpretation of state.  In
+addition to supplying a computation to a parameterised handler, we
+also supply one or more parameters. In this instance we pass the state
+as an additional parameter \lstinline$s$
+%
+\lstinputlisting{snippets/evalState.links}
+%
+The main difference compared to an unparameterised handler is that the
+continuation \lstinline$k$ is a curried function that takes a return
+value followed by the handler parameters. In the \lstinline$Get$
+clause, we return the state and also pass it unmodified to any
+subsequent invocations of the handler. Similarly, in the
+\lstinline$Put$ clause, we return unit and update the state.
+
+\todo{insert example}
+
 \section{The built-in concurrency model of Links}
 \label{sec:links-model}
 
@@ -892,7 +927,8 @@ must communicate with other processes through message passing. Each
 process is equipped with its own mailbox. Figure~\ref{fig:links-model}
 sketches an abstract representation of the interaction between two
 processes.
-\begin{figure}
+
+\begin{figure}[H]
 \centering
 \begin{tikzpicture}[node distance=5pt,every node/.style={draw, outer sep=0pt}]
 \tikzset{sarrow/.style={-latex,thick,dotted}}
@@ -1331,6 +1367,16 @@ simply be stored on the stack.
 \chapter{Compiling effect handlers}
 \label{ch:compiling}
 
+In this chapter we describe our compiler for Links. In addition, we
+give a formalisation of the intermediate language used within the
+Links compiler. Furthermore, we describe the translation of the
+intermediate representation of Links into the intermediate
+representation of OCaml. The material in
+Section~\ref{sec:compilation-strategy} and
+Section~\ref{sec:representation} is based on \cite{Hillerstrom2016b},
+while the contents of Section~\ref{sec:lambe-eff-row} are based on
+\cite{Hillerstrom2016a}.
+
 \section{Compilation strategy}
 \label{sec:compilation-strategy}
 
@@ -1462,25 +1508,28 @@ height=140pt,fit=(FrontendLabel)(Parser)(Typechecker)] (Frontend) {};
 \caption{OCaml backend \citep{Hillerstrom2016b}.}\label{fig:infra-diagram}
 \end{figure}
 
-We reuse most of the previous Links infrastructure. We extend the
-compiler infrastructure with a native backend as shown in
-Figure~\ref{fig:compiler-pipeline}. The Links frontend is type-checked
-and translated into a small, typed intermediate language in
-\emph{A-normal form} (ANF) \citep{Flanagan1993}. The Links interpreter
-implements a generalised CEK machine \citep{Hillerstrom2016a}, which
-interprets ANF code.
+We reuse most of the previous Links infrastructure. Though, we extend
+the compiler infrastructure with a native backend as shown in
+Figure~\ref{fig:compiler-pipeline}. The Links compiler pipeline
+follows a rather conventional compiler pipeline design. The frontend
+comprises a parser, an early elaboration pass that happens before type
+checking. The backend contains a translation pass of the Links
+frontend into a small, typed intermediate language in \emph{A-normal
+  form} (ANF) \citep{Flanagan1993}. This pass is assisted by a pattern
+matching compiler. The Links interpreter implements a generalised CEK
+machine \citep{Hillerstrom2016a}, which interprets ANF code directly.
 
 %
 
-Our compilation strategy is to translate the Links ANF language into the OCaml
-\emph{Lambda} language, which is a small, untyped lambda calculus. The OCaml
-backend exposes a hierarchy of intermediate representations (IRs), where the
-top representation is known as Lambda. As shown in the Figure
-\ref{fig:infra-diagram}, the Lambda IR offers two different compilation
-options: byte code and native code. Therefore by targeting Lambda rather than
-a lower level IR, we achieve maximum flexibility as a translation into byte
-code, in principle, enables us to take advantage of custom backends such as
-\texttt{js\_of\_ocaml} to produce efficient JavaScript.
+For the native backend our compilation strategy is to translate the
+Links ANF language into the OCaml \emph{Lambda} language, which is a
+small, untyped lambda calculus. The OCaml backend exposes a hierarchy
+of intermediate representations (IRs), where the top representation is
+known as Lambda. As shown in the Figure \ref{fig:infra-diagram}, the
+Lambda IR offers two different compilation options: byte code and
+native code. Therefore by targeting Lambda rather than a lower level
+IR, we achieve maximum flexibility as a translation into byte code, in
+principle, enables us to take advantage of custom backends.
 
 %
 
@@ -1868,7 +1917,7 @@ handled uniformly by the same handler.
     {\Delta \vdash C \Rightarrow D : \Handler}
 \end{mathpar}
 
-\caption{Kinding rules}
+\caption{Kinding rules \citep{Hillerstrom2016a}.}
 \label{fig:kinding}
 \end{figure}
 
@@ -1986,7 +2035,7 @@ Handlers
     {{\Delta;\Gamma} \vdash {H : C \Rightarrow D}}
 \end{mathpar}
 
-\caption{Typing Rules}
+\caption{Typing rules \citep{Hillerstrom2016a}.}
 \label{fig:typing}
 \end{figure*}
 
@@ -1994,32 +2043,71 @@ Handlers
 \label{sec:small-step}
 
 \begin{figure*}
+\begin{mathpar}
+\inferrule*[Lab=\semlab{App}]
+  {}
+  {  (\lambda x^A . \, M) V \reducesto M[V/x] }
 
-\begin{reductions}
-\semlab{App}   & (\lambda x^A . \, M) V &\reducesto& M[V/x] \\
-\semlab{TyApp} & (\Lambda \alpha^K . \, M) A &\reducesto& M[A/\alpha] \\
-\semlab{Split} & \Let \; \Record{\ell = x;y} = \Record{\ell = V;W} \; \In \; N &\reducesto& N[V/x,W/y] \\
-\semlab{Case$_1$} &
-  \Case \; (\ell\, V)^R \{ \ell \; x \mapsto M; y \mapsto N\} &\reducesto& M[V/x] \\
-\semlab{Case$_2$} &
-  \Case \; (\ell\, V)^R \{ \ell' \; x \mapsto M; y \mapsto N\} &\reducesto& N[(\ell\, V)^R/y], \hfill\quad \text{if } \ell \neq \ell' \\
-\semlab{Let} &
-  \Let \; x \revto \Return \; V \; \In \; N &\reducesto& N[V/x] \\
-\semlab{Handle-Ret} &
-  \Handle \; (\Return \; V) \; \With \; H &\reducesto& N[V/x], \hfill\quad \text{where } \{ \Return \; x \mapsto N \} \in H \\
-\semlab{Handle-Op} &
-  \Handle \; \mathcal{E}[\Do \; \ell \; V] \; \With \; H
-    &\reducesto& N[V/x, \lambda y . \, \Handle \; \mathcal{E}[\Return \; y] \; \With \; H/k],\qquad \\
-  \multicolumn{4}{@{}r@{}}
-      {\text{where } \ell \notin BL(\mathcal{E}) \text{ and } \{ \ell \; x \; k \mapsto M \} \in H} \\
-\semlab{Lift} &
-  M &\reducesto& N, \hfill \text{if }\mathcal{E}[M] \reducesto \mathcal{E}[N] \\
-\end{reductions}
+\inferrule*[Lab=\semlab{TyApp}]
+  {}
+  { (\Lambda \alpha^K . \, M) A \reducesto M[A/\alpha] }
+
+\inferrule*[Lab=\semlab{Split}]
+  {}
+  { \Let \; \Record{\ell = x;y} = \Record{\ell = V;W} \; \In \; N \reducesto N[V/x,W/y] }
+
+\inferrule*[Lab=\semlab{Case$_1$}]
+  {}
+  { \Case \; (\ell\, V)^R \{ \ell \; x \mapsto M; y \mapsto N\} \reducesto M[V/x] }
+
+\inferrule*[Lab=\semlab{Case$_2$}]
+  {}
+  { \Case \; (\ell\, V)^R \{ \ell' \; x \mapsto M; y \mapsto N\} \reducesto N[(\ell\, V)^R/y], \hfill\quad \text{if } \ell \neq \ell' }
+
+\inferrule*[Lab=\semlab{Let}]
+  {}
+  { \Let \; x \revto \Return \; V \; \In \; N \reducesto N[V/x] }
+
+\inferrule*[Lab=\semlab{Lift}]
+  {}
+  { M \reducesto N, \hfill \text{if }\mathcal{E}[M] \reducesto \mathcal{E}[N] }
+
+\inferrule*[Lab=\semlab{Handle-Ret}]
+  {}
+  { \Handle \; (\Return \; V) \; \With \; H \reducesto N[V/x], \hfill\quad \text{where } \{ \Return \; x \mapsto N \} \in H }
+
+\inferrule*[Lab=\semlab{Handle-Op}]
+  {}
+  { \Handle \; \mathcal{E}[\Do \; \ell \; V] \; \With \; H
+     \reducesto N[V/x, \lambda y . \, \Handle \; \mathcal{E}[\Return \; y] \; \With \; H/k],\\
+     \text{where } \ell \notin BL(\mathcal{E}) \text{ and } \{ \ell \; x \; k \mapsto M \} \in H}
+
+\end{mathpar}
+% \begin{reductions}
+% \semlab{App}   & (\lambda x^A . \, M) V &\reducesto& M[V/x] \\
+% \semlab{TyApp} & (\Lambda \alpha^K . \, M) A &\reducesto& M[A/\alpha] \\
+% \semlab{Split} & \Let \; \Record{\ell = x;y} = \Record{\ell = V;W} \; \In \; N &\reducesto& N[V/x,W/y] \\
+% \semlab{Case$_1$} &
+%   \Case \; (\ell\, V)^R \{ \ell \; x \mapsto M; y \mapsto N\} &\reducesto& M[V/x] \\
+% \semlab{Case$_2$} &
+%   \Case \; (\ell\, V)^R \{ \ell' \; x \mapsto M; y \mapsto N\} &\reducesto& N[(\ell\, V)^R/y], \hfill\quad \text{if } \ell \neq \ell' \\
+% \semlab{Let} &
+%   \Let \; x \revto \Return \; V \; \In \; N &\reducesto& N[V/x] \\
+% \semlab{Handle-Ret} &
+%   \Handle \; (\Return \; V) \; \With \; H &\reducesto& N[V/x], \hfill\quad \text{where } \{ \Return \; x \mapsto N \} \in H \\
+% \semlab{Handle-Op} &
+%   \Handle \; \mathcal{E}[\Do \; \ell \; V] \; \With \; H
+%     &\reducesto& N[V/x, \lambda y . \, \Handle \; \mathcal{E}[\Return \; y] \; \With \; H/k],\qquad \\
+%   \multicolumn{4}{@{}r@{}}
+%       {\text{where } \ell \notin BL(\mathcal{E}) \text{ and } \{ \ell \; x \; k \mapsto M \} \in H} \\
+% \semlab{Lift} &
+%   M &\reducesto& N, \hfill \text{if }\mathcal{E}[M] \reducesto \mathcal{E}[N] \\
+% \end{reductions}
 \begin{syntax}
 \slab{Evaluation contexts} &  \mathcal{E} &::=& [\,] \mid \Let \; x \revto \mathcal{E} \; \In \; N \mid \Handle \; \mathcal{E} \; \With \; H
 \end{syntax}
 
-\caption{Small-Step Operational Semantics}
+\caption{Small-step operational semantics \citep{Hillerstrom2016a}.}
 \label{fig:small-step}
 \end{figure*}
 We give a small-step operational semantics for \Calc. Figure
@@ -2123,13 +2211,15 @@ By induction on the given typing derivation.
                      &     &\mid& P\\
                      &     &    &\\
 \slab{Primitives}    &P    &::= & \Eq(L,J)\\
-                     &     &\mid& \Makeblock_i\\
-                     &     &\mid& \Field_i\\
-                     &     &\mid& \Perform \; L \\
+                     &     &\mid& [X]\\
+                     &     &\mid& \Field_i\; L\\
+                     &     &\mid& \Perform \; (l\,J) \\
                      &     &\mid& \Resume(S,L) \\
                      &     &\mid& \Clone \; L\\
                      &     &\mid& \Delegate(L,J)\\
+\slab{Box}           &     &::= & L;X \mid \cdot\\
 \slab{Stacks}        &S    &::= & \Alloc (L,I,J)\\
+\slab{Labels}        &l    &\in & \mathbb{L}\\
 \slab{Integers}      &i    &\in & \mathbb{Z} 
 \end{syntax}
 \caption{Term syntax for Lambda.}\label{fig:lambda-terms}
@@ -2169,7 +2259,7 @@ crucial to the implementation of handlers.
 The $\Perform(L)$ primitive invokes an abstract operation. The
 behaviour of $\Perform$ is undefined when $L$ does not evaluate to a
 name of an operation.
-
+%
 The $\Resume(S,L)$ primitive evaluates the expression $L$ with a
 handler $S$. If an abstract operation is performed in $L$ then the
 run-time attempts to look up a suitable operation clause in the
@@ -2177,11 +2267,11 @@ handler $S$. To forward an unhandled operation we use the
 $\Delegate(L,J)$ primitive. It forwards an abstract operation name $L$
 along with the continuation, $J$, of the abstract operation to another
 enclosing $\Resume$-block.
-
+%
 The $\Clone(L)$ primitive makes a copy of an expression $L$. This
 primitive is paramount to the successful encoding of multi-shot
 handlers of Links as Lambda supports only linear handlers.
-
+%
 A handler in Lambda is represented as a stack. The $\Alloc(L,I,J)$
 primitive allocates a new handler on the heap with return clause $L$,
 an exception clause $I$, and an operation clause $J$.
@@ -2200,7 +2290,7 @@ an exception clause $I$, and an operation clause $J$.
 \newcommand{\mtrans}[1]{\trans{#1}_\mathcal{M}}
 \newcommand{\vtrans}[1]{\trans{#1}_\mathcal{V}}
 \newcommand{\htrans}[1]{\trans{#1}_\mathcal{H}}
-\newcommand{\hptrans}[1]{\trans{#1}_{\mathcal{H}'}}
+\newcommand{\hptrans}[1]{\trans{#1}_{\mathcal{H}^{op}}}
 
 \begin{figure}
 Handle translation
@@ -2214,12 +2304,14 @@ Handle translation
 Handler stack allocation
 \begin{mathpar}
 \begin{eqs}
-  \htrans{\{\Return\; x \mapsto M\} \uplus H} &=& \Alloc
+  \htrans{\{\Return\; x \mapsto M\} \uplus H} &=& \Alloc \left(
  \begin{eqs}
-   &&(\Fun \; \vtrans{x} \mapsto \mtrans{M}\\
-   &&, \Error\\
-   &&, \Fun \;y \mapsto \Fun\; k \mapsto \hptrans{H,y,k})
+   &&\Fun \; \vtrans{x} \mapsto \mtrans{M},\\
+   &&\Error,\\
+   &&\Fun \;b \mapsto \Let\; y \revto \Field_1\; b \; \In \\
+   &&\Let\; k \revto \Field_2\; b \; \In \; \hptrans{H,y,k}
  \end{eqs}
+\right)
 \end{eqs}
 \end{mathpar}
 
@@ -2227,10 +2319,9 @@ Operation clause translation
 \begin{mathpar}
 \begin{eqs}
 %  \htrans{H} &=& \Fun \; x \mapsto \Fun \; k \mapsto \hptrans{H}^{x,k}\\
-  \hptrans{\{\ell \, x \, k \mapsto M\} \uplus H, z, k'} &=&  \If \; \Eq(\mathcal{N}(\ell), \Field_1 \; z) \; \Then \\
+  \hptrans{\{\ell \, x \, k \mapsto M\} \uplus H, (l\, x'), k'} &=&  \If \; \Eq(\mathcal{N}(\ell), l) \; \Then \\
                                                        & & 
 \begin{eqs}
- & &\Let \; x' \revto \Field_2 \; z \; \In \\
  & &\Let \; k'' \revto \Fun \; y \mapsto (\Clone\; k') y\\
  & &\In \; \mtrans{M}[k''/k,x'/x]
 \end{eqs} \\
@@ -2272,9 +2363,11 @@ operation label and the continuation, to translate the operation
 clauses.
 
 An operation clause translate into a conditional expression that
-checks whether operation clause label is the same as the carried
-operation label. In case they are the same, then we follow the first
-branch and create a wrapper function, $k''$, around the
+checks whether operation clause label matches the invoked
+operation. We assume the existence of a function
+$\mathcal{N} : \mathcal{L} \to \mathbb{L}$ that maps labels in Links
+to labels in Lambda. In case they are the same, then we follow the
+first branch and create a wrapper function, $k''$, around the
 continuation. This wrapper function clones the continuation $k'$
 before use, which effectively lets us reuse a linear continuation
 multiple times. If the two labels are not the same then we try another
@@ -2284,48 +2377,52 @@ forwards the operation label $x$ and the continuation $k$ to another
 enclosing handler.
 
 \section{Run-time representation}
+\label{sec:representation}
 By using the OCaml backend we naturally inherit the OCaml
 run-time. OCaml implements effect handlers as heap-managed stack data
 structures, and as a consequence composition of handlers gives rise to
 $n$-element stacks at run-time. For example, the composition
-\lstinline[mathescape]!randomResult(maybeResult($\cdot$))! is
-represented as a two-element stack. Thus, an invocation of an abstract
-operation amounts to performing a dynamic lookup for a suitable
-handler in a stack.
+\lstinline[mathescape]!maybeResult(randomResult($\cdot$))! is
+represented as a two-element linked list as shown in
+Figure~\ref{fig:rtstack}. Thus, an invocation of an abstract operation
+amounts to performing a dynamic lookup to locate a suitable handler in
+the linked list.
 
 Since the primary use of handlers in OCaml is to express concurrency,
 OCaml handlers are affine; continuations can only be resumed at most
 once, and multiple invocations of a continuation causes a run-time
-error. Multi-shot handlers can be simulated by manually cloning
-continuations using \lstinline$Obj.clone_continuation$. The cost of
-cloning is linear in the size of the handler stack. However, cloning
-is a fragile abstraction; if the handler stack contains at least one
-multi-shot handler, then every affine handler in the stack must be
-demoted to a multi-shot handler to be safe, because a multi-shot
-handler may consume a linear continuation more than
-once. Consequently, multi-shot handlers in OCaml break modularity.
+error. We can simulate multi-shot handlers can be simulated by cloning
+continuations prior to invocation. The cost of cloning is linear in
+the length of the linked list. 
 
-In the Links compiler we use the cloning capability under the hood to implement
-multi-shot handlers. For example, our encoding of \lstinline$allResults$
-amounts to the following in plain OCaml:
-% \kc{$Obj.clone$ was too generic and I plan to use $Obj.clone\_continuation$ to
-% be less ambiguous.}
-\begin{lstlisting}[style=ocaml]
-let all_results m = match m () with
- | x -> [x]
- | effect Choose k -> 
-   let k' arg = 
-     continue (Obj.clone_continuation k) arg 
-   in k' true @ k' false
-\end{lstlisting}
-OCaml provides a unified syntax for pattern-matching on regular, effect, and
-exception patterns. The keyword \lstinline[style=ocaml]$effect$ begins an
-operation-clause. Essentially, we create a local function \lstinline$k'$, which
-wraps the actual continuation \lstinline$k$. An invocation of \lstinline$k'$
-passes its argument to a fresh copy of the actual continuation. The
-\lstinline$continue$ function is provided by the standard library; given a
-continuation and a value, it invokes the continuation with that particular
-value. By default we implement every handler as a multi-shot handler.
+% However, cloning is a fragile abstraction; if the handler stack
+% contains at least one multi-shot handler, then every affine handler
+% in the stack must be demoted to a multi-shot handler to be safe,
+% because a multi-shot handler may consume a linear continuation more
+% than once. Consequently, multi-shot handlers in OCaml break
+% modularity.
+
+% In the Links compiler we use the cloning capability under the hood to implement
+% multi-shot handlers. For example, our encoding of \lstinline$allResults$
+% amounts to the following in plain OCaml:
+% % \kc{$Obj.clone$ was too generic and I plan to use $Obj.clone\_continuation$ to
+% % be less ambiguous.}
+% \begin{lstlisting}[style=ocaml]
+% let all_results m = match m () with
+%  | x -> [x]
+%  | effect Choose k -> 
+%    let k' arg = 
+%      continue (Obj.clone_continuation k) arg 
+%    in k' true @ k' false
+% \end{lstlisting}
+% OCaml provides a unified syntax for pattern-matching on regular, effect, and
+% exception patterns. The keyword \lstinline[style=ocaml]$effect$ begins an
+% operation-clause. Essentially, we create a local function \lstinline$k'$, which
+% wraps the actual continuation \lstinline$k$. An invocation of \lstinline$k'$
+% passes its argument to a fresh copy of the actual continuation. The
+% \lstinline$continue$ function is provided by the standard library; given a
+% continuation and a value, it invokes the continuation with that particular
+% value. By default we implement every handler as a multi-shot handler.
 
 \begin{figure}
 \centering
@@ -2388,7 +2485,8 @@ interface for spawning and suspending processes. In addition, we
 implement a basic process scheduler that we subsequently refine with
 more sophisticated features. In
 Section~\ref{sec:links-model-handlers-communication} we consider how
-to enable communication amongst processes.
+to enable communication amongst processes. The two latter sections are
+based on material from \cite{Hillerstrom2016c}.
 
 \section{Process abstraction}
 \label{sec:links-model-handlers-process}
@@ -3137,20 +3235,25 @@ also consider how to improve the performance of generated code.
 \section{Methodology}
 \label{sec:methodology}
 
-We have picked three benchmarks to discuss: state interpretation,
-$n$-queens, and our concurrency implementation. The state
-interpretation benchmark provides insight into the cost of using a
-state handler. The $n$-queens benchmark is interesting because it
-crucially relies on multi-shot handlers. Lastly, the concurrency
-benchmark is interesting because it provides insight into how well the
-concurrency implementation performs against the built-in. 
+We have picked three benchmarks to discuss: state interpretation
+(Section~\ref{sec:state-eval}), $n$-queens
+(Section~\ref{sec:queens-eval}), and our concurrency implementation
+(Section~\ref{sec:concurrency-eval}). The state interpretation
+benchmark provides insight into the cost of using a state handler. The
+$n$-queens benchmark is interesting because it crucially relies on
+multi-shot handlers. Lastly, the concurrency benchmark is interesting
+because it provides insight into how well the concurrency
+implementation performs against the built-in.
 
 Our data collection method is similar to the method
-of~\cite{Harris2016}. Prior to starting each experiment we have log
-many environment settings, computer hardware details, number of users
-logged in at the time, etc. Each experiment consists of a single
-benchmark that we run with different configurations. For each
-configuration we run the particular benchmark 25 times.
+of~\cite{Harris2016}. In the beginning of each experiment we log many
+environment settings, computer hardware details, number of users
+logged in at the time, etc. in order to be able to analyse the result
+meticulously. Each experiment consists of a single benchmark that we
+run with different configurations. For each configuration we run the
+particular benchmark 25 times. In our analysis we report the median
+execution time of the 25 runs either in raw time or relative to some
+baseline, each subsequent section clearly states which.
 
 Our benchmark machine is a fairly standard desktop machine provided by
 the Informatics CaRD group. The hostname of the machine is
