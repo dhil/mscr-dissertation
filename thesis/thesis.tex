@@ -388,7 +388,7 @@ A preface will possibly appear here\dots
 
 %% Create the table of contents
 \setcounter{secnumdepth}{2} % Numbering on sections and subsections
-\setcounter{tocdepth}{3} % Show chapters, sections and subsections in TOC
+\setcounter{tocdepth}{1} % Show chapters, sections and subsections in TOC
 %\singlespace
 \tableofcontents
 %\doublespace
@@ -487,17 +487,32 @@ A preface will possibly appear here\dots
 
 %\cite{Plotkin2013} first explored handlers at a theoretical level.
 
-In (purely) functional programming monads have proven to be remarkable
-successful abstraction for handling computational effects despite
-their lack of modularity \citep{Kammar2013,Kiselyov2013}. Recently,
+% In (purely) functional programming monads have proven to be a
+% remarkably successful abstraction for handling effectful computations
+% despite their lack of modularity
+% \citep{Kammar2013,Kiselyov2013}. 
+
+Computational effects are pervasive in programming. They arise
+naturally in many applications in many different shapes such as
+exceptions, file i/o, concurrency, nondeterminism, etc. Recently
 \emph{algebraic effects} \citep{Plotkin2001,Plotkin2003} and their
 \emph{handlers} \citep{Plotkin2013} have emerged as a modular
-alternative to handling computational effects.
-
-Since the inception of effect handlers many different implementations
-have appeared.
+alternative to monads for handling computational effects in functional
+programming. The key idea behind algebraic effect and their handlers
+is that an effect signature consists of \emph{abstract operations}
+whose implementations are given by one or more handlers. The clear
+separation between effect signatures and their implementation afford a
+considerable amount of modularity as programmers can express effectful
+computations independently of the concrete interpretation of their
+effects. Furthermore, programmers compose multiple effect handlers in
+order to instantiate the abstract operations of an effectful
+computation.
 %
-\todo{Fix introduction}
+
+Since \cite{Plotkin2013} conceived handlers many different
+implementations have appeared
+\citep{Brady2013,Kammar2013,Kiselyov2013,Kiselyov2015,Bauer2015,Dolan2015}. However most of these implementations 
+
 %
 \cite{Bauer2015} demonstrates that effect handlers provide a
 succinct interface for implementing concurrency. This idea is further
@@ -520,26 +535,29 @@ into an SQL query, taking advantage of the effect type system and the
 subformula property to guarantee query generation~\citep{Lindley2012}.
 Currently effect handlers are only supported on the server.
 
-\section{Problem analysis}
+\section{Motivation}
+\label{sec:motivation}
 
-\todo{Parallelism is multiplicity of processors simultaneously}
-%
-\todo{Unit of concurrency: Fibers} \todo{Unit of parallelism: Domains}
-%
-\todo{Don't conflate concurrency and parallelism; context switching
-  brings death to scaling}
-%
-\todo{Map fibers onto domains ($\#domains \approx \#cores$)}
-Parallelism is simultaneous execution
-%
-of computations. Concurrency is overlapped execution of processes.
-Parallelism is about utilising multiple computational resources
-simultaneously to maximise efficiency. The aim is speed up a
-computation by delegating different parts of it to different
-processors to execute at the same time \citep{Marlow2013}.
+% \section{Problem analysis}
 
-By contrast, concurrency is concerned with structuring interactions
-between multiple agents. Conceptually, 
+% \todo{Parallelism is multiplicity of processors simultaneously}
+% %
+% \todo{Unit of concurrency: Fibers} \todo{Unit of parallelism: Domains}
+% %
+% \todo{Don't conflate concurrency and parallelism; context switching
+%   brings death to scaling}
+% %
+% \todo{Map fibers onto domains ($\#domains \approx \#cores$)}
+% Parallelism is simultaneous execution
+% %
+% of computations. Concurrency is overlapped execution of processes.
+% Parallelism is about utilising multiple computational resources
+% simultaneously to maximise efficiency. The aim is speed up a
+% computation by delegating different parts of it to different
+% processors to execute at the same time \citep{Marlow2013}.
+
+% By contrast, concurrency is concerned with structuring interactions
+% between multiple agents. Conceptually, 
 
 % In theory,
 % parallelism is easy, since running any two sequential programs in
@@ -549,7 +567,7 @@ between multiple agents. Conceptually,
 % must carefully \emph{schedule} computations.
 
 
-\section{Problem statement}
+%\section{Problem statement}
 \section{Aims and objectives}
 Our main contributions are
 \begin{itemize}
@@ -592,11 +610,13 @@ work.
 
 \chapter{Background and related work}
 \label{ch:background}
-This chapter introduces algebraic effects and their
-handlers. Specifically, in Section~\ref{sec:theory-handlers}
-introduces the theory, while Sections~\ref{sec:links-handlers} and
-\ref{sec:ocaml-handlers} give an introduction to programming with
-effect handlers in Links and OCaml, respectively.
+In this chapter we give an introduction to programming with algebraic
+effects and handlers by example in Links. Although, first we introduce
+Links without effect handlers in Section~\ref{sec:links-primer}. Then
+in Sections~\ref{sec:links-handlers} we introduce effect handlers. In
+Section~\ref{sec:links-model} we discuss the built-in
+implementation of the concurrency model of Links. Finally, in
+Section~\ref{sec:related-work} we discuss related work.
 
 \section{Links primer}
 \label{sec:links-primer}
@@ -683,13 +703,26 @@ addition, the back list gets reversed to preserve the
 first-in-last-out semantics of the queue.
 
 \paragraph{Effect system} 
-The squiggly function arrow (\lstinline$~>$) is syntactic sugar for
-denoting that the computation has the \emph{wild} effect. The wild
-effect captures all intrinsic effects such as I/O, randomness,
-divergence, etc. To some extent it is analogous to the \emph{IO monad}
-of Haskell, though the wild effect is much stricter as without it
-general recursion is disallowed.
-\todo{Describe the effect system}
+Links has a type-and-effect system which tracks the effects that
+functions may perform. For example, the reader may have noticed that
+the arrow in the type signature of \lstinline$dequeue$ is squiggly
+(\lstinline$~>$) rather than straight (\lstinline$->$). The squiggly
+function arrow is syntactic sugar for denoting that the computation
+has the \emph{wild} effect. The wild effect captures intrinsic effects
+such as I/O, randomness, divergence, etc. To some extent it is
+analogous to the \emph{IO monad} of Haskell, though the wild effect is
+much stricter as without it general recursion is disallowed. The
+effect system of Links uses row polymorphism to provide extensible
+effect signature. We can elaborate the squiggly arrow \lstinline$~>$
+to \lstinline${wild|e}->$ where \lstinline${wild|e}$ denotes a row
+with a label \lstinline$wild$ and an effect variable
+\lstinline$e$. The effect variable is a row variable which can be
+instantiated to populate the row with additional
+labels~\citep{Hillerstrom2016a}. The straight arrow is actually
+syntactic sugar for writing \lstinline${ |e}->$, that is an empty open
+effect row which means the function can be used in the presence of any
+other effect.
+%
 
 \paragraph{Type inference} Often in Links we may omit type signatures
 altogether as Links has type inference. If we write
@@ -741,10 +774,20 @@ invokes an operation \lstinline$Choose$ using the \lstinline$do$
 primitive.  The \lstinline$sig$ keyword begins a signature, which
 reads: \lstinline$toss$ is a computation with effect signature
 \lstinline${Choose:Bool |e}$ and return value \lstinline$Toss$, whose
-constructors are \lstinline$Heads$ and \lstinline$Tails$.  Links
-employs row typing to support extensible effect signatures, thus
-\lstinline$e$ is an effect variable, which can be instantiated with
-additional operations.
+constructors are \lstinline$Heads$ and \lstinline$Tails$.  
+% Links employs row typing to support extensible effect signatures, thus
+% \lstinline$e$ is an effect variable, which can be instantiated with
+% additional operations.
+The type \lstinline[mathescape]!Comp($\cdot$,$\cdot$)! is not a
+built-in type. It is straightforward to define in Links:
+%
+\begin{lstlisting}
+typename Comp(e::Row,a::Type) = () -e-> a;
+\end{lstlisting}
+%
+The type constructor takes a row type \lstinline$e$ and a regular type
+\lstinline$a$ and constructs a thunk with effect row \lstinline$e$ and
+return type \lstinline$a$.
 
 Introduction of another operation causes the effect signature to grow
 accordingly. For example, if we introduce an exception operation
@@ -806,15 +849,20 @@ The type system prevents invocation of the continuation in the
 inhabitants. Linear and exception handlers together constitute
 \emph{affine handlers}.
 
-\begin{figure}
+We can compose \lstinline$maybeResult$ and \lstinline$randomResult$ to
+give an interpretation of
+\lstinline$drunkToss$. Figure~\ref{fig:sequence} depicts a sequence
+diagram for evaluation of this composition.
+
+\begin{figure}[H]
   \centering
 \begin{sequencediagram}
     \newthread{A}{Program}{}
-    \newinst[5]{B}{maybeResult}{}
+    \newinst[5.1]{B}{maybeResult}{}
     \newinst[2.5]{C}{randomResult}{}
     \newinst[0.5]{D}{drunkToss}{}
     \begin{call}[2]
-      {A}{\lstinline$maybeResult(randomResult(drunkToss))$}{B}{\lstinline$Just(Tails)$}
+      {A}{\lstinline$maybeResult(randomResult(drunkToss))()$}{B}{\lstinline$Just(Tails)$}
       \begin{call}[3]
         {B}{\lstinline$randomResult(drunkToss)()$}{C}{\lstinline$Tails$}
         \begin{call}[2]
@@ -829,7 +877,8 @@ inhabitants. Linear and exception handlers together constitute
       \end{call}
     \end{call}
   \end{sequencediagram}
-  \caption{Sequence diagram.}\label{fig:sequence}
+  \caption{Sequence diagram for
+    \lstinline$maybeResult(randomResult(drunkToss))$.}\label{fig:sequence}
 \end{figure}
 
 \section{The built-in concurrency model of Links}
@@ -837,22 +886,12 @@ inhabitants. Linear and exception handlers together constitute
 
 The concurrency model of Links is based on a typed \emph{actor} model
 \citet{Cooper2006}. In an actor model processes run in (memory)
-isolation. A process can only make local state changing decisions
-directly. In order to influence the global program state, the process
+isolation. A process can only make state changing decisions
+locally. In order to influence the global program state, the process
 must communicate with other processes through message passing. Each
-process is equipped with its own mailbox -- which may be either
-\emph{buffered} or \emph{unbuffered}. In Links mailboxes are buffered,
-that is a mailbox is a collection of messages that can be consumed one
-at a time. 
-%
-\todo{Tie this together somewhat better}
-Figure~\ref{fig:links-model} displays an abstract representation of
-the interaction between two processes. The process $P_1$ cannot access
-the state of process $P_2$ -- and vice versa. Each mailbox is
-intrinsic to each process. The process $P_1$ interact with $P_2$ via a
-message $s$ depending on the contents of $s$ the process $P_2$ may
-choose to alter its own state.
-%
+process is equipped with its own mailbox. Figure~\ref{fig:links-model}
+sketches an abstract representation of the interaction between two
+processes.
 \begin{figure}
 \centering
 \begin{tikzpicture}[node distance=5pt,every node/.style={draw, outer sep=0pt}]
@@ -886,11 +925,13 @@ choose to alter its own state.
 \label{fig:links-model}
 \end{figure}
 
-A Links program begins in a single thread of control but can fork into
-multiple processes. There are four essential built-in primitives for
-concurrency: process \emph{self referral}, process \emph{spawning},
-\emph{sending} and \emph{receiving} messages. In the following
-paragraphs we briefly introduce each primitive.
+A Links program begins in a single process of control, but this
+process can spawn multiple subprocesses, which in turn can spawn
+subprocesses of their own.  multiple processes. There are four
+essential built-in primitives for concurrency: process \emph{self
+  referral}, process \emph{spawning}, \emph{sending} and
+\emph{receiving} messages. In the following paragraphs we briefly
+introduce each primitive.
 
 \paragraph{Self referral} The built-in function \lstinline$self$
 retrieves the process identifier from the current context. A process
@@ -1074,7 +1115,7 @@ then the process forwards the candidate to its neighbour process. The
 initial process generates a sequence of natural numbers. These numbers
 are sent one by one to the first sieve process. We implement this as
 the function \lstinline$generator(n)$ where \lstinline$n$ is the upper
-bound on sequence being generated:
+bound of the sequence:
 %
 \begin{lstlisting}
 fun generator(n) {
@@ -1187,7 +1228,7 @@ As expected the primes between $2$ and $10$ get printed.
 %% Related work
 %%
 \section{Related work}
-\label{ch:related-work}
+\label{sec:related-work}
 
 Prior work focuses mainly on the design and expressiveness of handlers
 rather than performance. Nevertheless, some recent papers do address
@@ -1453,63 +1494,63 @@ for greater flexibility and control.  We effectively subvert OCaml's
 typechecker by targeting Lambda, however the translation is safe as
 Links programs are already typechecked.
 
-\subsection{Handler desugaring}
+% \subsection{Handler desugaring}
 
-\newcommand{\desugar}{\mathcal{D}}
-\newcommand{\vecc}{\overline}
-\renewcommand{\vec}{\overline}
+% \newcommand{\desugar}{\mathcal{D}}
+% \newcommand{\vecc}{\overline}
+% \renewcommand{\vec}{\overline}
 
-\begin{figure}
-Handler
-\hspace{-1cm}
-\[
-\begin{eqs}
-\linksify{handler h$\vecc{(p)}$} &\equiv& \linksify{handler[m] h$\vecc{(p)}$}, \text{ where \linksify{m} is fresh.}
-\vspace{5mm} \\
-\desugar \left( \linksify{handler[m] h$\vecc{(p)}$ \{ $\vec{c}$ \}} \right) &=& 
-\begin{cases} 
-  \linksify{fun h(m)() \{ handle(m) \{ $\desugar \left( \vec{c} \right)$ \} \}} &\hspace{-2mm}\text{if } |\vecc{(p)}| = 0\\
-  \linksify{fun h$\vecc{(p)}$(m)() \{ handle(m) \{ $\desugar_{\vecc{(p)}} \left( \vec{c} \right)$ \}$\vecc{(p)}$ \}} & \hspace{-2mm}\text{otherwise}
-\end{cases}
-\end{eqs}
-\]
-Handler cases
-\[
-\begin{eqs}
-\desugar_{\vecc{(p)}} \left( \vec{c} \right) &=& \desugar_{\vecc{(p)}} \left( c_1 \right) \cdots \desugar_{\vecc{(p)}} \left( c_n \right)
-\vspace{5mm} \\
-\desugar_{\vecc{(p)}} \left(\linksify{case $q$ -> $M$} \right) &=&  
-\begin{cases}
-  \linksify{case $q$ -> $\desugar \left( M \right)$}                      & \text{if } |\vecc{(p)}| = 0\\
-  \linksify{case $q$ -> fun$\vecc{(p)}$ \{ $\desugar \left( M \right)$ \}} & \text{otherwise}
-\end{cases}
-\end{eqs}
-\]
-\caption{Desugaring handlers \citep{Hillerstrom2016a}.}
-\label{fig:handlers-desugaring}
-\end{figure}
-The frontend implementation of handlers is based on a mild syntactic
-extension to Links: the syntax is extended with \lstinline$do$ for
-invoking operations and \lstinline$handle(m) {...}$ for handling
-abstract computations \citep{Hillerstrom2015}.
+% \begin{figure}
+% Handler
+% \hspace{-1cm}
+% \[
+% \begin{eqs}
+% \linksify{handler h$\vecc{(p)}$} &\equiv& \linksify{handler[m] h$\vecc{(p)}$}, \text{ where \linksify{m} is fresh.}
+% \vspace{5mm} \\
+% \desugar \left( \linksify{handler[m] h$\vecc{(p)}$ \{ $\vec{c}$ \}} \right) &=& 
+% \begin{cases} 
+%   \linksify{fun h(m)() \{ handle(m) \{ $\desugar \left( \vec{c} \right)$ \} \}} &\hspace{-2mm}\text{if } |\vecc{(p)}| = 0\\
+%   \linksify{fun h$\vecc{(p)}$(m)() \{ handle(m) \{ $\desugar_{\vecc{(p)}} \left( \vec{c} \right)$ \}$\vecc{(p)}$ \}} & \hspace{-2mm}\text{otherwise}
+% \end{cases}
+% \end{eqs}
+% \]
+% Handler cases
+% \[
+% \begin{eqs}
+% \desugar_{\vecc{(p)}} \left( \vec{c} \right) &=& \desugar_{\vecc{(p)}} \left( c_1 \right) \cdots \desugar_{\vecc{(p)}} \left( c_n \right)
+% \vspace{5mm} \\
+% \desugar_{\vecc{(p)}} \left(\linksify{case $q$ -> $M$} \right) &=&  
+% \begin{cases}
+%   \linksify{case $q$ -> $\desugar \left( M \right)$}                      & \text{if } |\vecc{(p)}| = 0\\
+%   \linksify{case $q$ -> fun$\vecc{(p)}$ \{ $\desugar \left( M \right)$ \}} & \text{otherwise}
+% \end{cases}
+% \end{eqs}
+% \]
+% \caption{Desugaring handlers \citep{Hillerstrom2016a}.}
+% \label{fig:handlers-desugaring}
+% \end{figure}
+% The frontend implementation of handlers is based on a mild syntactic
+% extension to Links: the syntax is extended with \lstinline$do$ for
+% invoking operations and \lstinline$handle(m) {...}$ for handling
+% abstract computations \citep{Hillerstrom2015}.
 
-The keyword \lstinline$handler$ is really syntactic sugar which makes
-it more convenient to program with handlers. We have slightly
-generalised the desugaring of handlers to account for parameterised
-handlers with multiple parameters. The function $\desugar$ is a
-source-to-source translation that elaborates the
-sugar. Figure~\ref{fig:handlers-desugaring} shows the cases for
-handlers only: $\desugar$ is a homomorphism on the other syntax
-constructors \citep{Hillerstrom2016a}.  Crucially, handlers are
-desugared into a function, that returns a thunk. This is important to
-ensure that handlers compose smoothly. For the same reason a
-parameterised handler desugars into a curried function, where the
-parameters precede the computation argument \lstinline$m$. The
-parameters are passed around by enclosing each operation clause by a
-function. Thus, the initial parameter values are applied directly to
-the \lstinline$handle$ expression.
+% The keyword \lstinline$handler$ is really syntactic sugar which makes
+% it more convenient to program with handlers. We have slightly
+% generalised the desugaring of handlers to account for parameterised
+% handlers with multiple parameters. The function $\desugar$ is a
+% source-to-source translation that elaborates the
+% sugar. Figure~\ref{fig:handlers-desugaring} shows the cases for
+% handlers only: $\desugar$ is a homomorphism on the other syntax
+% constructors \citep{Hillerstrom2016a}.  Crucially, handlers are
+% desugared into a function, that returns a thunk. This is important to
+% ensure that handlers compose smoothly. For the same reason a
+% parameterised handler desugars into a curried function, where the
+% parameters precede the computation argument \lstinline$m$. The
+% parameters are passed around by enclosing each operation clause by a
+% function. Thus, the initial parameter values are applied directly to
+% the \lstinline$handle$ expression.
 
-\section{A calculus of Rows and Handlers}
+\section{A formalisation of the Links IR}
 \label{sec:lambe-eff-row}
 
 In this section, we present a type and effect system and a small-step
@@ -2055,7 +2096,7 @@ effect $E$.
 By induction on the given typing derivation.
 \end{proof}
 
-\section{Lambda}
+\section{The Lambda IR}
 \label{sec:lambda}
 
 \newcommand{\If}{\keyw{if}}
@@ -2242,7 +2283,7 @@ operation clauses to translate then we insert a $\Delegate$ which
 forwards the operation label $x$ and the continuation $k$ to another
 enclosing handler.
 
-\subsection{Run-time representation}
+\section{Run-time representation}
 By using the OCaml backend we naturally inherit the OCaml
 run-time. OCaml implements effect handlers as heap-managed stack data
 structures, and as a consequence composition of handlers gives rise to
@@ -3088,9 +3129,37 @@ yield the compiler inserts appears in a handled context.
 \chapter{Experiments}
 \label{ch:experiments}
 
+In this chapter we discuss some experiments that we have performed
+with the compiler in order to obtain some insight into how it performs
+against the Links interpreter and the OCaml compiler. Furthermore, we
+also consider how to improve the performance of generated code.
+
 \section{Methodology}
 \label{sec:methodology}
-$n = 25$. Statistic: median. Our method is akin to the method of \cite{Harris2016}.
+
+We have picked three benchmarks to discuss: state interpretation,
+$n$-queens, and our concurrency implementation. The state
+interpretation benchmark provides insight into the cost of using a
+state handler. The $n$-queens benchmark is interesting because it
+crucially relies on multi-shot handlers. Lastly, the concurrency
+benchmark is interesting because it provides insight into how well the
+concurrency implementation performs against the built-in. 
+
+Our data collection method is similar to the method
+of~\cite{Harris2016}. Prior to starting each experiment we have log
+many environment settings, computer hardware details, number of users
+logged in at the time, etc. Each experiment consists of a single
+benchmark that we run with different configurations. For each
+configuration we run the particular benchmark 25 times.
+
+Our benchmark machine is a fairly standard desktop machine provided by
+the Informatics CaRD group. The hostname of the machine is
+``pamina''. The machine has a quad-core Intel i5-2400 processor where
+each core operates at 3.1 GHz. The four cores share a 6 MB Intel
+SmartCache. Furthermore, the machine has 8 GB of physical memory. It
+is running a 64 bit version of openSuSE 13.2 Linux with kernel version
+3.16.7-24-desktop.
+%
 
 \section{State interpretation}
 \label{sec:state-eval}
