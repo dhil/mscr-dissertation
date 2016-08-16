@@ -500,68 +500,113 @@ A preface will possibly appear here\dots
 % despite their lack of modularity
 % \citep{Kammar2013,Kiselyov2013}. 
 
-Computational effects are pervasive in programming. They arise
-naturally in many applications in many different shapes such as
-exceptions, file i/o, concurrency, nondeterminism, and so forth. Many
-programming languages provide no or little support for controlling
-computational effects. Recently \emph{algebraic
-  effects}~\citep{Plotkin2001,Plotkin2003} and combined with
-\emph{handlers}~\citep{Plotkin2013} have emerged as a modular approach
-for managing user-defined computational effects. An effect is
-described as a signature over a collection of \emph{abstract
-  operations} whose implementations are given by one or more
-handlers. The main idea of programming with algebraic effects and
-handlers is that performing an effectful operation is separate from
-its interpretation. 
+Computational effects are pervasive. They arise naturally in many
+different shapes such as exceptions, file i/o, global state mutation,
+concurrency, nondeterminism, and so forth. Many mainstream programming
+languages provide no or little support for controlling computational
+effects -- in most cases control is limited to exception
+handling. Recently \emph{algebraic
+  effects}~\citep{Plotkin2001,Plotkin2003} combined with \emph{effect
+  handlers}~\citep{Plotkin2013} have emerged as a modular abstraction
+for expressing and managing user-defined computational effects. By
+separating the expression of an effectful computation from its
+implementation, algebraic effects and handlers allow programmers to
+express effectful computations independently of their concrete
+interpretation~\citep{Kammar2013}. In this system, concurrency arise
+as just another computational effect, modularly expressed as a
+signature of \emph{abstract operations} whose implementations are
+given by one or more handlers. This allow programmers to define their
+own schedulers for concurrent programs~\citep{Dolan2015} rather than
+being stuck with a built-in, compiler-supported implementation.
 
-Effect handlers generalise exception handlers, providing a mechanism
-for interpreting arbitrary algebraic effects. Crucially, programming
-with handlers relies on non-linear control. When an effectful
-computation performs an effect it gets suspended and control is
-transferred to some suitable handler -- much like throwing an
-exception in any conventional programming language. However, unlike
-exception handlers, effect handlers expose a structured interface that
-permits resumption of the suspended computation.
-
-%Consequently, effect handlers afford a high degree of modularity.
-
-
-Since \cite{Plotkin2013} conceived handlers many different
-implementations have appeared
-\citep{Brady2013,Kammar2013,Kiselyov2013,Kiselyov2015,Bauer2015,Dolan2015,Lindley2016,McBride2016,Saleh2016}.
-Most of these implementations try to embed effect handlers within an
-existing programming language. Interestingly, \cite{Dolan2015} have
-extended the industrial-strength functional programming language OCaml
-with particular, restricted kind of handlers known as \emph{affine
-  handlers} which permit suspended computations to be resumed at most
-once. Their implementation is part of the Multicore OCaml project to
-bring multicore capabilities to the OCaml programming language. They
-adopt the idea of \cite{Bauer2015} to use effect handlers to implement
-user-defined concurrent multi-threaded schedulers.
+In previous work, we extended the functional programming language
+Links with algebraic effects and
+handlers~\citep{Hillerstrom2015}. Links is a full-fledged strict,
+single-source programming language for multi-tier web-programming. It
+comprise three backends:
+\begin{enumerate}
+  \item a JavaScript compiler for client-side code,
+  \item an interpreter for the server,
+  \item and an SQL generator for the database.
+\end{enumerate}
+The source language is compiled to a common intermediate
+representation (IR).  For the client, the IR is compiled to
+JavaScript. For the server, the IR is interpreted using a variant of
+the CEK machine~\citep{Felleisen1986,Hillerstrom2016a}. For the
+database, the IR is translated into an SQL query, taking advantage of
+the effect type system and the subformula property to guarantee query
+generation~\citep{Lindley2012}.
 %
+In addition, Links has built-in support for concurrency. The
+concurrency model of Links is a variant of the actor
+model~\citep{Hewitt1977} with type-safe communication amongst
+processes.
 
-In previous work, we extended the functional web programming language
-Links with algebraic effects and handlers \citep{Hillerstrom2015}.
-%
-Links is a strict ML-like functional language for the web
-\citep{Cooper2006}. The defining feature of Links is that it provides a single source
-language that targets all three tiers of a web application: client,
-server, and database. Links source code is translated into an
-intermediate representation (IR) based on A-normal
-form~\citep{Flanagan1993}.
-%
-For the client, the IR is compiled to JavaScript. For the server, the
-IR is interpreted using a variant of the CEK
-machine~\citep{Felleisen1986}. For the database, the IR is translated
-into an SQL query, taking advantage of the effect type system and the
-subformula property to guarantee query generation~\citep{Lindley2012}.
-Currently effect handlers are only supported on the server.
+In this work we extend the Links infrastructure with a native backend
+with support for effect handlers~\citep{Hillerstrom2016b}. In order to
+keep the compiler lean we separate the implementation of the
+concurrency model of Links from the compiler. Instead we reconstruct
+the message-passing concurrency implementation using effect
+handlers~\citep{Hillerstrom2016c}. In addition to keeping the compiler
+lean, lifting the concurrency implementation into user-space allows us
+to experiment with different implementations or even have several
+different implementations coexisting.
+
+% Computational effects are pervasive in programming. They arise
+% naturally in many applications in many different shapes such as
+% exceptions, file i/o, concurrency, nondeterminism, and so forth. Many
+% programming languages provide no or little support for controlling
+% computational effects. Recently \emph{algebraic
+%   effects}~\citep{Plotkin2001,Plotkin2003} and combined with
+% \emph{handlers}~\citep{Plotkin2013} have emerged as a modular approach
+% for managing user-defined computational effects. An effect is
+% described as a signature over a collection of \emph{abstract
+%   operations} whose implementations are given by one or more
+% handlers. The main idea of programming with algebraic effects and
+% handlers is that performing an effectful operation is separate from
+% its interpretation. 
+
+% Effect handlers generalise exception handlers, providing a mechanism
+% for interpreting arbitrary algebraic effects. Crucially, programming
+% with handlers relies on non-linear control. When an effectful
+% computation performs an effect it gets suspended and control is
+% transferred to some suitable handler -- much like throwing an
+% exception in any conventional programming language. However, unlike
+% exception handlers, effect handlers expose an interface that permits
+% resumption of the suspended computation.
+
+% %Consequently, effect handlers afford a high degree of modularity.
+
+% Since \cite{Plotkin2013} conceived handlers many different
+% implementations have appeared
+% \citep{Brady2013,Kammar2013,Kiselyov2013,Kiselyov2015,Bauer2015,Dolan2015,Lindley2016,McBride2016,Saleh2016}.
+% Most of these implementations try to embed effect handlers within an
+% existing programming language. Interestingly, \cite{Dolan2015} have
+% extended the industrial-strength functional programming language OCaml
+% with particular, restricted kind of handlers known as \emph{affine
+%   handlers} which permit suspended computations to be resumed at most
+% once. Their implementation is part of the Multicore OCaml project to
+% bring multicore capabilities to the OCaml programming language. They
+% adopt the idea of \cite{Bauer2015} to use effect handlers to implement
+% user-defined concurrent multi-threaded schedulers.
+% %
+
+% In previous work, we augmented the functional programming language
+% Links with algebraic effects and handlers
+% \citep{Hillerstrom2015}. Links is a strict, single-source, interpreted
+% programming language for multi-tier web systems. Additionally, it has
+% a built-in type-safe distributed message-passing concurrency model. We
+% are interested in further extending Links with a native compiler for
+% effect handlers. In the long term we are interested in studying the
+% implementation space of effect handlers. 
+
 
 \section{Motivation}
 \label{sec:motivation}
 
 Managed programming languages tend to be closely tied to a complex,
-monolithic run-time system.
+monolithic run-time system. Such run-time systems are difficult to
+maintain and change.
 
 %
 Benefits: Simplifies the life of the compiler writer; provides the
@@ -662,8 +707,8 @@ work.
 In this chapter we give an introduction to programming with algebraic
 effects and handlers by example in Links. Although, first we introduce
 Links without effect handlers in Section~\ref{sec:links-primer}. Then
-in Sections~\ref{sec:links-handlers} we introduce effect handlers. In
-Section~\ref{sec:links-model} we discuss the built-in
+in Section~\ref{sec:links-affine-multi} we introduce effect
+handlers. In Section~\ref{sec:links-model} we discuss the built-in
 implementation of the concurrency model of Links. Finally, in
 Section~\ref{sec:related-work} we discuss related work.
 
@@ -917,10 +962,10 @@ diagram for evaluation of this composition.
         \begin{call}[2]
           {C}{\lstinline$drunkToss()$}{D}{\lstinline$Tails$}
           \begin{call}[2]
-            {D}{\lstinline$do Choose$}{C}{\lstinline$k(true)$}
+            {D}{\lstinline$do Choose$}{C}{\lstinline$resume(true)$}
           \end{call}
           \begin{call}[2]
-            {D}{\lstinline$do Choose$}{C}{\lstinline$k(false)$}
+            {D}{\lstinline$do Choose$}{C}{\lstinline$resume(false)$}
           \end{call}
         \end{call}
       \end{call}
