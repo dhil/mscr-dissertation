@@ -502,29 +502,43 @@ A preface will possibly appear here\dots
 
 Computational effects are pervasive in programming. They arise
 naturally in many applications in many different shapes such as
-exceptions, file i/o, concurrency, nondeterminism, etc. Recently
-\emph{algebraic effects} \citep{Plotkin2001,Plotkin2003} and their
-\emph{handlers} \citep{Plotkin2013} have emerged as a modular
-alternative to monads for handling computational effects in functional
-programming. The key idea behind algebraic effect and their handlers
-is that an effect signature consists of \emph{abstract operations}
-whose implementations are given by one or more handlers. The clear
-separation between effect signatures and their implementation afford a
-considerable amount of modularity as programmers can express effectful
-computations independently of the concrete interpretation of their
-effects. Furthermore, programmers compose multiple effect handlers in
-order to instantiate the abstract operations of an effectful
-computation.
-%
+exceptions, file i/o, concurrency, nondeterminism, and so forth. Many
+programming languages provide no or little support for controlling
+computational effects. Recently \emph{algebraic
+  effects}~\citep{Plotkin2001,Plotkin2003} and combined with
+\emph{handlers}~\citep{Plotkin2013} have emerged as a modular approach
+for managing user-defined computational effects. An effect is
+described as a signature over a collection of \emph{abstract
+  operations} whose implementations are given by one or more
+handlers. The main idea of programming with algebraic effects and
+handlers is that performing an effectful operation is separate from
+its interpretation. 
+
+Effect handlers generalise exception handlers, providing a mechanism
+for interpreting arbitrary algebraic effects. Crucially, programming
+with handlers relies on non-linear control. When an effectful
+computation performs an effect it gets suspended and control is
+transferred to some suitable handler -- much like throwing an
+exception in any conventional programming language. However, unlike
+exception handlers, effect handlers expose a structured interface that
+permits resumption of the suspended computation.
+
+%Consequently, effect handlers afford a high degree of modularity.
+
 
 Since \cite{Plotkin2013} conceived handlers many different
 implementations have appeared
-\citep{Brady2013,Kammar2013,Kiselyov2013,Kiselyov2015,Bauer2015,Dolan2015}. However most of these implementations 
-
+\citep{Brady2013,Kammar2013,Kiselyov2013,Kiselyov2015,Bauer2015,Dolan2015,Lindley2016,McBride2016,Saleh2016}.
+Most of these implementations try to embed effect handlers within an
+existing programming language. Interestingly, \cite{Dolan2015} have
+extended the industrial-strength functional programming language OCaml
+with particular, restricted kind of handlers known as \emph{affine
+  handlers} which permit suspended computations to be resumed at most
+once. Their implementation is part of the Multicore OCaml project to
+bring multicore capabilities to the OCaml programming language. They
+adopt the idea of \cite{Bauer2015} to use effect handlers to implement
+user-defined concurrent multi-threaded schedulers.
 %
-\cite{Bauer2015} demonstrates that effect handlers provide a
-succinct interface for implementing concurrency. This idea is further
-adopted by \cite{Dolan2015} in their design of Multicore OCaml.
 
 In previous work, we extended the functional web programming language
 Links with algebraic effects and handlers \citep{Hillerstrom2015}.
@@ -545,6 +559,25 @@ Currently effect handlers are only supported on the server.
 
 \section{Motivation}
 \label{sec:motivation}
+
+Managed programming languages tend to be closely tied to a complex,
+monolithic run-time system.
+
+%
+Benefits: Simplifies the life of the compiler writer; provides the
+programmer with more flexibility.
+\section{Problem statement}
+\label{sec:problem-statement}
+
+It poises an interesting research question whether we can reconstruct
+the message-passing concurrency model of Links using effect handlers
+without any special concurrency support from the compiler.
+
+\begin{center}
+  \emph{How can we compile the handlers of Links to native code, and
+    moreover, how can we reconstruct a faithful implementation of the
+    message-passing concurrency model of Links with handlers?}
+\end{center}
 
 % \section{Problem analysis}
 
@@ -576,15 +609,23 @@ Currently effect handlers are only supported on the server.
 
 
 %\section{Problem statement}
-\section{Aims and objectives}
+\section{Scope, aims, and objectives}
+
+Links is full-fledged programming language for the web. In this work
+we will restrict ourselves to work only with a subset of Links,
+namely, the backend of Links which supports effect
+handlers. Furthermore, we aim to extend the Links infrastructure with
+a native backend for effect handlers. We will deliberately leave
+support for the web-related features of Links to future work.
+
 Our main contributions are
 \begin{itemize}
 \item A compiler for Links with effect handlers, that supports the
-  full abstraction provided by deep handlers.
+  full abstraction provided by deep handlers~\citep{Hillerstrom2016b}.
 \item A reconstruction of the message-passing concurrency model of
-  Links using effect handlers.
+  Links using effect handlers~\citep{Hillerstrom2016c}.
 \item A formalisation of the implementation of effect handlers in
-  Links.
+  Links~\citep{Hillerstrom2016a}.
 \end{itemize}
 \section{Thesis outline}
 
@@ -1325,7 +1366,7 @@ makes essential use of subtyping, includes a region system, and a form
 of effect polymorphism, which one might reasonably cast as a form of
 row polymorphism.
 
-\item Frank by \cite{McBride2014} takes the idea of effect handlers to
+\item Frank by \cite{Linedley2016} takes the idea of effect handlers to
   the extreme, having no primitive notion of function, only
   handlers. In Frank a function is but a special case of a handler.
   Frank is built on a bidirectional type system. It includes an effect
@@ -1367,11 +1408,18 @@ simply be stored on the stack.
 \chapter{Compiling effect handlers}
 \label{ch:compiling}
 
-In this chapter we describe our compiler for Links. In addition, we
-give a formalisation of the intermediate language used within the
-Links compiler. Furthermore, we describe the translation of the
-intermediate representation of Links into the intermediate
-representation of OCaml. The material in
+Links is a strict ML-like functional language for the web
+\citep{Cooper2006}. The defining feature of Links is that it provides
+a single source language that targets all three tiers of a web
+application: client, server, and database. Links source code is
+translated into an intermediate representation (IR) based on A-normal
+form~\citep{Flanagan1993}.
+
+In this chapter we describe our native compiler backend for
+server-side Links. In addition, we give a formalisation of the
+intermediate language used within the Links compiler. Furthermore, we
+describe the translation of the intermediate representation of Links
+into the intermediate representation of OCaml. The material in
 Section~\ref{sec:compilation-strategy} and
 Section~\ref{sec:representation} is based on \cite{Hillerstrom2016b},
 while the contents of Section~\ref{sec:lambe-eff-row} are based on
