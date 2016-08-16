@@ -642,6 +642,33 @@ without any special concurrency support from the compiler.
     message-passing concurrency model of Links with handlers?}
 \end{center}
 
+By faithful we mean an implementation that is close to the built-in
+implementation of the Links interpreter as we inevitably have to give
+up special syntax once we reify concurrency as user-defined library.
+
+\subsection{Approach and proposed solution}
+
+Recently, the Multicore OCaml project \citep{Dolan2015} has extended
+the industrial-strength functional programming language OCaml with
+so-called \emph{linear} effect handlers as an effort to bring
+multicore capabilities to the language. The purpose of adding handlers
+is to enable programmers to express user-defined concurrent
+multi-threaded schedulers.
+
+Implementing a native backend for a programming language such as Links
+is a non-trivial task. In order to make it viable task we plan to take
+advantage of Multicore OCaml backend that provides native support for
+effect handlers, and that Links is written in OCaml. Thus we intend to
+integrate the OCaml backend into Links infrastructure and translate
+the Links intermediate representation into the intermediate
+representation of OCaml.
+
+Our work differs from theirs as we try to support the full abstraction
+afforded by handlers, moreover, we attempt to implement
+process-oriented rather shared-memory concurrency. Furthermore, we
+consider how to encode an entire message-passing concurrency model
+using handlers.
+
 % \section{Problem analysis}
 
 % \todo{Parallelism is multiplicity of processors simultaneously}
@@ -1392,19 +1419,18 @@ implementations based on free monads~\citep{Kammar2013, Kiselyov2013,
 % in Haskell it relies on them being type classes, and hence not really
 % first class.
 
-\citet{Kammar2013} take advantage of Haskell's aggressive
-fusion optimisations for an efficient Haskell library for handlers, as
-explained in detail by \citet{Wu2015}. \citet{Kiselyov2015} also
-optimise a different Haskell library for handlers, taking advantage of
-prior work on optimising monadic reflection~\citep{Ploeg2014}.
+\citet{Kammar2013} take advantage of Haskell's aggressive fusion
+optimisations for an efficient Haskell library for handlers, as
+explained in detail by \citet{Wu2015}. \citet{Saleh2016} apply a
+similar technique for optimising their embedding of handlers in
+ProLog. \citet{Kiselyov2015} also optimise a different Haskell library
+for handlers, taking advantage of prior work on optimising monadic
+reflection~\citep{Ploeg2014}.
 
 The Idris effects library by \cite{Brady2013} takes advantage of
 dependent types to provide effect handlers for a form of effects
 corresponding to parameterised monads~\citep{Atkey09}.
 %
-The implementation in Idris does not consider the performance effect
-handlers.
-
 Our work differs from these systems in that we compile effect handlers
 directly, rather than via library.
 
@@ -1420,47 +1446,57 @@ It includes a novel feature for supporting fresh generation of effects
 in order to support effects such as ML-style higher-order state (which
 has an operation for generating new references).
 %
-The original version of Eff~\citep{Bauer2015} does not include an
-effect type system. However, an effect type system has subsequently
-been experimented with~\citep{BauerP13, Pretnar2014}.
-%
-This effect type system is considerably more complicated than ours. It
-makes essential use of subtyping, includes a region system, and a form
-of effect polymorphism, which one might reasonably cast as a form of
-row polymorphism.
+% The original version of Eff~\citep{Bauer2015} does not include an
+% effect type system. However, an effect type system has subsequently
+% been experimented with~\citep{BauerP13, Pretnar2014}.
+% %
+% This effect type system is considerably more complicated than ours. It
+% makes essential use of subtyping, includes a region system, and a form
+% of effect polymorphism, which one might reasonably cast as a form of
+% row polymorphism.
 
-\item Frank by \cite{Linedley2016} takes the idea of effect handlers to
+\item Frank by \cite{Lindley2016} takes the idea of effect handlers to
   the extreme, having no primitive notion of function, only
-  handlers. In Frank a function is but a special case of a handler.
-  Frank is built on a bidirectional type system. It includes an effect
-  type system and a novel form of effect polymorphism in which the
-  programmer never needs to read or write any effect
-  variables. Frank's effect system can be viewed as implementing a
-  form of row polymorphism. Unlike Links, but much like
-  Koka by \cite{Leijen14}, Frank allows multiple occurrences of the same
-  label in a row. In contrast rows in Links are based on Remy's design
-  in which duplicates are not allowed, but negative information is.
+  handlers. In Frank a function is but a special case of a
+  handler. Interestingly, Frank includes the notion of
+  \emph{multi-handlers} which handle multiple computations at
+  once. Frank is built on a bidirectional type system. It includes an
+  effect type system and a novel form of effect polymorphism in which
+  the programmer never needs to read or write any effect
+  variables. Currently, Frank has only a prototypical implementation.
+  % Frank's effect system can be viewed as implementing a
+  % form of row polymorphism. Unlike Links, but much like
+  % Koka by \cite{Leijen14}, Frank allows multiple occurrences of the same
+  % label in a row. In contrast rows in Links are based on Remy's design
+  % in which duplicates are not allowed, but negative information is.
 
-\item Shonky by \cite{McBride2016} amounts to a dynamically-typed variant
-  of Frank. Though it is not statically typed, handlers must be
-  annotated with the names of the effects that they handle. The
-  implementation of Shonky is quite similar to ours in that it uses a
-  generalisation of the CEK machine. The main differences are that
-  Shonky does not use an ANF representation, so has more forms of
-  continuation to handle, and in contrast to our nested continuation
-  structure, Shonky uses a completely flat structure.
-  % and where our continuations have a nested
-  % structure, Shonky uses a completely flat structure for
-  % continuations.
+\item Shonky by \cite{McBride2016} amounts to a dynamically-typed
+  variant of Frank. Though it is not statically typed, handlers must
+  be annotated with the names of the effects that they handle. The
+  implementation of Shonky uses a generalisation of the CEK machine
+  akin to the one used by the Links interpreter. The main differences
+  are that Shonky uses a different IR than Links. 
+  % does not use an ANF representation, so has more
+  % forms of continuation to handle, and in contrast to our nested
+  % continuation structure, Shonky uses a completely flat structure.
+  % % and where our continuations have a nested
+  % % structure, Shonky uses a completely flat structure for
+  % % continuations.
 \end{itemize}
 
 Although OCaml itself has no support for effect handlers, a
-development branch, Multicore OCaml~\cite{Dolan2015}, does. Multicore
+development branch, Multicore OCaml~\citep{Dolan2015}, does. Multicore
 OCaml does not include an effect type system, and handlers are
 restricted so that continuations are affine, that is, they can be
 invoked at most once. This design admits a particularly efficient
-implementation, as continuations need never be copied, so they can
-simply be stored on the stack.
+implementation~\citep{Bruggeman1996}, as continuations need never be
+copied, so they can simply be stored on the stack.
+
+The programming language Koka by \citet{Leijen2016} has recently
+been extended with effect handlers. The Koka compiler employs a
+particularly efficient compilation scheme using a type directed
+selective continuation-passing style (CPS) translation in order to
+compile effect handlers to common runtime platforms.
 
 \subsection{Parallel programming models}
 \todo{\cite{Marlow2013}}
