@@ -533,24 +533,25 @@ The source language is compiled to a common intermediate
 representation (IR).  For the client, the IR is compiled to
 JavaScript. For the server, the IR is interpreted using a variant of
 the CEK machine~\citep{Felleisen1986,Hillerstrom2016a}. For the
-database, the IR is translated into an SQL query, taking advantage of
-the effect type system and the subformula property to guarantee query
-generation~\citep{Lindley2012}.
+database, the IR is translated into an SQL query.
+%, taking advantage of
+%the effect type system and the subformula property to guarantee query
+%generation~\citep{Lindley2012}.
 %
 In addition, Links has built-in support for concurrency. The
 concurrency model of Links is a variant of the actor
-model~\citep{Hewitt1977} with type-safe communication amongst
-processes.
+model~\citep{Hewitt1977} with type-safe interaction amongst processes.
 
-In this work we extend the Links infrastructure with a native backend
-with support for effect handlers~\citep{Hillerstrom2016b}. In order to
-keep the compiler lean we separate the implementation of the
-concurrency model of Links from the compiler. Instead we reconstruct
-the message-passing concurrency implementation using effect
-handlers~\citep{Hillerstrom2016c}. In addition to keeping the compiler
-lean, lifting the concurrency implementation into user-space allows us
-to experiment with different implementations or even have several
-different implementations coexisting.
+In this dissertation we present an extension to the Links
+infrastructure: a native backend with support for effect
+handlers~\citep{Hillerstrom2016b}. In order to keep the compiler lean
+we separate the implementation of the concurrency model of Links from
+the compiler. Instead we reconstruct the message-passing concurrency
+implementation using effect handlers~\citep{Hillerstrom2016c}. In
+addition to keeping the compiler lean, lifting the concurrency
+implementation into user-space allows us to potentially experiment
+with different implementations or even have several different
+implementations coexisting.
 
 % Computational effects are pervasive in programming. They arise
 % naturally in many applications in many different shapes such as
@@ -604,13 +605,30 @@ different implementations coexisting.
 \section{Motivation}
 \label{sec:motivation}
 
-Managed programming languages tend to be closely tied to a complex,
-monolithic run-time system. Such run-time systems are difficult to
-maintain and change.
+Mainstream managed programming languages tend to be closely tied to a
+complex, monolithic runtime system. Examples are the Java family of
+programming languages, that run on top of Oracle's Java HotSpot
+VM~\citep{HotSpot2016}; the .NET family of programming languages, that
+run on top of Microsoft's Common Language Runtime~\citep{CLR2016}; the
+Haskell programming language with the Glasgow Haskell Compiler Runtime
+System~\citep{GHC2014}.
 
+Typically runtime systems are responsible for managing concurrency
+amongst other things such as garbage-collection, and any language
+features which do not compile to code themselves. Often concurrency
+support is hard-wired deeply into the runtime, requiring special
+support from the compiler to expose concurrency primitives as
+libraries for the programmer~\citep{KC2016}. As a consequence it is
+difficult to change the concurrency implementation.
+
+If we can lift concurrency into the programming language, allowing
+programmers to compose their own domain-specific concurrency
+abstractions, then we not only simplify the compiler and runtime
+system, we also simplify the life of the compiler writer.
 %
-Benefits: Simplifies the life of the compiler writer; provides the
-programmer with more flexibility.
+
+%Benefits: Simplifies the life of the compiler writer; provides the
+%programmer with more flexibility.
 \section{Problem statement}
 \label{sec:problem-statement}
 
