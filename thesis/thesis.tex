@@ -4475,11 +4475,19 @@ cooperative routines to provide concurrency.
 \section{Critical evaluation}
 \label{sec:criticaleval}
 
-% \section{Compiling effect handlers}
-% \label{sec:conclude-compiling}
+A constructive criticism is that I have not presented a good example
+of the usefulness of multi-shot handlers in concurrent
+programming. Though, I imagine that multi-shot handlers can prove
+useful in database transactions to implement a feature such as partial
+aborts in the style of \cite{Le2015}. In addition, it would make a
+much more natural story to have examples that involve the unique
+features of Links.
 
-% \section{Effect handler enabled concurrency}
-% \label{sec:conclude-concurrency}
+In the clarity of hindsight, I should have invested more time on
+setting up a benchmarking infrastructure early on to provide me with
+continuous feedback. It was only in the latter stages of the project
+that I managed to set this up, and it was incredible fruitful to see
+graphs.
 
 \section{Future work}
 \label{sec:futurework}
