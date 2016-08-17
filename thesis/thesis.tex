@@ -1498,8 +1498,22 @@ particularly efficient compilation scheme using a type directed
 selective continuation-passing style (CPS) translation in order to
 compile effect handlers to common runtime platforms.
 
-\subsection{Parallel programming models}
-\todo{\cite{Marlow2013}}
+\subsection{Abstracting concurrency}
+Lots of previous work has been done on abstracting concurrency. We
+will mention a few papers that relate somewhat to our approach.
+
+\cite{Marlow2013} gives a fairly comprehensive account of abstractions
+for concurrent, parallel, and distributed programming in Haskell.
+\todo{Finish this section}
+
+\cite{Marlow2014} describe a programming idiom for modular concurrent
+programming in Haskell based on Applicative Functors, which they
+employ in their codebase in Facebook.  The key insight is that the
+Applicative operator (\lstinline$<*>$) permits concurrent evaluation
+of both its arguments. 
+% By separating the signature of an applicative from its
+% implementation
+
 
 %%
 %% Compiling handlers
@@ -1671,11 +1685,11 @@ machine \citep{Hillerstrom2016a}, which interprets ANF code directly.
 For the native backend our compilation strategy is to translate the
 Links ANF language into the OCaml \emph{Lambda} language, which is a
 small, untyped lambda calculus. The OCaml backend exposes a hierarchy
-of intermediate representations (IRs), where the top representation is
-known as Lambda. As shown in the Figure \ref{fig:infra-diagram}, the
-Lambda IR offers two different compilation options: byte code and
-native code. Therefore by targeting Lambda rather than a lower level
-IR, we achieve maximum flexibility as a translation into byte code, in
+of intermediate representations, where the top representation is known
+as Lambda. As shown in the Figure \ref{fig:infra-diagram}, the Lambda
+IR offers two different compilation options: byte code and native
+code. Therefore by targeting Lambda rather than a lower level IR, we
+achieve maximum flexibility as a translation into byte code, in
 principle, enables us to take advantage of custom backends.
 
 %
@@ -2348,6 +2362,8 @@ By induction on the given typing derivation.
 \newcommand{\Error}{\keyw{error}}
 \newcommand{\Delegate}{\keyw{delegate}}
 
+\newcommand{\LBox}[1]{\langle\!\!\langle #1 \rangle\!\!\rangle}
+
 \begin{figure}
 \begin{syntax}
 \slab{Expressions}   &L,I,J  &::= & x\\
@@ -2357,27 +2373,32 @@ By induction on the given typing derivation.
                      &     &\mid& L\,J\\
                      &     &\mid& P\\
                      &     &    &\\
-\slab{Primitives}    &P    &::= & \Eq(L,J)\\
-                     &     &\mid& [X]\\
+\slab{Primitives}    &P    &::= & i\\
+                     &     &\mid& \LBox{X}\\
                      &     &\mid& \Field_i\; L\\
-                     &     &\mid& \Perform \; (l\,J) \\
-                     &     &\mid& \Resume(S,L) \\
+                     &     &\mid& \Error\\
+                     &     &\mid& \Eq(L,J)\\
                      &     &\mid& \Clone \; L\\
+                     &     &\mid& \Perform \; L \\
+                     &     &\mid& \Resume(S,L) \\
                      &     &\mid& \Delegate(L,J)\\
 \slab{Box}           &     &::= & L;X \mid \cdot\\
 \slab{Stacks}        &S    &::= & \Alloc (L,I,J)\\
-\slab{Labels}        &l    &\in & \mathbb{L}\\
-\slab{Integers}      &i    &\in & \mathbb{Z} 
+%\slab{Labels}        &l    &\in & \mathbb{L}\\
+\slab{Integers}      &i,l  &\in & \mathbb{Z} 
 \end{syntax}
 \caption{Term syntax for Lambda.}\label{fig:lambda-terms}
 \end{figure}
 
 In this section we describe OCaml IR Lambda, which is an untyped
-call-by-value lambda calculus. The Lambda IR is a fairly high-level
-language, however not every Lambda program is portable across
-different native targets \citep{Dolan2016}. It does not have a
-formally specified semantics. However, \citet{Dolan2016} gives
-definitional interpreter for a subset of the Lambda IR.
+call-by-value lambda calculus. Lambda is a fairly high-level language
+even though it exposes low-level primitives. However a rather daunting
+problem with Lambda is that it does not have a formally specified
+semantics. As a result the behaviour of Lambda programs vary depending
+on the platform. As a consequence it is considerably complicated to
+exhibit a faithful translation into Lambda. Hopefully, this will
+change in the future as both \cite{Dolan2016} and \cite{Chambert2016}
+are working on defining a semantics for Lambda.
 
 A small fragment of Lambda suffices for our purposes.
 Figure~\ref{fig:lambda-terms} gives the term syntax of the subset of
@@ -2387,7 +2408,7 @@ Lambda that we consider.
 The term syntax is given in Figure~\ref{fig:lambda-terms}. The term
 syntax comprises: \emph{expressions}, \emph{primitives}, and
 \emph{stacks}. Expressions comprise variables ($x$) and conditional
-expressions ($\If\; L \; \Then\; I \Else\; J$) which evaluate one of
+expressions ($\If\; L \; \Then\; I\; \Else\; J$) which evaluate one of
 their branches depending on the evaluation of $L$. Let-bindings
 ($\Let\; x \revto L\; \In \; J$) are similar to those of \Calc. The
 expression ($\Fun \; x \mapsto L$) is a lambda abstraction that binds
@@ -2395,17 +2416,21 @@ the variable $x$ in the body $L$. Expression application ($L\,J$) is
 the standard eliminator for lambda abstractions. Expressions also
 comprise primitives.
 
-The primitive category consists of operations which are given special
-support by the OCaml compiler.  The primitive $\Eq$ is a binary
-structural equality operator. The primitive $\Makeblock_i$ creates a
-contiguous block of memory with $i$ fields. The dual operation
-$\Field_i$ projects the $i$th field of a contiguous block.  The
-operations $\Perform$, $\Resume$, $\Clone$, and $\Delegate$ are all
-crucial to the implementation of handlers. 
+The primitive category comprises integers, a box introduction
+primitive ($\LBox{X}$) and a box elimination primitive ($\Field_i\;L$)
+whose semantics is well-defined if and only if the expression $L$
+evaluates to a box in which case it projects the $i$th element of the
+given box.  The $\Error$ primitive is a special instruction which
+abruptly halts program execution. The generic, structural equality
+operator ($\Eq(L,J)$) compares its two arguments. It returns a boolean
+value encoded as an integer. The operations $\Perform$, $\Resume$,
+$\Clone$, and $\Delegate$ are all crucial to the implementation of
+handlers.
 
-The $\Perform(L)$ primitive invokes an abstract operation. The
-behaviour of $\Perform$ is undefined when $L$ does not evaluate to a
-name of an operation.
+The $\Perform(L)$ primitive invokes an abstract operation. An abstract
+operation is encoded as a two-place box, where the first component
+contains the operation name and the second component contains the
+operation argument.
 %
 The $\Resume(S,L)$ primitive evaluates the expression $L$ with a
 handler $S$. If an abstract operation is performed in $L$ then the
@@ -2419,7 +2444,7 @@ The $\Clone(L)$ primitive makes a copy of an expression $L$. This
 primitive is paramount to the successful encoding of multi-shot
 handlers of Links as Lambda supports only linear handlers.
 %
-A handler in Lambda is represented as a stack. The $\Alloc(L,I,J)$
+A handler in Lambda is represented as a triple. The $\Alloc(L,I,J)$
 primitive allocates a new handler on the heap with return clause $L$,
 an exception clause $I$, and an operation clause $J$.
 
@@ -2434,10 +2459,15 @@ an exception clause $I$, and an operation clause $J$.
 \label{sec:translation}
 
 \newcommand{\trans}[1]{\llbracket #1 \rrbracket}
-\newcommand{\mtrans}[1]{\trans{#1}_\mathcal{M}}
-\newcommand{\vtrans}[1]{\trans{#1}_\mathcal{V}}
-\newcommand{\htrans}[1]{\trans{#1}_\mathcal{H}}
-\newcommand{\hptrans}[1]{\trans{#1}_{\mathcal{H}^{op}}}
+%\newcommand{\mtrans}[1]{\trans{#1}_\mathcal{M}}
+% \newcommand{\vtrans}[1]{\trans{#1}_\mathcal{V}}
+% \newcommand{\htrans}[1]{\trans{#1}_\mathcal{H}}
+% \newcommand{\hptrans}[1]{\trans{#1}_{\mathcal{H}^{op}}}
+
+\newcommand{\mtrans}[1]{\mathcal{M}\left(#1\right)}
+\newcommand{\vtrans}[1]{\mathcal{V}\left(#1\right)}
+\newcommand{\htrans}[1]{\mathcal{H}\left(#1\right)}
+\newcommand{\hptrans}[1]{\mathcal{H}^{op}\left(#1\right)}
 
 \begin{figure}
 Handle translation
@@ -2466,7 +2496,7 @@ Operation clause translation
 \begin{mathpar}
 \begin{eqs}
 %  \htrans{H} &=& \Fun \; x \mapsto \Fun \; k \mapsto \hptrans{H}^{x,k}\\
-  \hptrans{\{\ell \, x \, k \mapsto M\} \uplus H, (l\, x'), k'} &=&  \If \; \Eq(\mathcal{N}(\ell), l) \; \Then \\
+  \hptrans{\{\ell \, x \, k \mapsto M\} \uplus H, \LBox{l; x'}, k'} &=&  \If \; \Eq(\mathcal{N}(\ell), l) \; \Then \\
                                                        & & 
 \begin{eqs}
  & &\Let \; k'' \revto \Fun \; y \mapsto (\Clone\; k') y\\
@@ -2480,7 +2510,7 @@ Operation clause translation
 Operation invocation translation
 \begin{mathpar}
 \begin{eqs}
-  \mtrans{\Do (\ell \; V)^E} &=& \Perform \; \vtrans{(\ell \; V)^E}
+  \mtrans{\Do\; (\ell \; V)^E} &=& \Perform \; \vtrans{(\ell \; V)^E}
 \end{eqs}
 \end{mathpar}
 \caption{Translation of Links handlers into Lambda terms.}\label{fig:translation}
@@ -2512,7 +2542,7 @@ clauses.
 An operation clause translate into a conditional expression that
 checks whether operation clause label matches the invoked
 operation. We assume the existence of a function
-$\mathcal{N} : \mathcal{L} \to \mathbb{L}$ that maps labels in Links
+$\mathcal{N} : \mathcal{L} \to \mathbb{Z}$ that maps labels in Links
 to labels in Lambda. In case they are the same, then we follow the
 first branch and create a wrapper function, $k''$, around the
 continuation. This wrapper function clones the continuation $k'$

@@ -18,8 +18,8 @@ fun drunkToss() { if (do Choose) toss()
 sig randomResult : (Comp({Choose:Bool |e}, a)) ->
                     Comp({Choose{_}   |e}, a)
 handler randomResult {
-  case Return(x) -> x
-  case Choose(k) -> k(random() > 0.5)
+  case Return(x)      -> x
+  case Choose(resume) -> resume(random() > 0.5)
 }
 #end
 
@@ -27,8 +27,8 @@ handler randomResult {
 sig allResults : (Comp({Choose:Bool |e},  a)) ->
                   Comp({Choose{_}   |e}, [a])
 handler allResults {
-  case Return(x) -> [x]
-  case Choose(k) -> k(true) ++ k(false)
+  case Return(x)      -> [x]
+  case Choose(resume) -> resume(true) ++ resume(false)
 }
 #end
 
