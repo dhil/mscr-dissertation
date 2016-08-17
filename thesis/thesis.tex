@@ -2485,8 +2485,8 @@ Handler stack allocation
  \begin{eqs}
    &&\Fun \; \vtrans{x} \mapsto \mtrans{M},\\
    &&\Error,\\
-   &&\Fun \;b \mapsto \Let\; y \revto \Field_1\; b \; \In \\
-   &&\Let\; k \revto \Field_2\; b \; \In \; \hptrans{H,y,k}
+   &&\Fun \;z \mapsto \Let\; y \revto \Field_1\; z \; \In \\
+   &&\Let\; k \revto \Field_2\; z \; \In \; \hptrans{H,y,k}
  \end{eqs}
 \right)
 \end{eqs}
@@ -2513,6 +2513,13 @@ Operation invocation translation
   \mtrans{\Do\; (\ell \; V)^E} &=& \Perform \; \vtrans{(\ell \; V)^E}
 \end{eqs}
 \end{mathpar}
+
+Operation translation
+\begin{mathpar}
+\begin{eqs}
+  \vtrans{(\ell \; V)^E} &=& \LBox{\mathcal{N}(\ell); \vtrans{V}}
+\end{eqs}
+\end{mathpar}
 \caption{Translation of Links handlers into Lambda terms.}\label{fig:translation}
 \end{figure}
 
@@ -2520,10 +2527,12 @@ The translation from Links to Lambda consists of three mutual
 recursive translation functions: $\vtrans{\cdot}$ which translate a
 Links value into a Lambda term, $\mtrans{\cdot}$ which translates a
 Links computation term into a Lambda term, and $\htrans{\cdot}$ which
-translates a Links handler into Lambda term. The latter is the only
-interesting translation function as both $\vtrans{\cdot}$ and
-$\mtrans{\cdot}$ are homomorphisms on most other syntax constructors.
-Figure~\ref{fig:translation} shows the translation of handlers.
+translates a Links handler into a Lambda term. Additionally, we
+require a function $\mathcal{N} : \mathcal{L} \to \mathbb{Z}$ that
+maps labels in Links to labels in Lambda, which happens to be just
+integers.  Figure~\ref{fig:translation} shows the translation of
+handlers. The other syntax constructors are mostly straightforward to
+translate.
 
 The ($\Handle\; M \; \With\; H$) gets translated into a resumable
 context. The handler $H$ gets translated into a Lambda handler, which
@@ -2532,45 +2541,56 @@ clause of $H$ independently of the operation clauses. In the exception
 component of \Alloc\ we place the \Error\ primitive. This is safe
 because Links does not have a distinct notion of exception as in
 OCaml, and thus there is no way we could ever raise an exception that
-would activate this component. In the operation clause component we
-create a curried function which first binds the operation label and
-then binds the continuation of the operation. We use an auxiliary
-translation function $\hptrans{\cdot,op,k}$, which carries a reference
-to the invoked operation and the continuation, to translate the
-operation clauses.
+would activate this component. 
+%
+In the operation clause component we install a function whose argument
+$z$ is a box of two elements: an operation and the continuation of the
+operation. In the function body we dismantle the box by projecting and
+binding the operation to a fresh variable $y$. Similarly, we project
+and bind the continuation to $k$. These two variables are passed to an
+auxiliary translation function $\hptrans{\cdot,y,k}$. This function
+needs to keep track of the performed operation and its continuation as
+it translates the operation clauses recursively.
 
-An operation clause translate into a conditional expression that
-checks whether operation clause label matches the invoked
-operation. We assume the existence of a function
-$\mathcal{N} : \mathcal{L} \to \mathbb{Z}$ that maps labels in Links
-to labels in Lambda. In case they are the same, then we follow the
-first branch and create a wrapper function, $k''$, around the
-continuation. This wrapper function clones the continuation $k'$
-before use, which effectively lets us reuse a linear continuation
-multiple times. If the two labels are not the same then we try another
-operation clause in the second branch. When there are no more
-operation clauses to translate then we insert a $\Delegate$ which
-forwards the operation label $x$ and the continuation $k$ to another
+The translation of operation clauses is rather involved. The basic
+idea is to translate the clauses into a chain of if-then-else
+expressions with each if-expression guarding a particular clause
+body. We check whether the label of the operation clause matches the
+label of the invoked operation. If they match then we create a fresh
+wrapper function, $k''$, around the continuation. This wrapper
+function is key to simulate multi-shot continuations with linear
+continuation as it clones the continuation $k'$ before use, which
+effectively lets us reuse a linear continuation multiple
+times. Crucially, we substitute the binder of the wrapper function for
+the binder of the continuation in the translated body. We also
+substitute the binder to the operation argument. When there are no
+more operation clauses to translate then we insert a $\Delegate$ which
+forwards the operation $x$ and the continuation $k$ to another
 enclosing handler.
 
-\section{Run-time representation}
+\section{Runtime representation}
 \label{sec:representation}
 By using the OCaml backend we naturally inherit the OCaml
 run-time. OCaml implements effect handlers as heap-managed stack data
-structures, and as a consequence composition of handlers gives rise to
-$n$-element stacks at run-time. For example, the composition
-\lstinline[mathescape]!maybeResult(randomResult($\cdot$))! is
-represented as a two-element linked list as shown in
-Figure~\ref{fig:rtstack}. Thus, an invocation of an abstract operation
-amounts to performing a dynamic lookup to locate a suitable handler in
-the linked list.
+structures, and as consequence composition of handlers gives rise to
+$n$-element stacks at runtime. For example, the composition
+\lstinline[mathescape]!maybeResult(randomResult(drunkToss))! is
+represented as a two-element stack as shown in
+Figure~\ref{fig:rtstack}. In the figure we have explicitly unpacked
+the computation to exemplify how the abstract operations have
+immediate access to the enclosing handler's operation clause. For
+example, the \lstinline$Choose$ operation has direct access its
+corresponding clause in the current handler. By contrast, the
+\lstinline$Fail$ operation will have to fall-through the
+\lstinline$Choose$-clause before finding its corresponding clause in
+the next handler. Thus, an invocation of an abstract operation amounts
+to performing a dynamic lookup to locate a suitable handler in the
+stack.
 
-Since the primary use of handlers in OCaml is to express concurrency,
-OCaml handlers are affine; continuations can only be resumed at most
-once, and multiple invocations of a continuation causes a run-time
-error. We can simulate multi-shot handlers can be simulated by cloning
-continuations prior to invocation. The cost of cloning is linear in
-the length of the linked list. 
+As we demonstrated in our translation, we simulate multi-shot handlers
+by cloning continuations prior to invocation. The cost of cloning is
+linear in the size of stack. Thus it becomes rather expensive to
+invoke an abstract operation in a deep pipeline of handlers.
 
 % However, cloning is a fragile abstraction; if the handler stack
 % contains at least one multi-shot handler, then every affine handler
@@ -4426,22 +4446,31 @@ Number of process & 27 & 47 & 80 & 111 & 140 & 169 \\
 \chapter{Conclusions and future work}
 \label{ch:conclusions}
 
-We have presented a compiler for the functional programming Links with
-effect handlers. The compiler interfaces with the OCaml Multicore
-backend to generate native code. Specifically, we translate the
-intermediate representation of Links to the intermediate
-representation of OCaml known as Lambda. The Lambda intermediate
-language contains primitives to support compilation of linear effect
-handlers. Our translation demonstrates how to encode the multi-shot
-handlers of Links in Lambda using a cloning primitive to copy
-continuations prior to invocation.
+We presented a compiler for the functional programming Links with an
+emphasise on the compilation of effect handlers. The compiler
+interfaces with the OCaml Multicore backend to generate native
+code. Specifically, we demonstrated a translation from the Links IR to
+OCaml IR known as Lambda.  The Lambda intermediate language contains
+primitives to support compilation of linear effect handlers. Our
+translation demonstrates how to encode the multi-shot handlers in
+Lambda using a cloning primitive to copy continuations prior to
+invocation. However, whether our translation is faithful is not clear
+as Lambda does not have a formally specified semantics.
 
-%
+By contrast, the Links IR now have a formally specified semantics as
+we presented a core calculus \Calc{} that captures the essence of the
+Links IR.
 
-The compiler does not provide any built-in support for the concurrency
-model of Links. We demonstrated how to implement the concurrency model
-using effect handlers. The implementation uses cooperative routines to
-provide concurrency.
+Rather than baking concurrency support into the compiler, we presented
+a modular implementation of the concurrency model of Links using
+effect handlers. Our implementation closely approximates the built-in
+implementation provided by the Links interpreter. By taking advantage
+of the effect system, we manage to encode a process abstraction akin
+to the built-in one, which tracks the effects that a process may
+perform. We also identified some shortcomings and limitations of our
+concurrency implementation (c.f. Section~\ref{sec:limitations}), in
+particular, we do not have preemptive concurrency since we use
+cooperative routines to provide concurrency.
 
 \section{Critical evaluation}
 \label{sec:criticaleval}
