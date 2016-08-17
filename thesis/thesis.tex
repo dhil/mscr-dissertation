@@ -1760,7 +1760,7 @@ Links programs are already typechecked.
 % function. Thus, the initial parameter values are applied directly to
 % the \lstinline$handle$ expression.
 
-\section{A formalisation of the Links IR}
+\section{A formalisation of the Links intermediate language}
 \label{sec:lambe-eff-row}
 
 In this section, we present a type and effect system and a small-step
@@ -2345,7 +2345,7 @@ effect $E$.
 By induction on the given typing derivation.
 \end{proof}
 
-\section{The Lambda IR}
+\section{The Lambda intermediate language}
 \label{sec:lambda}
 
 \newcommand{\If}{\keyw{if}}
@@ -2400,21 +2400,21 @@ exhibit a faithful translation into Lambda. Hopefully, this will
 change in the future as both \cite{Dolan2016} and \cite{Chambert2016}
 are working on defining a semantics for Lambda.
 
-A small fragment of Lambda suffices for our purposes.
-Figure~\ref{fig:lambda-terms} gives the term syntax of the subset of
-Lambda that we consider.
+% A small fragment of Lambda suffices for our purposes.
+% Figure~\ref{fig:lambda-terms} gives the term syntax of the subset of
+% Lambda that we consider.
 
 \subsection{Terms} 
 The term syntax is given in Figure~\ref{fig:lambda-terms}. The term
-syntax comprises: \emph{expressions}, \emph{primitives}, and
-\emph{stacks}. Expressions comprise variables ($x$) and conditional
-expressions ($\If\; L \; \Then\; I\; \Else\; J$) which evaluate one of
-their branches depending on the evaluation of $L$. Let-bindings
-($\Let\; x \revto L\; \In \; J$) are similar to those of \Calc. The
-expression ($\Fun \; x \mapsto L$) is a lambda abstraction that binds
-the variable $x$ in the body $L$. Expression application ($L\,J$) is
-the standard eliminator for lambda abstractions. Expressions also
-comprise primitives.
+syntax comprises: \emph{expressions}, \emph{primitives}, \emph{boxes},
+and \emph{stacks}. Expressions comprise variables ($x$) and
+conditional expressions ($\If\; L \; \Then\; I\; \Else\; J$) which
+evaluate one of their branches depending on the evaluation of
+$L$. Let-bindings ($\Let\; x \revto L\; \In \; J$) are similar to
+those of \Calc. The expression ($\Fun \; x \mapsto L$) is a lambda
+abstraction that binds the variable $x$ in the body $L$. Expression
+application ($L\,J$) is the standard eliminator for lambda
+abstractions. Expressions also comprise primitives.
 
 The primitive category comprises integers, a box introduction
 primitive ($\LBox{X}$) and a box elimination primitive ($\Field_i\;L$)
@@ -2527,17 +2527,17 @@ Figure~\ref{fig:translation} shows the translation of handlers.
 
 The ($\Handle\; M \; \With\; H$) gets translated into a resumable
 context. The handler $H$ gets translated into a Lambda handler, which
-is allocated using the \Alloc\ primitive. We translate the
-return clause of $H$ independently of the operation clauses. In the
-exception component of \Alloc\ we place the \Error\ primitive. This is
-safe because Links does not have a distinct notion of exception as in
+is allocated using the \Alloc\ primitive. We translate the return
+clause of $H$ independently of the operation clauses. In the exception
+component of \Alloc\ we place the \Error\ primitive. This is safe
+because Links does not have a distinct notion of exception as in
 OCaml, and thus there is no way we could ever raise an exception that
 would activate this component. In the operation clause component we
 create a curried function which first binds the operation label and
 then binds the continuation of the operation. We use an auxiliary
-translation function $\hptrans{\cdot}^{op,k}$, which carries the
-operation label and the continuation, to translate the operation
-clauses.
+translation function $\hptrans{\cdot,op,k}$, which carries a reference
+to the invoked operation and the continuation, to translate the
+operation clauses.
 
 An operation clause translate into a conditional expression that
 checks whether operation clause label matches the invoked
