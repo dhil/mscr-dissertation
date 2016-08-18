@@ -27,7 +27,6 @@ var pidToString = intToString;
 #end
 
 # Fresh name generator
-#snippet:freshnames.links
 sig names : ((a)   {FreshName{p}|e}~> a ,a)  ->
             (Comp( {FreshName:a |e}    ,b)) ->
              Comp( {FreshName{p}|e}    ,b)
@@ -38,6 +37,14 @@ fun names(gen, seed) {
    };
    h(seed)
 }
+#snippet:freshnames.links
+sig pidgenerator : (Int) ->
+                   (Comp({FreshName:Int|e}, b)) ->
+                    Comp({FreshName{_} |e}, b)
+handler pidgenerator(nextPid) {
+  case Return(x)    -> x
+  case FreshName(k) -> k(nextPid)(nextPid+1)
+}
 #end
 
 #snippet:freshname.links
@@ -47,8 +54,9 @@ fun freshName() {do FreshName}
 
 typename PackedProcess(e::Row,y::Type) = forall p :: Row . (ExecutionUnit(Pid,(),{ |e},())) -p-> y;
 #typename EProcess(e::Row) = forall y, p :: Row . (PackedProcess({ |e}, y)) -p-> y;
+#typename EProcess(e::Row) = (id:Pid);
 #snippet:eprocess.links
-typename EProcess(e::Row) = (id:Pid);
+typename EProcess(e::Row) = Int;
 #end
 
 fun showProcess(p) {
@@ -61,12 +69,12 @@ fun makeExecutionUnit(f, id) {
 }
 
 #snippet:makeProcess.links
-sig makeProcessHandle : (() -e-> (), Pid) -> EProcess({ |e})
-fun makeProcessHandle(_, pid) { (id=pid) }
+sig makeProcessHandle : (() -e-> (), Int) -> EProcess({ |e})
+fun makeProcessHandle(_, pid) { pid }
 #end
 
 sig getPid : (EProcess({ |e})) -> Pid
-fun getPid(proc) { proc.id }
+fun getPid(proc) { proc }
 
 #sig makeProcess : (() -e-> (), Pid) -> EProcess({ |e})
 #fun makeProcess(f, pid) {
@@ -147,18 +155,24 @@ fun dequeue(q) {
 ## TODO: Implement the queue as a handler
 
 # State handler
-sig evalState : (s) -> (Comp({Get:s,Put:(s) {}-> () |e}, a)) -> Comp({Get{_},Put{_} |e}, a)
+#snippet:evalState.links
+sig evalState : (s) ->
+                (Comp({Get:s ,Put:(s) {}-> () |e}, a)) ->
+                 Comp({Get{_},Put{_}          |e}, a)
 handler evalState(s) {
   case Get(k)    -> k(s)(s)
   case Put(s,k)  -> k(())(s)
   case Return(x) -> x
 }
+#end
 
+#snippet:getput.links
 sig get : () {Get:s|_}-> s
 fun get() {do Get}
 
 sig put : (s) {Put:(s) {}-> ()|_}-> ()
 fun put(s) {do Put(s)}
+#end
 
 # Process scheduler
 #snippet:enqueueProcess.links
@@ -173,11 +187,10 @@ fun enqueueProcess(f) {
 
 #snippet:dequeueProcess.links
 sig dequeueProcess :
-   () {Get: %q
-      ,Put:(%q) {}-> ()|_}~> (() -e-> ())
+   () {Get: Queue(() -e-> ())
+      ,Put:(Queue(() -e-> ())) {}-> ()|_}~> (() -e-> ())
 fun dequeueProcess() {
-   var q = get();
-   switch (dequeue(q)) {
+   switch (dequeue(get())) {
      case (Just(p), q) -> put(q); p
      case (Nothing, q) -> fun() { () } # The trivial process
    }
@@ -566,7 +579,7 @@ fun upRoundrobin(m)() {
 #end
 
 #snippet:pidgenerator.links
-var pidgenerator = names(fun(i) { i + 1 }, 0);
+var pidgenerator = pidgenerator(0);
 #end
 
 
@@ -586,6 +599,6 @@ fun nthfib(n)() {
   print("Fib: " ^^ intToString(precv()))
 }
 
-var dummy = run -<- names(incrPid, 0) -<- evalState([]) -<- mailbox -<- evalState(emptyQueue()) -<- roundrobin -< generator(101);
+var dummy = run -<- pidgenerator -<- evalState([]) -<- mailbox -<- evalState(emptyQueue()) -<- roundrobin -< generator(101);
 
 #var dummy = run(names(incrPid, 0)(evalState([])(mailbox(evalState(emptyQueue())(roundrobin(generator(200)))))));
