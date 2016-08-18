@@ -289,19 +289,30 @@
 %% Specify the abstract here.
 \abstract{%
   %
-  Algebraic effects and effect handlers have emerged as a modular
-  alternative to monads for handling computational
-  effects. Computational effects arise naturally in many different
-  applications.
+  Algebraic effects combined with effect handlers have emerged as
+  compelling, modular abstraction for modelling and controlling
+  computational effects. By separating the effect signatures from
+  their implementation, algebraic effects afford a high degree of
+  modularity as programmers can describe effectful computations
+  independently of their concrete interpretation.
   
-  We present a compiler for Links that uses the Multicore OCaml
-  backend to provide a native implementation of handlers.
+  We present a compiler for the functional programming language Links
+  that uses the Multicore OCaml backend to provide a native
+  implementation of effect handlers. 
 
   We present a core calculus \Calc{} with row-polymorphic effects and
   effect handlers based on a variation of A-normal form used in our
   implementation. In addition, we give an operational semantics for
   the calculus. Furthermore, we describe a translation from \Calc{} to
-  Lambda.
+  a subset of the intermediate language used by OCaml.
+
+  Interestingly, concurrency can be described as an algebraic effect,
+  whose handler amounts to a scheduler. Thus, rather than baking
+  concurrency support into the compiler, we keep the compiler lean by
+  implementing the message-passing concurrency model of Links using
+  handlers. We demonstrate a faithful encoding of the concurrency
+  model, which maintains type-safe communication by taking advantage
+  of the effect system of Links.
 %   \todo{Refine abstract} 
 % %
 %   Applications are comprised of \emph{effectful operations}, such as
@@ -503,7 +514,7 @@ A preface will possibly appear here\dots
 Computational effects are pervasive. They arise naturally in many
 different shapes such as exceptions, file i/o, global state mutation,
 concurrency, nondeterminism, and so forth. Many mainstream programming
-languages provide no or little support for controlling computational
+languages provide little or no support for controlling computational
 effects -- in most cases control is limited to exception
 handling. Recently \emph{algebraic
   effects}~\citep{Plotkin2001,Plotkin2003} combined with \emph{effect
@@ -515,9 +526,10 @@ express effectful computations independently of their concrete
 interpretation~\citep{Kammar2013}. In this system, concurrency arise
 as just another computational effect, modularly expressed as a
 signature of \emph{abstract operations} whose implementations are
-given by one or more handlers. This allow programmers to define their
+given by one or more handlers. This allows programmers to define their
 own schedulers for concurrent programs~\citep{Dolan2015} rather than
-being stuck with a built-in, compiler-supported implementation.
+being stuck with a built-in, specially compiler-supported
+implementation.
 
 In previous work, we extended the functional programming language
 Links with algebraic effects and
@@ -546,12 +558,12 @@ In this dissertation we present an extension to the Links
 infrastructure: a native backend with support for effect
 handlers~\citep{Hillerstrom2016b}. In order to keep the compiler lean
 we separate the implementation of the concurrency model of Links from
-the compiler. Instead we reconstruct the message-passing concurrency
-implementation using effect handlers~\citep{Hillerstrom2016c}. In
-addition to keeping the compiler lean, lifting the concurrency
-implementation into user-space allows us to potentially experiment
-with different implementations or even have several different
-implementations coexisting.
+the compiler. Instead we implement the message-passing concurrency
+model using effect handlers~\citep{Hillerstrom2016c}. In addition to
+keeping the compiler lean, lifting the concurrency implementation into
+user-space allows us to potentially experiment with different
+implementations or even have several different implementations
+coexisting.
 
 % Computational effects are pervasive in programming. They arise
 % naturally in many applications in many different shapes such as
@@ -619,7 +631,7 @@ features which do not compile to code themselves. Often concurrency
 support is hard-wired deeply into the runtime, requiring special
 support from the compiler to expose concurrency primitives as
 libraries for the programmer~\citep{KC2016}. As a consequence it is
-difficult to change the concurrency implementation.
+difficult to change or evolve the concurrency implementation.
 
 If we can lift concurrency into the programming language, allowing
 programmers to compose their own domain-specific concurrency
@@ -632,9 +644,11 @@ system, we also simplify the life of the compiler writer.
 \section{Problem statement}
 \label{sec:problem-statement}
 
-It poises an interesting research question whether we can reconstruct
-the message-passing concurrency model of Links using effect handlers
-without any special concurrency support from the compiler.
+It poises an interesting research question whether we can implement a
+compiler for Links without concurrency support, and then reconstruct
+the message-passing concurrency model of Links using effect
+handlers. Thus, in this dissertation we attempt to answer the
+following problem:
 
 \begin{center}
   \emph{How can we compile the handlers of Links to native code, and
@@ -650,24 +664,26 @@ up special syntax once we reify concurrency as user-defined library.
 
 Recently, the Multicore OCaml project \citep{Dolan2015} has extended
 the industrial-strength functional programming language OCaml with
-so-called \emph{linear} effect handlers as an effort to bring
+so-called \emph{linear effect handlers} as an effort to bring
 multicore capabilities to the language. The purpose of adding handlers
 is to enable programmers to express user-defined concurrent
 multi-threaded schedulers.
 
 Implementing a native backend for a programming language such as Links
 is a non-trivial task. In order to make it viable task we plan to take
-advantage of Multicore OCaml backend that provides native support for
-effect handlers, and that Links is written in OCaml. Thus we intend to
-integrate the OCaml backend into Links infrastructure and translate
-the Links intermediate representation into the intermediate
-representation of OCaml.
+advantage of Multicore OCaml backend that already provides native
+support for effect handlers, and that Links is written in OCaml. Thus
+we intend to integrate the OCaml backend into Links infrastructure,
+and translate the Links intermediate representation into the
+intermediate representation of OCaml. However, the task is somewhat
+complicated by the fact that the effect handlers of Links are
+so-called \emph{multi-shot effect handlers}, which are more expressive
+than linear effect handlers. Thus, we will consider how to encode
+multi-shot handlers in OCaml backend.
 
-Our work differs from theirs as we try to support the full abstraction
-afforded by handlers, moreover, we attempt to implement
+Our work differs further from theirs as we attempt to implement
 process-oriented rather shared-memory concurrency. Furthermore, we
-consider how to encode an entire message-passing concurrency model
-using handlers.
+consider how to encode an entire message-passing concurrency model.
 
 % \section{Problem analysis}
 
@@ -701,22 +717,27 @@ using handlers.
 %\section{Problem statement}
 \section{Scope, aims, and objectives}
 
-Links is full-fledged programming language for the web. In this work
-we will restrict ourselves to work only with a subset of Links,
-namely, the backend of Links which supports effect
-handlers. Furthermore, we aim to extend the Links infrastructure with
-a native backend for effect handlers. We will deliberately leave
-support for the web-related features of Links to future work.
+Since Links is full-fledged programming language for the web, we will
+restrict ourselves to work only with a subset of Links, namely, the
+backend of Links which supports effect handlers. In other words, we
+aim to extend the Links infrastructure with a native backend for
+effect handlers. We will deliberately leave support for the
+web-related features of Links for future work.
 
 Our main contributions are
 \begin{itemize}
-\item A compiler for Links with effect handlers, that supports the
-  full abstraction provided by deep handlers~\citep{Hillerstrom2016b}.
+\item A compiler for Links, that support native compilation of
+  multi-shot handlers~\citep{Hillerstrom2016b}. We describe a
+  translation from the Links IR to the OCaml IR which demonstrates how
+  to encode multi-shot handlers in the OCaml IR.
 \item A reconstruction of the message-passing concurrency model of
-  Links using effect handlers~\citep{Hillerstrom2016c}.
+  Links using effect handlers~\citep{Hillerstrom2016c}, that maintains
+  the type-safe communication property of the original built-in
+  implementation.
 \item A formalisation of the implementation of effect handlers in
   Links~\citep{Hillerstrom2016a}.
 \end{itemize}
+
 \section{Thesis outline}
 
 In Chapter~\ref{ch:background} we give a brief introduction to
@@ -724,15 +745,14 @@ programming Links, effect handlers, and the concurrency model of
 Links. We also discuss related work.
 
 We discuss the compiler infrastructure and the compilation strategy in
-Chapter~\ref{ch:compiling} as well as our formalisation of the Links
-effect handlers implementation. The chapter describes the translation
-from the Links intermediate representation to the intermediate
-representation of OCaml.
+Chapter~\ref{ch:compiling} as well as a core calculus, \Calc{}, that
+captures the essence of the Links IR. Furthermore, we describe a
+translation from the Links IR to the OCaml IR.
 
 In Chapter~\ref{ch:concurrency} we demonstrate a reconstruction of the
 concurrency model of Links using effect handlers.
 
-We perform experiments with our compiler in order to measure its
+We perform some experiments with our compiler in order to measure its
 performance against the Links interpreter and the OCaml compiler in
 Chapter~\ref{ch:experiments}. We analyse and discuss the results of
 the experiments. In addition, we consider how one may improve the
@@ -740,8 +760,6 @@ performance of our compiler.
 
 Finally in Chapter~\ref{ch:conclusions} we conclude and discuss future
 work.
-
-\section{Typographical conventions}
 
 %%
 %% Background
@@ -759,11 +777,11 @@ Section~\ref{sec:related-work} we discuss related work.
 
 \section{Links primer}
 \label{sec:links-primer}
-In this section we provide a brief primer to the Links programming
-language. We will introduce Links by example, that is, we will
-implement a purely functional first-in-last-out queue in the style of
+In section provides a brief primer to the Links programming
+language. As an introductory example we will implement a purely
+functional first-in-last-out queue in the style of
 \cite{Okasaki1998}. The example comprises most of the Links features
-that we use later in Chapter~\ref{ch:concurrency}.
+that we will use in Chapter~\ref{ch:concurrency}.
 
 We begin by defining a type constructor \lstinline$Queue(a)$ which
 classifies queues whose elements have type \lstinline$a$:
@@ -776,7 +794,7 @@ notation \lstinline$a::Type$ denotes that the type variable
 however, we will only use the \lstinline$Type$ and \lstinline$Row$
 kinds. The type constructor \lstinline$Queue(a)$ constructs a pair of
 lists whose elements have type \lstinline$a$. The main idea is that
-the two lists respectively represent the front and back of the
+the two lists, respectively, represent the front and back of the
 queue. We always insert elements into the back list, and remove
 elements from the front list.
 
@@ -803,14 +821,14 @@ Here we \emph{pattern match} on the first argument of
 back list to \lstinline$ys$. We cons the element \lstinline$y$ onto
 the back list by using the list cons operator \lstinline$::$.
 
-Now that we can populate a queue we consider how to depopulate a
+Now that we can populate a queue we will consider how to depopulate a
 queue. We will define a function \lstinline$dequeue$ that removes the
 head of a given queue. The definition of \lstinline$dequeue$ is a bit
 more involved than the definition of \lstinline$enqueue$, because we
-have consider the special case when the queue is empty. To deal with
-this case we use a standard functional programming pattern: represent
-the possibility of failure as a \lstinline$Maybe$-type. We can define
-the type as a \emph{variant}:
+have to deal with the special case when the queue is empty. To deal
+with this case we use a standard functional programming pattern:
+represent the possibility of failure as a \lstinline$Maybe$-type. We
+can define the type as a \emph{variant}:
 %
 \begin{lstlisting}
 typename Maybe(a) = [|Nothing
@@ -917,8 +935,13 @@ constructors are \lstinline$Heads$ and \lstinline$Tails$.
 % Links employs row typing to support extensible effect signatures, thus
 % \lstinline$e$ is an effect variable, which can be instantiated with
 % additional operations.
-The type \lstinline[mathescape]!Comp($\cdot$,$\cdot$)! is not a
-built-in type. It is straightforward to define in Links:
+The effect signature conveys that the computation may perform the
+\lstinline$Choose$ operation. In particular, the effect row has an
+effect variable \lstinline$e$ which means the computation may be
+invoked in the scope of additional effects.
+%
+The computation type \lstinline[mathescape]!Comp($\cdot$,$\cdot$)! is
+not a built-in type. It is straightforward to define in Links:
 %
 \begin{lstlisting}
 typename Comp(e::Row,a::Type) = () -e-> a;
@@ -928,18 +951,10 @@ The type constructor takes a row type \lstinline$e$ and a regular type
 \lstinline$a$ and constructs a thunk with effect row \lstinline$e$ and
 return type \lstinline$a$.
 
-Introduction of another operation causes the effect signature to grow
-accordingly. For example, if we introduce an exception operation
-\lstinline$Fail : Zero$, then we can model a drunk coin toss:
-%
-\snippet{drunkToss.links}
-%
-Here \lstinline$Zero$ is the empty type, and thus the
-\lstinline$switch$ pattern matching construct has no clauses.
-
-An effect handler instantiates a subset of the operations of an
-abstract computation. For example, the following handler interprets
-\lstinline$Choose$ randomly:
+We need a suitable effect handler in order to evaluate the computation
+\lstinline$toss$. An effect handler instantiates a subset of the
+operations of an abstract computation. For example, the following
+handler interprets \lstinline$Choose$ randomly:
 %
 \snippet{randomResult.links}
 %
@@ -951,16 +966,25 @@ polymorphic in its presence.  The handler comprises two clauses:
   \item the \lstinline$Return$-clause specifies how to handle the return
     value of the computation.
   \item the \lstinline$Choose$-clause specifies how to handle a
-    \lstinline$Choose$ operation. The parameter \lstinline$k$ is the
-    (delimited) continuation of the operation \lstinline$Choose$ in the
-    computation.
+    \lstinline$Choose$ operation. The parameter \lstinline$resume$ is
+    the delimited continuation of the operation \lstinline$Choose$ in
+    the computation.
 \end{enumerate}
 We say that \lstinline$randomResult$ is a \emph{linear handler},
 because it invokes every continuation exactly once.  Essentially, the
 handler interprets the computation \lstinline$toss$ as modelling a
-\emph{fair} coin, that is the composition
-\lstinline$randomResult(toss)$ produces a computation that outputs
-\lstinline$Heads$ and \lstinline$Tails$ uniformly.
+\emph{fair} coin. Using this handler we can evaluate the computation
+\lstinline$toss$ in the Links interpreter:
+%
+\begin{lstlisting}[style=terminal]
+links> randomResult(toss)();
+Tails : Toss
+links> randomResult(toss)();
+Heads : Toss
+\end{lstlisting}
+%
+Evaluating the composition produces either \lstinline$Heads$ or
+\lstinline$Tails$ uniformly.
 
 Alternatively, we may define a handler for \lstinline$Choose$ that
 invokes its continuation twice to enumerate every possible outcome:
@@ -972,12 +996,34 @@ Observe that the return value is lifted into a singleton list. The
 interpreting the operation as \lstinline$true$ and \lstinline$false$,
 respectively. We say that \lstinline$allResults$ is a \emph{multi-shot
   handler}. The composition \lstinline$allResults(toss)$ produces a
-computation that yields a list of the possible outcomes,
-i.e. \lstinline$[Heads,Tails]$.
+computation that yields a list of the possible outcomes, i.e.
+%
+\begin{lstlisting}[style=terminal]
+links> allResults(toss)();
+[Heads, Tails] : [Toss]
+\end{lstlisting}
+%
 
-Finally, we have handlers that do not invoke continuations. These are
-familiar \emph{exception handlers}. As an example consider the
-following handler, which returns \lstinline$Just$ the result of the
+Using the \lstinline$toss$ computation we can model a \emph{drunk coin
+  toss}. In a drunken coin toss the drunkard may fail to catch the
+coin after flipping it. We need an additional operation
+\lstinline$Fail : Zero$ that models failure, then we can implement the
+drunk coin toss as follows:
+%
+\snippet{drunkToss.links}
+%
+Here \lstinline$Zero$ is the empty type, and thus the
+\lstinline$switch$ pattern matching construct has no clauses.
+
+Note that the additional operation causes the effect row to grow
+accordingly. Now it comprises two operations. Thus,
+\lstinline$randomResult$ is no longer sufficient in order to give a
+full interpretation of \lstinline$drunkToss$. We need yet another
+handler that interprets \lstinline$Fail$.
+
+An interpretation of \lstinline$Fail$ amounts to defining a familiar
+\emph{exception handler}.  As an example consider the following
+exception handler, which returns \lstinline$Just$ the result of the
 computation or returns \lstinline$Nothing$ if the operation
 \lstinline$Fail$ is performed:
 %
@@ -991,7 +1037,16 @@ inhabitants. Linear and exception handlers together constitute
 We can compose \lstinline$maybeResult$ and \lstinline$randomResult$ to
 give an interpretation of
 \lstinline$drunkToss$. Figure~\ref{fig:sequence} depicts a sequence
-diagram for evaluation of this composition.
+diagram for evaluation of this composition.  The result of the
+evaluation is nondeterministic:
+%
+\begin{lstlisting}[style=terminal]
+links> maybeResult(randomResult(drunkToss))();
+Just(Tails) : Maybe(Toss)
+links> maybeResult(randomResult(drunkToss))();
+Nothing : Maybe(Toss)
+\end{lstlisting}
+%
 
 \begin{figure}[H]
   \centering
@@ -1016,21 +1071,64 @@ diagram for evaluation of this composition.
       \end{call}
     \end{call}
   \end{sequencediagram}
-  \caption{Sequence diagram for
+  \caption{Sequence diagram for a
     \lstinline$maybeResult(randomResult(drunkToss))$.}\label{fig:sequence}
 \end{figure}
 
+\subsection{Handler pipelines}
+A composition of handlers effectively form a pipeline where unhandled
+operations flow from inside out. To capture this intuition -- and to
+reduce the number of parentheses -- we define an infix binary operator
+that constructs a pipeline:
+%
+\begin{lstlisting}
+op h -<- g { fun(m) { h(g(m)) } }
+\end{lstlisting}
+%
+The \lstinline$op$ keyword begins the definition of an infix binary
+operator in Links. The operator reads: \lstinline$h$ after
+\lstinline$g$. In addition, we give another operator to plug a
+computation into a handler pipeline:
+%
+\begin{lstlisting}
+op h -< m { h(m) }
+\end{lstlisting}
+%
+This operator simply applies the handler \lstinline$h$ to the
+computation \lstinline$m$. Furthermore, it is convenient to have a
+top-level function that \emph{runs} a handler pipeline:
+%
+\begin{lstlisting}
+fun run(m) { m() }
+\end{lstlisting}
+%
+The function forces the thunk produced by a handler pipeline. Now, we
+can write the composition of \lstinline$maybeResult$ and
+\lstinline$randomResult$ as
+%
+\begin{lstlisting}[style=terminal]
+links> run -<- maybeResult -<- randomResult -< drunkToss;
+Just(Tails) : Maybe(Toss)
+\end{lstlisting}
+%
+For deep pipeline of handlers these two operators help make handler
+composition syntactically lightweight.
 
 \section{State and parameterised handlers}
 \label{sec:parameterised-handlers}
 
-Most programs contain some sort of state. It is possible to describe
-state as an effect with operations for reading (\lstinline$Get : s$)
-and updating (\lstinline$Put : s {}-> ()$) a state of type
-\lstinline$s$. We implement them as follows:
+Most programs maintain some sort of state through their life time. It
+is possible to describe state as an effect with operations for reading
+(\lstinline$Get : s$) and updating (\lstinline$Put : s {}-> ()$) a
+state of type \lstinline$s$. We implement them as follows:
 %
 \lstinputlisting{snippets/getput.links}
 %
+Typically, we wrap the invocation of an abstract operation inside a
+function. This is mainly because it lets us compose effects with
+functions seamlessly. Moreover, sometimes we want to do more than just
+invoking an operation.  
+
 We use a parameterised handler to give an interpretation of state.  In
 addition to supplying a computation to a parameterised handler, we
 also supply one or more parameters. In this instance we pass the state
@@ -1045,21 +1143,47 @@ clause, we return the state and also pass it unmodified to any
 subsequent invocations of the handler. Similarly, in the
 \lstinline$Put$ clause, we return unit and update the state.
 
-\todo{insert example}
+In order to demonstrate the state handler in action consider the
+following example:
+%
+\begin{lstlisting}
+fun fortytwo() {
+  var q = enqueue(get(), 42);
+  put(q);
+  var (x, _) = dequeue(get());
+  switch (x) {
+    case Just(i) -> print(intToString(i))
+    case Nothing -> print("No elements.")
+  }
+}
+\end{lstlisting}
+%
+The program retrieves a queue using the \lstinline$get$ operation,
+enqueues the element \lstinline$42$, and stores the modified
+queue. Afterwards, the queue is retrieved again and an element is
+dequeued.
+%
+We use the \lstinline$evalState$ handler to interpret the computation:
+\begin{lstlisting}[style=terminal]
+links> run -<- evalState(emptyQueue()) -< fortytwo;
+42 : Int
+\end{lstlisting}
+We seed the state handler with the empty queue which is the initial
+state of the program.
 
 \section{The built-in concurrency model of Links}
 \label{sec:links-model}
 
-The concurrency model of Links is based on a typed \emph{actor} model
-\citet{Cooper2006}. In an actor model processes run in (memory)
-isolation. A process can only make state changing decisions
-locally. In order to influence the global program state, the process
-must communicate with other processes through message passing. Each
-process is equipped with its own mailbox. Figure~\ref{fig:links-model}
-sketches an abstract representation of the interaction between two
-processes.
+The concurrency model of Links is based on a typed \emph{actor}
+model~\citep{Cooper2006}. In an actor model processes run in (memory)
+isolation~\citep{Hewitt1977}. A process can only make state changing
+decisions locally. In order to influence the global program state, the
+process must communicate with other processes through message
+passing. Each process is equipped with its own
+mailbox. Figure~\ref{fig:links-model} sketches an abstract
+representation of the interaction between two processes.
 
-\begin{figure}[H]
+\begin{figure}
 \centering
 \begin{tikzpicture}[node distance=5pt,every node/.style={draw, outer sep=0pt}]
 \tikzset{sarrow/.style={-latex,thick,dotted}}
@@ -1159,8 +1283,8 @@ the standard out.
 the \lstinline$recv$ function, e.g.
 %
 \begin{lstlisting}
-links> var p1 = spawn { print("Message: " ^^ recv()) };
-p1 = 1 : Process ({ hear:String,wild|_ })
+links> var p2 = spawn { print("Message: " ^^ recv()) };
+p2 = 2 : Process ({ hear:String,wild|_ })
 \end{lstlisting}
 %
 The \lstinline$recv$ function blocks until a message becomes
@@ -1168,11 +1292,11 @@ available.  Each mailbox is given a static type according to the
 messages it expects to receive. The built-in effect \lstinline$hear$
 reflects and tracks this type.
 %
-Now we can send message to process \lstinline$1$ using the \lstinline
-$(!)$ (pronounced ``send''):
+We can send a message to process \lstinline$1$ using the \lstinline
+$!$ primitive (pronounced ``send''):
 %
 \begin{lstlisting}
-links> p1 ! "Hello";
+links> p2 ! "Hello";
 Message: Hello
 () : ()
 \end{lstlisting}
@@ -1181,8 +1305,9 @@ Process \lstinline$1$ prints the received message \lstinline$"Hello"$
 and terminates afterwards. The process is only capable of receiving
 strings but often a process will use a variant to tag the different
 messages it can receive. Typically, a process will dispatch on the tag
-of received message. As a concrete example consider a coffee machine process that 
-gets informed about passing comets and celebrity sightings:
+of received message. As a concrete example consider this example
+adapted from the Links documentation \citep{Links} where a process
+that gets informed about passing comets and celebrity sightings:
 \begin{lstlisting}
 var p3 = spawn {
   fun loop() {
@@ -1209,7 +1334,8 @@ links> p3;
                      |PassingComet:(Int, Float, Float)|]
              , wild|_ })
 \end{lstlisting}
-Now, we can inform the process of any passing comets and celebrity sightings:
+We can inform the process of any passing comets and celebrity
+sightings:
 %
 \begin{lstlisting}
 links> p3 ! CelebritySighting("Ewan McGregor", "Leith");
@@ -1226,8 +1352,8 @@ Comet no. 42 sighted (10.3, 180.5)
 
 We will now consider a larger example which will serve to demonstrate
 an actual concurrent application in Links. However, we shall reuse the
-example to demonstrate our reconstructed concurrency model in
-Section~\ref{sec:links-model-handlers} too.
+example to demonstrate our reconstruction of the concurrency model in
+Chapter~\ref{ch:concurrency}.
 
 We shall implement a parallel version of the \emph{Sieve of
   Eratosthenes} prime number finding algorithm. 
@@ -1270,8 +1396,8 @@ We shall implement a parallel version of the \emph{Sieve of
 \caption{Visual representation of Sieve of Eratosthenes.}\label{fig:sieve}
 \end{figure}
 
-The parallel version constructs a pipeline of processes where each
-process holds one prime number
+The basic idea is to dynamically construct a pipeline of processes
+where each process holds one prime number
 \citep{Andrews2000}. Figure~\ref{fig:sieve} visualises the sieve
 pipeline which finds primes between $2$ and $10$. In the figure the
 subscript of each process is its identifier and the superscript is the
@@ -1334,19 +1460,20 @@ fun sieve() {
 %
 We describe function line by line.
 \begin{description}
-\item[Line 2] receives the process's prime number. The
+\item[Line 2] receives the process' prime number. The
   \lstinline$fromCandidate$ simply removes the \lstinline$Candidate$
   tag from the number.
 \item[Line 3] simply prints the prime to standard out.
-\item[Line 4] begins the definition of process's main loop. The
-  function is parameterised by a handle to its neighbouring process.
+\item[Line 4] begins the definition of the main loop of the
+  process. The function is parameterised by a handle to its
+  neighbouring process.
 \item[Lines 5-9] dispatch on the message tag. If the message is
   \lstinline$Stop$ then the auxiliary function \lstinline$stop$
   (described below) propagates the stop signal to the neighbour
   process. If a candidate prime number is received then the process
   performs a primality test on the candidate number. In case the
-  number is composite the \lstinline$loop$ function recursively calls
-  itself to repeat the procedure.
+  number is composite the \lstinline$loop$ function recurse in order
+  to repeat the procedure.
 \item[Lines 11-17] forwards the candidate \lstinline$number$ to its
   neighbour. However before doing so the process must ensure it has a
   neighbour. If the process already has a neighbour then the
@@ -2587,7 +2714,7 @@ the next handler. Thus, an invocation of an abstract operation amounts
 to performing a dynamic lookup to locate a suitable handler in the
 stack.
 
-As we demonstrated in our translation, we simulate multi-shot handlers
+As our translation demonstrates, one can simulate multi-shot handlers
 by cloning continuations prior to invocation. The cost of cloning is
 linear in the size of stack. Thus it becomes rather expensive to
 invoke an abstract operation in a deep pipeline of handlers.
@@ -2648,6 +2775,18 @@ invoke an abstract operation in a deep pipeline of handlers.
 \caption{Representation of \lstinline$maybeResult(randomResult(drunkToss))$ at runtime.}\label{fig:rtstack}
 \end{figure}
 
+\section{Summary}
+This chapter presented a native backend for the Links compiler which
+interfaces with the Multicore OCaml backend to provide native
+compilation of common language features and effect handlers. However,
+the translation from the Links IR to the OCaml IR is somewhat
+complicated by the fact that the OCaml IR does not have a formally
+specified semantics. Unlike the Links IR for which we presented a
+formalisation. The translation shows how one may encode multi-shot
+handlers with linear handlers by cloning continuations prior to
+invocation. Purposely, the compiler does not provide any special
+support for concurrency.
+
 %%
 %% Concurrent programming with handlers
 %%
@@ -2671,7 +2810,7 @@ invoke an abstract operation in a deep pipeline of handlers.
 % how to implement communication between processes.
 
 In this chapter we explore an implementation of the concurrency model
-of Links using effect handlers. Our construction of the concurrency
+of Links using effect handlers. The construction of the concurrency
 model spans multiple sections: in
 Section~\ref{sec:links-model-handlers-process} we discuss a process
 abstraction that is somewhat faithful to the built-in process
@@ -2682,8 +2821,8 @@ interface for spawning and suspending processes. In addition, we
 implement a basic process scheduler that we subsequently refine with
 more sophisticated features. In
 Section~\ref{sec:links-model-handlers-communication} we consider how
-to enable communication amongst processes. The two latter sections are
-based on material from \cite{Hillerstrom2016c}.
+to enable communication amongst processes. The two latter sections
+elaborate the idea outlined in \cite{Hillerstrom2016c}.
 
 \section{Process abstraction}
 \label{sec:links-model-handlers-process}
@@ -2692,81 +2831,76 @@ In Links each process has its own unique process identifier which
 makes the process uniquely identifiable. The built-in process type is
 an abstract type, but under the hood it is really just an integer that
 gets incremented each time a new process is spawned. We introduce a
-process identifier type, \lstinline$Pid$, which is a type alias for an
-integer:
-%
-\snippet{pidInt.links}
-%
-We define a process name type that contains a process
-identifier. Furthermore, we parameterise the process name type by the
-effects that actual process may perform, thus we name it
-\lstinline$EProcess$ for \emph{effectful process}:
+process handle type, \lstinline[mathescape]!EProcess($\cdot$)!, which
+is a type alias for an integer:
 %
 \snippet{eprocess.links}
 %
-The type is a simple alias for the singleton record type with an
-\lstinline$id$ field of type \lstinline$Pid$. However, the process
-type is parameterised by a \emph{phantom} row \lstinline$e$ -- it is
-not mentioned in the definition of \lstinline$EProcess$ -- which we
-will use to track the effects of processes. We use a small trick to
-get effect tracking to work as desired. Though, the trick is quite
-obvious: let the type and effect system do the work for us. We achieve
-this by making essential use of a helper function to create process
-handles:
+The name of the type is short for \emph{effectful process} because the
+type is not just a simple alias, it also tracks effects. It is
+parameterised by a \emph{phantom} row \lstinline$e$ -- it is not
+mentioned in the definition of \lstinline$EProcess$ -- which tracks
+the effects of processes. We use a small trick to get effect tracking
+to work as desired. Though, the trick is quite obvious: let the type
+and effect system do the work for us. By making essential use of a
+helper function to create process handles, we can obtain effect
+tracking mostly for free:
 %
 \snippet{makeProcess.links}
 %
-The entire trick is in the type signature. First note that the
-function accepts as its first argument a nullary function that has
-effect row \lstinline$e$ and returns unit. We intend that this nullary
-function is the computation that the process will execute. Now,
-observe that \lstinline$makeProcessHandle$ wholly ignores its first
-argument. It uses only its second argument to construct an inhabitant
-of the type \lstinline$EProcess$. The type system captures the effect
-row on the first argument and uses it to construct a process type with
-an open row that mentions \lstinline$e$, i.e.
+The cleverness is in the type signature. First, note that the function
+accepts as its first argument a nullary function that has effect row
+\lstinline$e$ and returns unit. It is intended that this nullary
+function is the computation that the process will execute. Observe
+that \lstinline$makeProcessHandle$ wholly ignores its first
+argument. It uses only its second argument trivially. The type system
+captures the effect row on the first argument and uses it to construct
+a process type with an open row that mentions \lstinline$e$, i.e.
 \lstinline$EProcess({ |e})$. Because the process type mentions
 \lstinline$e$ it must, by row polymorphism, have the same effects as
-the ignored input function. We can try it out to see that it indeed
-works:
+the ignored input function. Let us try it out:
 %
 \begin{lstlisting}
 links> makeProcess(fun() { print("I am wild!") }, 1);
-(id=1) : EProcess ({ |wild|_ })
+1 : EProcess ({ |wild|_ })
 links> makeProcess(fun() { if (do Choose) print("True") 
 ......                     else print("False") }, 2);
-(id=2) : EProcess ({ |Choose:Bool,wild|_ })
+2 : EProcess ({ |Choose:Bool,wild|_ })
 \end{lstlisting}
 %
 
 \section{Spawning, suspending, and scheduling processes}
 \label{sec:links-model-handlers-scheduler}
 
-\todo{Introduce fibers} 
-%
-Though, the caveat is that cooperative
-multi-tasking does not provide preemptive concurrency.
+Cooperative routines (coroutine) provide an abstraction for expressing
+user-defined concurrency. A coroutine is just a regular function that
+is evaluated by the program thread of control. Thus it is rather cheap
+to spawn a coroutine. However, the program thread can at most execute
+one coroutine at a time. The key to introduce concurrency is to have
+some control operators that transfer control from one coroutine to
+another. The caveat is that coroutines cannot provide preemptive
+concurrency.
 
-\subsection{Concurrency operations}
+\subsection{Spawn and Yield}
 
-We require an interface to spawn and suspend processes. We define an
-operation \lstinline$Spawn$ that takes a nullary function with an
-effect signature \lstinline$e$ as its argument and returns a process
-of type \lstinline$EProcess({ |e})$, i.e.
+The interface for spawning and suspending processes consists of two
+operations. The operation \lstinline$Spawn$ takes a nullary
+function with an effect signature \lstinline$e$ as its argument and
+returns a process of type \lstinline$EProcess({ |e})$, i.e.
 %
 \snippet{pspawn.links}
 %
-We dub the function \lstinline$pspawn$ for \emph{process spawn}. The
-function is quite simple. Most of the work is concerned with getting
-the type signature right. The signature enforces any interpretation of
-\lstinline$pspawn$ to at least return a process handle. In a similar
-fashion we define an operation for suspending a computation:
+The function name \lstinline$pspawn$ is short for \emph{process
+  spawn}. The function is quite simple. Most of the work is concerned
+with getting the type signature right. The signature enforces any
+interpretation of \lstinline$pspawn$ to at least return a process
+handle. In a similar fashion we define an operation for suspending a
+computation:
 %
 \snippet{yield.links}
 %
-This settles the interface for fibers. Next, we need to give a
-concrete implementation of fibers through an interpretation of
-\lstinline$Spawn$ and \lstinline$Yield$.
+This function is completely trivial.  Next, we need to give a concrete
+interpretation of operations \lstinline$Spawn$ and \lstinline$Yield$.
 
 \subsection{A basic round-robin scheduler}
 
@@ -2775,16 +2909,16 @@ to scheduling processes. Our programs will be running in the a single
 thread of control and therefore it is the responsibility of the
 scheduler to share execution time among processes.
 
-We will begin by considering a simple fair, round-robin scheduler. The
-main idea is to maintain a process queue with first-in-first-out
-(FIFO) semantics.  There are two obvious scheduling policies to choose
-from when a process invokes the \lstinline$Spawn$ operation. The
-scheduler either enqueues the parent process and runs the child
-process immediately or enqueues the child process and resumes the
-parent process. We will adopt the former policy. Using this policy an
-invocation of \lstinline$Yield$ simply enqueues the yielding process
-and dequeues the next process to run. We implement the scheduler as a
-handler:
+We will begin by considering a simple fair, round-robin scheduler in
+the style of \citet{Bauer2015}. The main idea is to maintain a process
+queue with first-in-first-out (FIFO) semantics.  There are two obvious
+scheduling policies to choose from when a process invokes the
+\lstinline$Spawn$ operation. The scheduler either enqueues the parent
+process and runs the child process immediately or enqueues the child
+process and resumes the parent process. We adopt the former
+policy. Using this policy an invocation of \lstinline$Yield$ simply
+enqueues the yielding process and dequeues the next process to
+run. The scheduler is implemented as follows:
 %
 \lstinputlisting[numbers=left]{snippets/basicRoundrobin.links}
 %
@@ -2794,7 +2928,7 @@ We describe the handler line by line.
 \item[Lines 2-5] handle the \lstinline$Spawn$ operation by first
   creating an process handle of type
   \lstinline[mathescape]!EProcess($\cdot$)! for the new
-  \lstinline$child$ process. Note that for now we impetuously assign
+  \lstinline$child$ process. Note that for now we carelessly assign
   the identifier \lstinline$0$ to every process. Later we will rectify
   this. The handle is returned to the parent via the resumption
   function, \lstinline$resume$. However, the evaluation of the
@@ -2819,11 +2953,11 @@ We describe the handler line by line.
 The process queue is inherently stateful as it changes every time a
 process is spawned or suspended.  The auxiliary functions
 \lstinline$enqueueProcess$ and \lstinline$dequeueProcess$ use the
-abstract state operations \lstinline$Get$ and \lstinline$Put$ that we
-introduced in Section~\ref{sec:??} to maintain the queue. The
-underlying queue data structure is the one we implemented in
-Section~\ref{sec:links-primer}. The \lstinline$enqueueProcess$ simply
-retrieves and updates the queue, i.e.
+abstract state operations \lstinline$Get$ and \lstinline$Put$ that was
+introduced in Section~\ref{sec:parameterised-handlers} to maintain the
+queue. The underlying queue data structure is the one we implemented
+in Section~\ref{sec:links-primer}. The \lstinline$enqueueProcess$
+simply retrieves and updates the queue, i.e.
 %
 \snippet{enqueueProcess.links}
 %
@@ -2834,18 +2968,17 @@ special cases. The implementation is straightforward:
 %
 \snippet{dequeueProcess.links}
 %
-Now we have all the necessary infrastructure in place to spawn simple
-non-interacting processes. In the following small example we spawn a
-family of non-interacting processes where each generation has only one
-child:
+Now all the necessary infrastructure is in place to spawn simple
+non-interacting processes. The following small example spawns a family
+of non-interacting processes:
 %
-\snippet{spawnLoneChild.links}
+\snippet{spawnSiblings.links}
 %
 To run this example we plug our handlers together, i.e.
 %
 \begin{lstlisting}
 run -<- evalState(emptyQueue()) 
-    -<- basicRoundrobin -< spawnLoneChild(2);
+    -<- basicRoundrobin -< spawnSiblings(2);
 \end{lstlisting}
 %
 Initially the process queue is empty hence why we seed the state
@@ -2854,6 +2987,10 @@ handler with the empty queue. The program compiles and runs:
 \begin{lstlisting}[style=terminal]
 $ ./links -c basic_concur_model.links -o basic_model
 $ ./basic_model
+Spawned P#0
+Spawned P#0
+Spawned P#0
+Spawned P#0
 Spawned P#0
 Spawned P#0
 \end{lstlisting}
@@ -2866,12 +3003,13 @@ them the \lstinline$0$ identifier.
 
 The scheduler \lstinline$basicRoundrobin$ neatly demonstrates that the
 essence of the scheduling is fairly simple: variations on enqueuing
-and dequeuing of processes. However, in order to have interacting
-processes we need to be able to uniquely identify processes. 
+and dequeuing of processes. In order to have interacting processes we
+must to be able to uniquely identify processes.
 
-As a first attempt at making processes unique we might consider a
-parameterised version of basic round-robin scheduler that carries the
-identifier of the executing process, that is
+% As a first attempt at making processes unique we might consider a
+% parameterised version of basic round-robin scheduler that carries the
+% identifier of the executing process. However, we will soon realise
+% this approach fails, because  
 % %
 % \snippet{wrongRoundrobin.links}
 % %
@@ -2942,22 +3080,24 @@ that generates a new name (or identifier) of type \lstinline$a$:
 %
 \snippet{freshname.links}
 %
-We implement a function \lstinline$names$ that generates a suitable
-name generator. The function takes as arguments a generating function
-and a seed value:
+To interpret the operation we implement a parameterised handler,
+\lstinline$pidgenerator$ that generates an increasing sequence of
+integers:
 %
 \snippet{freshnames.links}
 %
-The generated handler \lstinline$h$ is parameterised by the next fresh
-name. Observe that the handler essentially interprets the
+Observe that the handler essentially interprets the
 \lstinline$FreshName$ operation as performing both state operations
-\lstinline$Get$ and \lstinline$Put$. First the \lstinline$name$ is
-retrieved afterwards a new name is generated by
-\lstinline$gen(name)$. We can use \lstinline$names$ to implement a
-process identifier generator:
-%
-\snippet{pidgenerator.links}
-%
+\lstinline$Get$ and \lstinline$Put$. 
+
+% First the \lstinline$name$ is
+% retrieved afterwards a new name is generated by
+% \lstinline$gen(name)$. We can use \lstinline$names$ to implement a
+% process identifier generator:
+% %
+% \snippet{pidgenerator.links}
+% %
+
 Now, we have to update our round-robin scheduler to use the name
 generation operation. However, simply using \lstinline$freshName$ in
 the \lstinline$Spawn$-clause will not be enough as the initial process
@@ -2970,15 +3110,15 @@ generates a name for initial process:
 \lstinputlisting[linebackgroundcolor={\lstcolorlines{1,2,5,14}}]{snippets/uniqueRoundrobin.links}
 %
 The implementation of \lstinline$scheduler$ is similar to
-\lstinline$basicRoundrobin$ the only difference is the use of
-\lstinline$freshName$. The first invocation of \lstinline$freshName$
-generates a name for the initial process which is the input
-computation \lstinline$m$. We run the scheduler on the initial process
-to handle its effects. We end up with the following pipeline of
-handlers:
+\lstinline$basicRoundrobin$. The important differences from the
+previous scheduler \lstinline$roundrobin$ are highlighted.  The first
+invocation of \lstinline$freshName$ generates a name for the initial
+process which is the input computation \lstinline$m$. The scheduler
+gets applied to the initial process in order to handle its effects. We
+end up with the following pipeline of handlers:
 %
 \begin{lstlisting}
-run -<- pidgenerator 
+run -<- pidgenerator(0)
     -<- evalState(emptyQueue()) -<- upRoundrobin 
     -<  spawnSiblings(2);
 \end{lstlisting}
@@ -3000,8 +3140,9 @@ As we see every process gets a unique name.
 
 \subsection{Self-referral}
 
-We now consider a final refinement of the round-robin scheduler:
-process self-referral. We introduce a new operation \lstinline$Myself$:
+Lastly, we consider a final refinement of the round-robin scheduler:
+process self-referral. We introduce a new operation
+\lstinline$Myself$:
 %
 \snippet{myself.links}
 %
@@ -3016,10 +3157,10 @@ process:
 %
 We describe the changes line by line.
 \begin{description}
-\item[Line 3] begins the definition of \lstinline$scheduler$ that now
-  takes a parameter \lstinline$activeProcess$ which is a handle to the
+\item[Line 3] begins the definition of \lstinline$scheduler$ which
+  takes a parameter \lstinline$activeProcess$ that is a handle of the
   current executing process.
-\item[Lines 7-8] suspends the parent process. As usual the
+\item[Lines 7-8] suspend the parent process. As usual the
   \lstinline$resume$ function returns the child handle. In addition it
   also sets the executing process. Once \lstinline$resume$ gets
   invoked control gets transferred back to the parent process, hence
