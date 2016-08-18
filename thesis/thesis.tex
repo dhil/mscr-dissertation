@@ -313,6 +313,11 @@
   handlers. We demonstrate a faithful encoding of the concurrency
   model, which maintains type-safe communication by taking advantage
   of the effect system of Links.
+
+  Finally, we perform some experiments with the compiler using the
+  concurrency implementation to see how it performs against the Links
+  interpreter. Moreover, we consider how to improve the performance of
+  the compiler.
 %   \todo{Refine abstract} 
 % %
 %   Applications are comprised of \emph{effectful operations}, such as
@@ -354,19 +359,30 @@
 
 %% Acknowledgements
 \begin{acknowledgements}
-Acknowledgements will appear here\dots
+  This year has been intensive but also incredibly educational and
+  joyful experience.  I owe my gratitude to a lot of people for making
+  this year a memorable experience. 
 
-Thanks Christophe\dots
+  First and foremost, I would like to thank my supervisors, Christophe
+  Dubach and Sam Lindley, who both provided me with invaluable
+  guidance throughout this year. Furthermore, I would also like to
+  thank my colleagues from Office 1.07 in Informatics Forum with whom
+  I have enjoyed a lot of fun moments.
 
-Thanks Sam\dots
+  A substantial part of this work was done during my visit to OCaml
+  Labs, University of Cambridge. In particular, I would like to thank
+  KC Sivaramakrishnan for demystifying the OCaml backend for me, and
+  for many interesting discussions on applications of effect
+  handlers. Also, I would like to thank Anil Madhavapeddy for hosting
+  me at Pembroke College during my first visit. I would also like to
+  thank Gemma Gordon for helping sorting our the details of my visits,
+  and for our many cheerful conversations.
 
-Thanks Office 1.07\dots
-
-Thanks OCaml Labs and KC\dots
-
-Thanks to Caoimhín Laoide-Kemp\dots
-
-This work was supported in part by the EPSRC Centre for Doctoral Training in Pervasive Parallelism, funded by the UK Engineering and Physical Sciences Research Council (grant EP/L01503X/1) and the University of Edinburgh.
+  This work was supported in part by the EPSRC Centre for Doctoral
+  Training in Pervasive Parallelism, funded by the UK Engineering and
+  Physical Sciences Research Council (grant EP/L01503X/1) and the
+  University of Edinburgh. This work was also supported by OCaml Labs,
+  University of Cambridge.
 \end{acknowledgements}
 
 %% Next we need to have the declaration.
@@ -401,9 +417,9 @@ This work was supported in part by the EPSRC Centre for Doctoral Training in Per
 %% you want one).
 %\dedication{To my mummy.}
 
-\begin{preface}
-A preface will possibly appear here\dots
-\end{preface}
+% \begin{preface}
+% A preface will possibly appear here\dots
+% \end{preface}
 
 %% Create the table of contents
 \setcounter{secnumdepth}{2} % Numbering on sections and subsections
@@ -1524,9 +1540,13 @@ As expected the primes between $2$ and $10$ get printed.
 \section{Related work}
 \label{sec:related-work}
 
-Prior work focuses mainly on the design and expressiveness of handlers
-rather than performance. Nevertheless, some recent papers do address
-performance.
+% Prior work focuses mainly on the design and expressiveness of handlers
+% rather than performance. Nevertheless, some recent papers do address
+% performance.
+Since the inception of effect handlers a rather lot of implementations
+have appeared. Many of these implementations are attempts at encoding
+handlers in an existing language. Nevertheless, some new languages
+have been designed from the ground up with handlers in mind.
 
 \subsection{Implementations of effect handlers}
 Any signature of abstract operations can be understood as a free
@@ -1567,11 +1587,13 @@ effect handlers in mind.
 \begin{itemize}
 \item The Eff language by \cite{Bauer2015} is a strict language with
   Hindley-Milner type inference similar in spirit to ML, but extended
-  with effect handlers.
+  with effect handlers. It has the look-and-feel of the OCaml
+  programming language.
 %
-It includes a novel feature for supporting fresh generation of effects
-in order to support effects such as ML-style higher-order state (which
-has an operation for generating new references).
+  It includes a novel feature for supporting fresh generation of
+  effects in order to support effects such as ML-style higher-order
+  state. Currently, the Eff is compiled to a free monad encoding in
+  the surface syntax of OCaml.
 %
 % The original version of Eff~\citep{Bauer2015} does not include an
 % effect type system. However, an effect type system has subsequently
@@ -1590,7 +1612,7 @@ has an operation for generating new references).
   once. Frank is built on a bidirectional type system. It includes an
   effect type system and a novel form of effect polymorphism in which
   the programmer never needs to read or write any effect
-  variables. Currently, Frank has only a prototypical implementation.
+  variables. Currently, Frank has only a prototypical interpreter.
   % Frank's effect system can be viewed as implementing a
   % form of row polymorphism. Unlike Links, but much like
   % Koka by \cite{Leijen14}, Frank allows multiple occurrences of the same
@@ -1625,21 +1647,21 @@ particularly efficient compilation scheme using a type directed
 selective continuation-passing style (CPS) translation in order to
 compile effect handlers to common runtime platforms.
 
-\subsection{Abstracting concurrency}
-Lots of previous work has been done on abstracting concurrency. We
-will mention a few papers that relate somewhat to our approach.
+% \subsection{Abstracting concurrency}
+% Lots of previous work has been done on abstracting concurrency. We
+% will mention a few papers that relate somewhat to our approach.
 
-\cite{Marlow2013} gives a fairly comprehensive account of abstractions
-for concurrent, parallel, and distributed programming in Haskell.
-\todo{Finish this section}
+% \cite{Marlow2013} gives a fairly comprehensive account of abstractions
+% for concurrent, parallel, and distributed programming in Haskell.
+% \todo{Finish this section}
 
-\cite{Marlow2014} describe a programming idiom for modular concurrent
-programming in Haskell based on Applicative Functors, which they
-employ in their codebase in Facebook.  The key insight is that the
-Applicative operator (\lstinline$<*>$) permits concurrent evaluation
-of both its arguments. 
-% By separating the signature of an applicative from its
-% implementation
+% \cite{Marlow2014} describe a programming idiom for modular concurrent
+% programming in Haskell based on Applicative Functors, which they
+% employ in their codebase in Facebook.  The key insight is that the
+% Applicative operator (\lstinline$<*>$) permits concurrent evaluation
+% of both its arguments. 
+% % By separating the signature of an applicative from its
+% % implementation
 
 
 %%
@@ -3226,11 +3248,10 @@ message to send. We wrap it inside a function \lstinline$psend$ (for
 %
 \snippet{psend.links}
 %
-In addition to the \lstinline$Send$ operation the function also
-performs the \lstinline$Yield$ operation, which will transfer control
-to another process. After sending a message another process will
-presumably be able to make progress. Thus it seems like a reasonable
-heuristic to yield control at this point.  
+Besides sending a message the function, in a rather ad-hoc fashion,
+also yields. However, it seems like a reasonable heuristic to yield
+after sending a message under the assumption that another process will
+be able to receive the message and make progress.
 
 To obtain the look-and-feel of the bang operator, \lstinline$!$, we
 define an infix operator that looks similar:
@@ -3245,10 +3266,10 @@ There are several interesting designs to choose from for implementing
 a blocking receive. We may do the straightforward thing of ``just''
 performing an abstract operation \lstinline$Recv$ leaving it for a
 handler to implement the blocking semantics. Alternatively, we may use
-type system to hint handlers of \lstinline$Recv$ that it is not
-important whether the operation is blocking or not, but rather whether
-a message was received or not. It is easy implement a blocking receive
-in terms of a non-blocking receive, e.g.
+type system to provide a hint to handlers of \lstinline$Recv$ that it
+is not important whether the operation is blocking or not, but rather
+whether a message was received or not. It is easy implement a blocking
+receive in terms of a non-blocking receive, e.g.
 %
 \snippet{precv.links}
 %
@@ -3258,8 +3279,9 @@ message has been received. To obtain the process handle we invoke
 \lstinline$Myself$ operation. The \lstinline$loop$-body invokes the
 operation \lstinline$Recv$ which returns a \lstinline$Maybe$-value. If
 there are no messages then the function invokes itself in order to
-retry. However, before retrying the function yields in order to let
-another process run.
+retry. Prior to the recursive call the function yields, again this is
+a rather ad-hoc heuristic, but as with send it seems reasonable to
+transfer control when there are no messages available.
 
 \subsection{Facilitating communication}
 
@@ -3272,13 +3294,15 @@ time\footnote{Although, in this particular example we could
   \frac{n}{\log(n)}$.}. Furthermore, a mailbox is essentially a FIFO
 queue of messages that is private to some process. Thus we can
 represent a single mailbox as a pair of a process identifier and a
-queue. We can represent many of such pairs with dictionary type that
-maps process identifiers to mailboxes. We will omit the implementation
-details of the dictionary we use, however, we do present its
-interface:
+queue. Many such pairs can be conveniently represented as a dictionary
+type that maps process identifiers to mailboxes. We omit the
+implementation details of the dictionary for brevity, however, we do
+present its interface:
 \begin{itemize}
 \item A type \lstinline$Dictionary(k,a)$ that classifies mappings from
   keys of type \lstinline$k$ to elements of type \lstinline$a$.
+\item A function \lstinline$dictEmpty : () -> Dictionary(k,a)$ that
+  returns an empty dictionary.
 \item A function
   \lstinline$dictLookup : (k, Dictionary(k,a)) ~> Maybe(a)$ that given
   a key and a dictionary returns \lstinline$Just$ the element
@@ -3290,11 +3314,12 @@ interface:
   of type \lstinline$a$ to a given dictionary. If the key is already
   bound, then that binding is overwritten.
 \end{itemize}
-We use this data structure to implement a function
-\lstinline$enqueueMessage$ that appends some given message,
-\lstinline$msg$, to the message queue of some given identifier,
-\lstinline$pid$. We will use a state interpretation to maintain a
-collection of mailboxes, i.e.
+This data structure enables us implement an auxiliary function
+\lstinline$enqueueMessage$ that appends a given message,
+\lstinline$msg$, to the message queue belonging to the process with
+the given identifier, \lstinline$pid$. In order to maintain the
+collection of mailboxes we will make use of yet another state
+interpretation, i.e.
 %
 \snippet{enqueueMessage.links}
 %
@@ -3305,13 +3330,13 @@ create a new empty queue and append the message \lstinline$msg$ onto
 it. Thus, we delay construction of a mailbox until we have some data
 to put inside of it. 
 %
-Alternatively, if a queue already exists then we simply append the new
+Conversely, if a queue already exists then we simply append the new
 message onto that queue. Finally, we bind \lstinline$pid$ to the new
 queue \lstinline$q$ in the dictionary.
 
 The dual operation \lstinline$dequeueMessage$ dequeues a message from
 a mailbox. We let the function return a \lstinline$Maybe$-value to
-accommodate for the special case when a mailbox is empty:
+account for when a mailbox is empty:
 %
 \snippet{dequeueMessage.links}
 %
@@ -3328,14 +3353,12 @@ then there are two cases to consider:
     point to the modified queue.
 \end{enumerate}
 
-Using the two functions \lstinline$enqueueMessage$ and
-\lstinline$dequeueMessage$ we give an interpretation of the operations
+Using these two functions we give an interpretation of
 \lstinline$Send$ and \lstinline$Recv$:
 %
 \lstinputlisting{snippets/communication.links}
 %
 The implementation is straightforward.
-\todo{Implement amendments}
 
 \section{Sieve of Eratosthenes example revisited}
 \label{sec:links-model-handlers-example}
@@ -3409,8 +3432,6 @@ concurrency model. The correct solution to this issue is to make
 encoding \lstinline$EProcess$ as an abstract type in Links would
 obscure rather than clarify.
 
-\todo{Heterogeneous mailboxes}
-
 Perhaps the biggest advantage and disadvantage of our implementation
 is that it does not provide preemptive concurrency. On one hand it not
 being preemptive makes it considerably easier to reason about
@@ -3422,6 +3443,15 @@ into standard library functions. In addition, we can have the
 compiler silently insert yields into user functions. In order to do so
 successfully requires great care as we have to make sure that any
 yield the compiler inserts appears in a handled context.
+
+\section{Summary}
+This chapter described an implementation of the message-passing
+concurrency model of Links. By using effect handlers to drive the
+implementation, we were able to modularly define scheduling policy and
+the communication protocol independently of one and another. We
+composed the handlers seamlessly to give a full interpretation of the
+sieve program. Furthermore, we identified and discussed some
+shortcomings and limitations.
 
 % \section{Pipeline parallelism}
 % \label{sec:prime}
@@ -3597,7 +3627,9 @@ the Informatics CaRD group. The hostname of the machine is
 each core operates at 3.1 GHz. The four cores share a 6 MB Intel
 SmartCache. Furthermore, the machine has 8 GB of physical memory. It
 is running a 64 bit version of openSuSE 13.2 Linux with kernel version
-3.16.7-24-desktop.
+3.16.7-24-desktop. The experiments were compiled using an experimental
+OCaml compiler \texttt{4.02.2+effects}, and further, they were ran
+with the runtime parameter \texttt{OCAMLRUNPARAM="s=300M"}.
 %
 
 \section{State interpretation}
@@ -3655,8 +3687,8 @@ instantiate the state parameter with $10000000$.
   ocamlopt          & 0.0250   & 0.0753  & *1.0000 \\
 \hline
 \end{tabular}
-\caption{Comparison of state implementations. The component marked
-  with * is the baseline.}\label{tbl:state-all}
+\caption{Relative speed up of state implementations. The component
+  marked with * is the baseline.}\label{tbl:state-all}
 \end{table}
 
 Table~\ref{tbl:state-all} shows the speed of the different state
@@ -3756,8 +3788,8 @@ specialisation.
   Links compiler/lin+eq & 0.0222 & 0.0438 & 1.1905 \\
 \hline
 \end{tabular}
-\caption{Comparison of state implementations. The component marked
-  with * is the baseline.}\label{tbl:state-all-recovered}
+\caption{Relative speed up of state implementations. The component
+  marked with * is the baseline.}\label{tbl:state-all-recovered}
 \end{table}
 \begin{figure}
 \centering
@@ -3804,22 +3836,79 @@ the compiler.
   better).}\label{fig:statehandler-all}
 \end{figure}
 
-\section{Queens benchmark}
+\section{N-Queens benchmark}
 \label{sec:queens-eval}
+
+The $N$-Queens benchmark program makes use of backtracking in order to
+find a solution to the queens problem for a given board size
+$N \times N$. The handler-based version of the program relies on
+multi-shot continuations in order to perform
+backtracking. Table~\ref{tbl:queens} displays the speed ups relative
+to the Links interpreter.
 
 \begin{table}[H]
 \centering
-\begin{tabular}{| l | r | r | r | r |}
+\begin{tabular}{| c | r | r | r | r | r |}
+\cline{2-6}
+ \multicolumn{1}{c|}{~} & \multicolumn{2}{c |}{\textbf{Links interpreter}} & \multicolumn{2}{c |}{\textbf{Links compiler}} & \multicolumn{1}{c |}{\textbf{ocamlopt}} \\
 \hline
-N  & 8 & 12 & 16 & 20 \\
+  \textbf{Board size} & No handler & Handler & No handler & Handler & Handler\\
 \hline
-  Links interpreter (ms) & 0.0 & 0.0 & 0.0 & 0.0\\
+  $8 \times 8$                 & *1.0        & 0.97           & 5.93         & 5.93 & 5.93\\
 \hline
-  Links compiler    (ms) & 0.0 & 0.0 & 0.0 & 0.0\\
+  $12 \times 12$               & *1.0        & 0.98           & 16.35        & 17.37 & 18.53\\
+\hline
+  $16 \times 16$               & *1.0        & 0.99           & 246.62       & 239.03 & 621.48\\
+\hline
+  $20 \times 20$               & *1.0        & 0.86           & 323.61       & 289.65 & 1694.21\\
 \hline
 \end{tabular}
-\caption{$N$-queens benchmark.}\label{tbl:queens}
+% \begin{tabular}{| l || r || r || r || r |}
+% \hline
+% Board size  & 8 & 12 & 16 & 20 \\
+% \hline
+%   Interpreter/no handlers & 0.0 & 0.0 & 0.0 & 0.0\\
+% \hline
+%   Links compiler    & 0.0 & 0.0 & 0.0 & 0.0\\
+% \hline
+% \end{tabular}
+\caption{$N$-Queens benchmark relative speed ups. The component marked
+  with * is the baseline across the row.}\label{tbl:queens}
 \end{table}
+
+The baseline is for every board size the execution time of queens
+program without handlers using the Links
+interpreter. Figure~\ref{fig:nqueens-all} displays a bar plot of data
+from Table~\ref{tbl:queens}, whilst Figure~\ref{fig:nqueens} displays
+the same plot without the data for the ocamlopt compiler, which enjoys
+a massive speed up in $20 \times 20$-case. As the table and figures
+show the Links compiler beats the interpreter in every
+case. Interestingly, for the Links compiler the performance of the
+handler based program keeps well up with the performance handlerless
+program. This is likely because there is little or no need for
+backtracking for the smaller board sizes. As a result the continuation
+do not need to be cloned.
+
+The massive speed up achieved by the ocamlopt compiler compared to the
+Links compiler is due to difference in data placement. The Lambda IR
+permits boxes that contain only primitive values (integers, floats,
+string, and characters) to be allocated on the stack rather than the
+heap. The Links compiler always allocates its boxes on the heap. Thus,
+the programs compiled by the Links compiler will perform more
+indirections.
+
+
+\begin{figure}
+\centering
+\includegraphics[scale=0.65]{plots/nqueens_all.pdf}
+\caption{Plot of data from Table~\ref{tbl:queens} (higher is better).}\label{fig:nqueens-all}
+\end{figure}
+\begin{figure}
+\centering
+\includegraphics[scale=0.65]{plots/nqueens.pdf}
+\caption{Plot of data from Table~\ref{tbl:queens} without ocamlopt
+  (higher is better).}\label{fig:nqueens}
+\end{figure}
 
 \section{Concurrency implementation}
 \label{sec:concur-label}
@@ -3838,7 +3927,7 @@ contains the data obtained by running the Sieve example
 % 4    111      231     136       24301
 % 5    140      409     186       48679
 % 6    169      658     247       84822
-\begin{table}[H]
+\begin{table}
 \centering
 \begin{tabular}{| l | r | r | r | r | r | r |}
 \hline
@@ -3847,11 +3936,11 @@ N  & 101 & 201 & 401 & 601 & 801 & 1001\\
 Number of process & 27 & 47 & 80 & 111 & 140 & 169\\
 \hline
 \hline
-  Interpreter/handlers (ms) & 992  & 2473 & 9589 & 24301  & 48679  & 84822\\
+  Interpreter/handlers [ms] & 992  & 2473 & 9589 & 24301  & 48679  & 84822\\
 \hline
-  Interpreter/built-in (ms) & 56 & 65 & 95 & 136 & 186 & 247\\
+  Interpreter/built-in [ms] & 56 & 65 & 95 & 136 & 186 & 247\\
 \hline
-  Compiler/handlers    (ms) & 21 & 38 & 103 & 231  & 409  & 658\\
+  Compiler/handlers    [ms] & 21 & 38 & 103 & 231  & 409  & 658\\
 \hline
 \end{tabular}
 \caption{Concurrency implementation scaling (lower is better).}\label{tbl:sieve}
@@ -3879,7 +3968,7 @@ Figure~\ref{fig:sieve-recovered-plot} displays a visualisation of the
 data. In particular, it appears that the compiled implementation
 scales as nicely as the built-in implementation.
 
-\begin{figure}[H]
+\begin{figure}
 \centering
 \includegraphics[scale=0.55]{plots/sieve.pdf}
 \caption{Concurrency implementation scaling (lower is better).}\label{fig:sieve-plot}
@@ -3899,7 +3988,7 @@ scales as nicely as the built-in implementation.
 % 4    111      231     136          61
 % 5    140      409     186          99
 % 6    169      658     247         153
-\begin{table}[H]
+\begin{table}
 \centering
 \begin{tabular}{| l | r | r | r | r | r | r | r |}
 \hline
@@ -3908,11 +3997,11 @@ N  & 101 & 201 & 401 & 601 & 801 & 1001 \\
 Number of process & 27 & 47 & 80 & 111 & 140 & 169 \\
 \hline
 \hline
-  Interpreter/built-in (ms) & 56 & 65 & 95 & 136 & 186 & 247 \\
+  Interpreter/built-in [ms] & 56 & 65 & 95 & 136 & 186 & 247 \\
 \hline
-  Compiler/handlers (ms) & 21 & 38 & 103 & 231  & 409  & 658  \\
+  Compiler/handlers [ms] & 21 & 38 & 103 & 231  & 409  & 658  \\
 \hline 
-  Compiler/handlers/lin+eq (ms) & 17 & 22 & 36 & 61 & 99 & 153 \\
+  Compiler/handlers/lin+eq [ms] & 17 & 22 & 36 & 61 & 99 & 153 \\
 \hline
 \end{tabular}
 \caption{Concurrency implementation scaling with hand-coded optimisations.}\label{tbl:sieve-recovered}
@@ -4593,8 +4682,8 @@ OCaml IR known as Lambda.  The Lambda intermediate language contains
 primitives to support compilation of linear effect handlers. Our
 translation demonstrates how to encode the multi-shot handlers in
 Lambda using a cloning primitive to copy continuations prior to
-invocation. However, whether our translation is faithful is not clear
-as Lambda does not have a formally specified semantics.
+invocation. However, whether our translation is faithful is unclear as
+Lambda does not have a formally specified semantics.
 
 By contrast, the Links IR now have a formally specified semantics as
 we presented a core calculus \Calc{} that captures the essence of the
@@ -4608,8 +4697,8 @@ of the effect system, we manage to encode a process abstraction akin
 to the built-in one, which tracks the effects that a process may
 perform. We also identified some shortcomings and limitations of our
 concurrency implementation (c.f. Section~\ref{sec:limitations}), in
-particular, we do not have preemptive concurrency since we use
-cooperative routines to provide concurrency.
+particular, we do not have preemptive concurrency since the
+implementation uses cooperative routines to provide concurrency.
 
 \section{Critical evaluation}
 \label{sec:criticaleval}
@@ -4632,30 +4721,68 @@ graphs.
 \label{sec:futurework}
 
 We can view Links as an experimental frontend to OCaml with a more
-expressive type system. Thus we can use Links to try to answer
+expressive type system. Thus we can try to use Links to answer
 research questions that are either hard or impossible to answer in
 OCaml presently.
 
-\subsection{Type and effect directed optimisations}
-\paragraph{Linearisation} \dots
+\paragraph{Optimisations of handlers} 
+Given the results presented in Chapter~\ref{ch:experiments} to promote
+handlers that use their continuations linearly to linear handlers at
+compile time. However, every linear handler in the context of
+multi-shot handler must be demoted to a multi-shot handler. Otherwise
+linear continuations risk being consumed more than once. We believe
+that we can use the existing linear type system of Links to track the
+linearity of handlers. During code generation we can specialise the
+run-time representation of handlers according to their linearity.
 
-\paragraph{Handler resolution} \dots
+Traversal of the handler stack is expensive for deep pipelines of
+handlers. If the handler stack, or part of it, is known statically,
+then we can imagine instantiating abstract operations already at
+compile time.
 
-\subsection{Improve concurrency implementation}
-Heterogeneous mailboxes, abstract types to make it safe. Simulate
-preemptive.
+\paragraph{Improving the concurrency implementation}
+In Section~\ref{sec:limitations} we identified several shortcomings of
+the concurrency implementation. In the future we plan to improve on
+these. However, it may turn out be extremely hard to simulate
+preemptive concurrency. Caution must be taken if we are to have the
+compiler silently inserting yields into user-defined code, because the
+yields must only be inserted in the scope of a suitable handler.
 
-\subsection{Applications of multi-shot handlers in parallelism}
-Transactions. Distribution.
+% In the concurrency implementation all mailboxes are homogeneous, that
+% is, they can only contain messages of a single type. It would be
+% beneficial to permit mailboxes to be heterogeneous. This would allow 
 
-\subsection{Shallow handlers}
-The implementation supports only deep handlers. For instance, with
-shallow handlers it is easier to express parallel pipes
-\citep{Kammar2013}.
+\paragraph{Support for parallelism}
+We have not made use of the multicore capabilities of the Multicore
+OCaml backend. We plan to enable multicore support in the
+future. Alternatively, we should be able to take an established
+parallel runtime such as MPI~\citep{Mpi2012} off the shelf and
+substitute it in place of the coroutine implementation.
 
-\subsection{Type signatures}
-The type signature for the scheduler \lstinline$roundrobin$ is
-enormous.
+\paragraph{Applications of multi-shot handlers in concurrency}
+Multi-shot handlers ought to be useful in applications where we want
+to replay a computation. For example, we believe multi-shot handlers
+could provide an elegant abstraction for database transactions. In
+particular, they may be useful for implementing partial abort
+transactions~\citep{Le2015} which require delimited continuations.
+
+\paragraph{Shallow handlers}
+In this dissertation we have only discussed so-called \emph{deep
+  handlers} which handle abstract operations uniformly.  But Links
+also has so-called \emph{shallow handlers}~\citep{Kammar2013}. These
+handlers permit a nonuniform interpretation of abstract
+operations. With shallow handlers one must explicitly reinvoke the
+handler each time the continuation is used inside an operation
+clause. An advantage is that it makes it easy to switch to a different
+handler midway through a computation.
+%
+A disadvantage is that shallow handlers are less easy to optimise than
+deep handlers~\cite{Wu2015}.
+
+The Multicore OCaml backend does not yet have support for shallow
+handlers. It remains a question how to provide compile shallow
+handlers to native code.
+
 
 %%
 %% Appendices
