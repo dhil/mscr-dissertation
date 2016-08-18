@@ -3169,7 +3169,7 @@ We describe the changes line by line.
   active process.
 \item[Line 10] suspends the executing process and wakes up the next
   process to run.
-\item[Lines 12-13] returns the handle to the executing process. This
+\item[Lines 12-13] returns a handle to the executing process. This
   clause, unlike the two previous clauses, does not alter the state of
   the executing process.
 \end{description}
@@ -3204,9 +3204,7 @@ Spawned P#5
 Spawned P#6
 \end{lstlisting}
 %
-From the perspective of computations the initial process is no longer
-a special case. Every process gets handled uniformly by this
-scheduler. 
+Every process gets handled uniformly by this scheduler.
 
 \section{Handling communication}
 \label{sec:links-model-handlers-communication}
@@ -3241,7 +3239,7 @@ define an infix operator that looks similar:
 %
 Since the bang operator built deeply into the parsing level of Links
 we cannot override its definition in programming language level. Thus
-\lstinline$!!$ is the closest we can get. We dub it \emph{bang-bang}.
+\lstinline$!!$ is the closest we can get.
 
 There are several interesting designs to choose from for implementing
 a blocking receive. We may do the straightforward thing of ``just''
