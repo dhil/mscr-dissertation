@@ -8,14 +8,14 @@ dat = read.csv(paste("/home/dhil/projects/mscr-dissertation/experiments/results"
 x = dat
 
 normalized = (x-min(x))/(max(x)-min(x))
-x = normalized
+#x = normalized
 print(x)
 
 pure <- x$purestate.links
 monadic <- x$monadicstate.links
 handler <- x$state.links
 
-data <- data.frame(handler=handler)
+data <- data.frame(pure=pure,monadic=monadic,handler=handler)
 boxplot(data)
 
 meanPure <- mean(pure)
