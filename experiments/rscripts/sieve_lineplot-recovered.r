@@ -49,7 +49,7 @@ plot1 <- ggplot(data.m, aes(x=SieveN, y=value, colour=factor(impl, labels=names)
   geom_line(size=2) +
   geom_point(size=4) +
   scale_x_continuous(breaks = round(seq(min(data.m$SieveN)-7, max(data.m$SieveN), by=20),1)) +
-  xlab("Number of processes") + ylab("Median execution time (ms)") +
+  xlab("Number of processes") + ylab("Median execution time [ms]") +
   ggtitle("Dynamic process generation (Sieve)\nwith optimisations") +
   labs(colour="Concurrency impl.") + theme_gray(base_size = 16)
 print(plot1)

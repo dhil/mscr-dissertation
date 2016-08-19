@@ -59,7 +59,7 @@ print(data.m)
 pdf("/home/dhil/projects/mscr-dissertation/thesis/plots/stateAll.pdf", width = 10, height = 7)
 plot1 <- ggplot(data.m, aes(x=reorder(names,value), y=value)) +   
   geom_bar(aes(fill = statetype), position = "dodge", stat="identity") +
-  ylab("Relative speed") +
+  ylab("Relative speed up") +
   xlab("Compilation tool") + 
   ggtitle("State interpretation comparison\nacross compilation tools") + 
   labs(fill="State impl.") + theme_gray(base_size = 16)

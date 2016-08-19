@@ -38,7 +38,7 @@ print(data.m)
 pdf("/home/dhil/projects/mscr-dissertation/thesis/plots/statehandlerAll.pdf", width = 10, height = 7)
 plot1 <- ggplot(data.m, aes(x=reorder(names, value), y=value)) +   
   geom_bar(aes(fill = statetype), position = "dodge", stat="identity") +
-  ylab("Relative speed") +
+  ylab("Relative speed up") +
   xlab("Compilation tool") + 
   ggtitle("State handler comparison cross compilation tools\n(with optimisations)") + 
   labs(fill=NULL) + theme_gray(base_size = 16) + theme(legend.position = 'none')
