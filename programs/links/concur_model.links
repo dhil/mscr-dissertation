@@ -1,0 +1,606 @@
+# An attempt at encoding the concurrency model of Links using effect
+# handlers.
+#
+# Ideally, the implementation should meet the following criteria:
+#
+# 1. Messages can only be sent to existing processes
+# 2. Process types carry effect information, e.g. Process({Foo:(Bar) {}-> Baz |e})
+# 3. Mailboxes are heterogeneous
+#
+
+# typename Option(a) = [|None
+#                       |Some:a
+#                       |];
+
+# typename Priority  = [|Low
+#                       |Medium
+#                       |High
+#                       |];
+
+# Generic execution unit type (process or thread)
+typename ExecutionUnit(id::Type,inp::Type,e::Row,out::Type) =
+         (id:id, comp:(inp) -e-> out);
+
+#snippet:pidInt.links
+typename Pid = Int;
+var pidToString = intToString;
+#end
+
+# Fresh name generator
+sig names : ((a)   {FreshName{p}|e}~> a ,a)  ->
+            (Comp( {FreshName:a |e}    ,b)) ->
+             Comp( {FreshName{p}|e}    ,b)
+fun names(gen, seed) {
+   var h = handler(name) {
+      case Return(x)    -> x
+      case FreshName(k) -> k(name)(gen(name))
+   };
+   h(seed)
+}
+#snippet:freshnames.links
+sig pidgenerator : (Int) ->
+                   (Comp({FreshName:Int |e}, b)) ->
+                    Comp({FreshName{_} |e}, b)
+handler pidgenerator(nextPid) {
+  case Return(x)    -> x
+  case FreshName(k) -> k(nextPid)(nextPid+1)
+}
+#end
+
+#snippet:freshname.links
+sig freshName : () {FreshName:a|_}-> a
+fun freshName() {do FreshName}
+#end
+
+typename PackedProcess(e::Row,y::Type) = forall p :: Row . (ExecutionUnit(Pid,(),{ |e},())) -p-> y;
+#typename EProcess(e::Row) = forall y, p :: Row . (PackedProcess({ |e}, y)) -p-> y;
+#typename EProcess(e::Row) = (id:Pid);
+#snippet:eprocess.links
+typename EProcess(e::Row) = Int;
+#end
+
+fun showProcess(p) {
+    "P#" ^^ pidToString(getPid(p))
+}
+
+sig makeExecutionUnit : ((a) -e-> b, id) -> ExecutionUnit(id, a, { |e}, b)
+fun makeExecutionUnit(f, id) {
+    (id=id, comp=f)
+}
+
+#snippet:makeProcess.links
+sig makeProcessHandle : (() -e-> (), Int) -> EProcess({ |e})
+fun makeProcessHandle(_, pid) { pid }
+#end
+
+sig getPid : (EProcess({ |e})) -> Pid
+fun getPid(proc) { proc }
+
+#sig makeProcess : (() -e-> (), Pid) -> EProcess({ |e})
+#fun makeProcess(f, pid) {
+#    var eu = makeExecutionUnit(fun(_) { f() }, pid);
+#    fun( p : PackedProcess({ |e}, y) ) {
+#       p(eu)
+#    }
+#}
+
+#sig getPid : (EProcess({ |e})) -> Pid
+#fun getPid(proc) {
+#    #var packedFun = (fun(proc) { proc.id } : PackedProcess({ |e}, Pid) );
+#    var packedFun = fun(proc) { proc.id };
+#    proc(packedFun)
+#}
+
+#sig makeChildPid : (EProcess({ |e}), Int) -> Pid
+#fun makeChildPid(parent, childNumber) {
+#    getPid(parent) ^^ "." ^^ intToString(childNumber)
+#}
+
+fun incrPid(i) { i + 1 }
+
+
+# Process creation
+#snippet:pspawn.links
+sig pspawn : (() -e-> ()) {Spawn:(() -e-> ()) {}-> EProcess({ |e}) |_}-> EProcess({ |e})
+fun pspawn(f) { do Spawn(f) }
+#end
+
+# Process suspension
+#snippet:yield.links
+sig yield : () {Yield:() |_}-> ()
+fun yield() { do Yield }
+#end
+
+#snippet:myself.links
+sig myself : () {Myself:EProcess({ |e}) |_}-> EProcess({ |e})
+fun myself() {do Myself}
+#end
+
+# Process queue
+#snippet:queue.links
+typename Queue(a::Type) = ([a],[a]);
+#end
+
+#snippet:emptyQueue.links
+sig emptyQueue : () -> Queue(a)
+fun emptyQueue() { ([], []) }
+#end
+
+#snippet:isEmptyQueue.links
+sig isEmptyQueue : (Queue(a)) -> Bool
+fun isEmptyQueue(q) {
+  switch(q) {
+    case ([],[])   -> true
+    case otherwise -> false
+  }
+}
+#end
+
+#snippet:enqueue.links
+sig enqueue : (Queue(a), a) -> Queue(a)
+fun enqueue((xs,ys), y) { (xs, y::ys) }
+#end
+
+#snippet:dequeue.links
+sig dequeue : (Queue(a)) ~> (Maybe(a), Queue(a))
+fun dequeue(q) {
+  switch (q) {  
+    case ([], [])      -> (Nothing, q)
+    case (x :: xs, ys) -> (Just(x), (xs, ys))
+    case ([], ys)      -> dequeue((reverse(ys), []))
+  }
+}
+#end
+
+## TODO: Implement the queue as a handler
+
+# State handler
+#snippet:evalState.links
+sig evalState : (s) ->
+                (Comp({Get:s ,Put:(s) {}-> () |e}, a)) ->
+                 Comp({Get{_},Put{_}          |e}, a)
+handler evalState(s) {
+  case Get(k)    -> k(s)(s)
+  case Put(s,k)  -> k(())(s)
+  case Return(x) -> x
+}
+#end
+
+#snippet:getput.links
+sig get : () {Get:s|_}-> s
+fun get() {do Get}
+
+sig put : (s) {Put:(s) {}-> ()|_}-> ()
+fun put(s) {do Put(s)}
+#end
+
+# Process scheduler
+#snippet:enqueueProcess.links
+sig enqueueProcess :
+   (() -e-> ()) {Get: Queue(() -e-> ())
+                ,Put:(Queue(() -e-> ())) {}-> ()|_}~> ()
+fun enqueueProcess(f) {
+  var q = enqueue(get(), f);
+  put(q)
+}
+#end
+
+#snippet:dequeueProcess.links
+sig dequeueProcess :
+   () {Get: Queue(() -e-> ())
+      ,Put:(Queue(() -e-> ())) {}-> ()|_}~> (() -e-> ())
+fun dequeueProcess() {
+   switch (dequeue(get())) {
+     case (Just(p), q) -> put(q); p
+     case (Nothing, q) -> fun() { () } # The trivial process
+   }
+}
+#end
+
+# handler roundrobin(parent, numChildren) {
+#   case Spawn(f,k) ->
+#        var childPid = makeChildPid(parent, numChildren+1);
+#        var child = makeProcessHandle(f, childPid);
+#        enqueueProcess(fun() { k(child)(parent, numChildren+1) });
+#        roundrobin(child, 0)(f)()
+#   case Yield(k)   ->
+#        enqueueProcess(fun() { k(())(parent, numChildren) });
+#        dequeueProcess()()
+#   case MyPid(k) -> k(getPid(parent))(parent, numChildren)
+#   case Return(_)  ->
+#        dequeueProcess()()
+# }
+
+#snippet:roundrobin.links
+fun roundrobin(m)() {
+  var root = makeProcessHandle(m, freshName());
+  handler scheduler(activeProcess) {
+    case Spawn(f,resume) ->
+      var childPid = freshName();
+      var child = makeProcessHandle(f, childPid);
+      enqueueProcess(fun() { resume(child)(activeProcess) });
+      scheduler(child)(f)()
+    case Yield(resume)   ->
+      enqueueProcess(fun() { resume(())(activeProcess) });
+      dequeueProcess()()
+    case Myself(resume)  ->
+      resume(activeProcess)(activeProcess)
+    case Return(_)       ->
+      dequeueProcess()()
+  }
+  run(scheduler(root)(m))
+}
+#end
+
+fun hello(depth)() {
+  var self = myself();
+  print("Hello from process " ^^ showProcess(self));
+  if (depth == 0) { () }
+  else {         
+    var _ = pspawn(hello(depth-1));
+    var _ = pspawn(hello(depth-1));
+    ()
+  }
+}
+
+# Example
+op h -<- g { fun(m) { h(g(m)) } }
+op h -< m  { h(m) }
+
+fun run(m) { m() }
+
+#var dummy = run -<- evalState(emptyQueue()) -<- roundrobin(makeProcessHandle(fun() { () }, "0"), 0) -< hello(4);
+
+# Communication
+#snippet:psend.links
+sig psend :
+  (EProcess({ |e}), a) {Send:(EProcess({ |e}), a) {}-> (),Yield:()|_}-> ()
+fun psend(proc, msg) { do Send(proc, msg); yield() }
+#end
+
+#snippet:psendOp.links
+op proc !! msg { psend(proc, msg) }
+#end
+
+#snippet:precv.links
+sig precv : () {Recv: (EProcess({ |e})) {}-> Maybe(a)
+               ,Myself:EProcess({ |e}),Yield:()|_}~> a
+fun precv() {    
+  fun loop(proc) {
+    var msg = do Recv(proc);
+    switch (msg) {
+      case Nothing   -> yield(); loop(proc)
+      case Just(msg) -> msg
+    }
+  }
+  loop(myself())
+}
+#end
+
+typename Ordering = [|GT
+                     |EQ
+                     |LT
+                     |];
+
+typename Comparer(a::Type,e::Row) = (a,a) ~e~> Ordering;
+
+#
+fun pidKeyCmp((p,_),(q,_)) {
+    if (p < q) LT
+    else if (p > q) GT
+    else EQ
+}
+
+# sig enqueueMessage : (Pid, a) {Get:RedBlackSet((Pid,Queue(a))),Put:(RedBlackSet((Pid,Queue(a)))) {}-> ()|_}~> ()
+# fun enqueueMessage(pid, msg) {
+#   var rb = get();
+#   var emptyQ = emptyQueue();
+#   switch (rbLookup((pid, emptyQ), rb, pidKeyCmp)) {
+#      case Just((_,q)) ->
+#         var rb = rbReplace((pid,q), (pid,enqueue(q, msg)), rb, pidKeyCmp);
+#         put(rb)
+#      case Nothing ->
+#         var rb = rbInsert((pid,enqueue(emptyQ, msg)), rb, pidKeyCmp);
+#         put(rb)
+#   }
+# }
+
+# # Typing bug?
+# #
+# # Type error: Because of the value restriction there can be no
+# # free rigid type variables at an ungeneralisable binding site,
+# # but the type `RedBlackSet ((Pid, Queue (a)))' has free rigid type variables.
+# # In expression: var rb = get();.
+# #sig dequeueMessage : (Pid) {Get:RedBlackSet ((Pid, Queue (a))),Put:(RedBlackSet ((Pid, Queue (a)))) {}-> ()|_}~> Maybe (a)
+# fun dequeueMessage(pid : Pid) {
+#   var rb = get();
+#   switch (rbLookup((pid, emptyQueue()), rb, pidKeyCmp)) {
+#      case Just((_,q)) ->
+#        if (isEmptyQueue(q)) {
+#          Nothing : Maybe(a)
+#        } else {
+#          var (msg, q) = dequeue(q);
+#          var rb = rbReplace((pid, emptyQueue()), (pid, q), rb, pidKeyCmp);
+#          put(rb);
+#          Just(msg) : Maybe(a)
+#        }
+#       case Nothing    -> Nothing : Maybe(a)
+#   }
+# }
+
+typename Dictionary(k,a) = [(k,a)];
+
+sig pop : (k, Dictionary(k,a)) ~> (Maybe(a), Dictionary(k,a))
+fun pop(x, alist) {
+  switch (lookup(x, alist)) {
+    case Just(y) -> (Just(y), removeAssoc(x, alist))
+    case Nothing -> (Nothing, alist)
+  }
+}
+
+sig dictEmpty : () -> Dictionary(k,a)
+fun dictEmpty() { [] }
+
+sig dictLookup : (k, Dictionary(k,a)) ~> Maybe(a)
+var dictLookup = lookup;
+
+sig dictModify : (k, a, Dictionary(k,a)) ~> Dictionary(k,a)
+fun dictModify(k, x, dict) {
+  (k, x) :: removeAssoc(k, dict)
+}
+
+typename Mailbox(a::Type) = Dictionary(Pid, Queue(a));
+
+#snippet:enqueueMessage.links
+
+
+sig enqueueMessage :
+  (Int, a) {Get: Dictionary(Int,Queue(a))
+           ,Put:(Dictionary(Int,Queue(a))) {}-> ()|_}~> ()
+fun enqueueMessage(pid, msg) {
+  var dict = get();
+  var q = switch (dictLookup(pid, dict)) {
+            case Nothing -> enqueue(emptyQueue(), msg)
+            case Just(q) -> enqueue(q, msg)
+          };
+  put(dictModify(pid, q, dict))         
+}
+#end
+
+#snippet:dequeueMessage.links
+sig dequeueMessage :
+  (Int) {Get: Dictionary(Int,Queue(a))
+        ,Put:(Dictionary(Int,Queue(a))) {}-> ()|_}~> Maybe(a)
+fun dequeueMessage(pid) {
+  switch (dictLookup(pid, get())) {
+    case Nothing -> Nothing
+    case Just(q) ->
+      switch (dequeue(q)) {
+        case (Nothing, _) -> Nothing
+        case (msg    , q) ->
+          put(dictModify(pid, q, get())); msg
+      }
+  }
+}
+#end
+
+#sig mailbox : (Comp({Recv:(Pid) {}-> Maybe(a),Send:(Pid,a) {}-> (),Get:RedBlackSet((Pid, Queue(a))),Put:((Pid, Queue(a))) {}-> ()|e}, a)) ->
+#               Comp({Recv{_},Send{_},Get:RedBlackSet((Pid, Queue(a))),Put:((Pid, Queue(a))) {}-> ()|e}, a)
+#sig mailbox : (Comp({Get:RedBlackSet ((Pid, Queue (a))),Put:(RedBlackSet ((Pid, Queue (a)))) {}-> (),Recv:(Pid) {}-> Maybe (a),Send:(Pid, a) {}-> ()|e}, b)) ->
+#               Comp({Get:RedBlackSet ((Pid, Queue (a))),Put:(RedBlackSet ((Pid, Queue (a)))) {}-> (),Recv{_},Send{_}|e}, b)
+# fun mailbox2(m)() {
+#   handle(m) {
+#     case Return(x)        -> x
+#     case Recv(proc,resume) ->
+#       var msg = dequeueMessage(pid);
+#       resume(msg)
+#     case Send(proc,msg,resume) ->
+#       enqueueMessage(pid, msg);
+#       resume(())
+#   }
+# }
+
+sig communication : (Comp({Get:Dictionary(Pid,Queue(a)),Put:(Dictionary(Pid,Queue(a))) {}-> ()
+                          ,Recv:(EProcess({ |_})) {}-> Maybe(a)
+                          ,Send:(EProcess({ |_}),a) {}-> ()|e}, b)) ->
+                     Comp({Get:Dictionary(Pid,Queue(a)),Put:(Dictionary(Pid,Queue(a))) {}-> ()
+                          ,Recv{_}
+                          ,Send{_}                         |e}, b)
+#snippet:communication.links
+handler communication {
+  case Return(x)             -> x
+  case Recv(proc,resume)     ->
+    var msg = dequeueMessage(getPid(proc));
+    resume(msg)
+  case Send(proc,msg,resume) ->
+    enqueueMessage(getPid(proc), msg);
+    resume(())
+}
+#end
+
+# Handshaking
+fun hello2(depth)() {    
+    var mypid = myself();
+    var me = showProcess(mypid);
+    print(me ^^ ": Spawned!");
+    if (depth == 0) {
+       var msg = precv();
+       print(me ^^ ": Received message: " ^^ msg)
+    } else {         
+         print(me ^^ ": Spawning two children");
+         var p1 = pspawn(hello2(depth-1));
+         psend(p1, "Hello from " ^^ me);
+         yield();
+         var p2 = pspawn(hello2(depth-1));
+         psend(p2, "Hello from " ^^ me);
+         ()
+    }
+}
+
+fun stop(process) {
+  switch (process) {
+    case Nothing    -> ()
+    case Just(proc) -> proc !! Stop
+  }
+}
+
+fun fromCandidate(msg) {
+  switch(msg) {
+    case Candidate(i) -> i
+    case _ -> error("Attempt to unwrap non-candidate.")
+  }
+}
+
+fun printInt(i) {
+  print(intToString(i))
+}
+
+#snippet:sieve.links
+fun sieve() {
+  var myprime = fromCandidate(precv());
+  print(intToString(myprime));
+  fun loop(neighbour) {
+    switch (precv()) {
+      case Stop -> stop(neighbour)
+      case Candidate(prime) ->
+      if (prime `mod` myprime == 0) {
+        loop(neighbour)
+      } else {
+        var neighbour =
+          switch (neighbour) {
+            case Just(pid) -> pid
+            case Nothing   -> pspawn(sieve)
+          };
+        neighbour !! Candidate(prime);
+        loop(Just(neighbour))
+  } } }
+  loop(Nothing)
+}
+#end
+
+fun foreach(xs, action) {
+  switch (xs) {
+    case [] -> ()
+    case x :: xs -> action(x); foreach(xs, action)
+  }
+}
+
+#snippet:generator.links
+fun generator(n)() {
+  var first = pspawn(sieve);
+  foreach([2..n], fun(p) { first !! Candidate(p) });
+  first !! Stop }
+#end
+
+#snippet:basicRoundrobin.links
+handler basicRoundrobin {
+  case Spawn(f,resume) ->
+    var child = makeProcessHandle(f, 0);
+    enqueueProcess(fun() { resume(child) });
+    basicRoundrobin(f)()
+  case Yield(resume) ->
+    enqueueProcess(fun() { resume(()) });
+    dequeueProcess()()
+  case Return(_) ->
+    dequeueProcess()()
+}
+#end
+
+#snippet:spawnLoneChild.links
+fun spawnLoneChild(n)() {
+    if (n == 0) ()
+    else {
+       var p1 = pspawn(spawnLoneChild(n-1));
+       print("Spawned " ^^ showProcess(p1))
+    }
+}
+#end
+
+# fun helloFamily() {
+#    sayHello("Parent")();
+#    var p1 = pspawn(fun() { yield(); sayHello("Child 1")() });
+#    var p2 = pspawn(sayHello("Child 2"));
+#    ()
+# }
+
+#snippet:wrongRoundrobin.links
+handler wrongRoundrobin(pid) {
+  case Spawn(f,resume) ->
+    var child = makeProcessHandle(f, pid+1);
+    enqueueProcess(fun() { resume(child)(pid) });
+    wrongRoundrobin(pid+1)(f)()
+  case Yield(resume) ->
+    enqueueProcess(fun() { resume(())(pid) });
+    dequeueProcess()()
+  case Return(_) ->
+    dequeueProcess()()
+}
+#end
+
+#snippet:spawnSiblings.links
+fun spawnSiblings(n)() {
+  if (n == 0) ()
+  else {
+    var p1 = pspawn(spawnSiblings(n-1));
+    print("Spawned " ^^ showProcess(p1));
+    var p2 = pspawn(spawnSiblings(n-1));
+    print("Spawned " ^^ showProcess(p2))
+  }
+}
+#end
+
+#snippet:spawnFamily.links
+fun spawnFamily(n)() {
+  var self = myself();
+  print("Spawned " ^^ showProcess(self));
+  if (n == 0) { () }
+  else {         
+    var _ = pspawn(spawnFamily(n-1));
+    var _ = pspawn(spawnFamily(n-1));
+    ()
+  }
+}
+#end
+
+#snippet:uniqueRoundrobin.links
+fun upRoundrobin(m)() {
+  var root = makeProcessHandle(m, freshName());
+  handler scheduler {
+    case Spawn(f,resume) ->
+      var child = makeProcessHandle(f, freshName());
+      enqueueProcess(fun() { resume(child) });
+      scheduler(f)()
+    case Yield(resume) ->
+      enqueueProcess(fun() { resume(()) });
+      dequeueProcess()()
+    case Return(_) ->
+      dequeueProcess()()
+  }
+  run(scheduler(m))
+}
+#end
+
+#snippet:pidgenerator.links
+var pidgenerator = pidgenerator(0);
+#end
+
+
+# Fibonacci example
+fun fib(n,parent)() {
+  if (n == 0 || n == 1) psend(parent, n)
+  else {
+    var me = myself();
+    var _  = pspawn(fib(n-1, me));
+    var _  = pspawn(fib(n-2, me));
+    psend(parent, precv() + precv())
+  }
+}
+
+fun nthfib(n)() {
+  fib(n, myself())();
+  print("Fib: " ^^ intToString(precv()))
+}
+
+var dummy = run -<- pidgenerator -<- evalState(dictEmpty()) -<- communication -<- evalState(emptyQueue()) -<- roundrobin -< generator(101);
+
+#var dummy = run(names(incrPid, 0)(evalState([])(mailbox(evalState(emptyQueue())(roundrobin(generator(200)))))));

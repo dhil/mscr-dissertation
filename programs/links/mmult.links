@@ -1,0 +1,50 @@
+# Source: https://stackoverflow.com/questions/4846938/divide-and-conquer-matrix-multiplication
+# private static int[][] divideAndConquer(int[][] matrixA, int[][] matrixB){
+#     if (matrixA.length == 2){
+#          //calculate and return base case
+#     }
+#     else {
+#         //make a11, b11, a12, b12 etc. by dividing a and b into quarters      
+#         int[][] c11 = addMatrix(divideAndConquer(a11,b11),divideAndConquer(a12,b21));
+#         int[][] c12 = addMatrix(divideAndConquer(a11,b12),divideAndConquer(a12,b22));
+#         int[][] c21 = addMatrix(divideAndConquer(a21,b11),divideAndConquer(a22,b21));
+#         int[][] c22 = addMatrix(divideAndConquer(a21,b12),divideAndConquer(a22,b22));
+#         //combine result quarters into one result matrix and return
+#     }
+# }
+
+
+typename Matrix = [[Int]];
+
+#let matrix_multiply m1 m2 =
+#  List.map
+#    (fun row ->
+#      mapn
+#       (fun column ->
+#         List.fold_left (+) 0
+#          (List.map2 ( * ) row column))
+#       m2)
+#    m1
+
+fun mapn(f, lists) {
+  if ([] `elem` lists) []
+  else f(map(hd, lists)) :: mapn(f, (map(tl, lists)))
+}
+
+sig map2 : ((a,b) ~c~> d, [a], [b]) ~c~> [d]
+fun map2(f,xs,ys) {
+  switch ((xs,ys)) {
+    case (x::xs,y::ys) -> f(x,y) :: map2(f,xs,ys)
+    case ([],[])       -> []
+    case _             -> error("|xs| != |ys|")
+  }
+}
+
+#sig mmult : (Matrix, Matrix) ~> Matrix
+fun mmult(xss, yss) {
+    map(fun(r) {
+      mapn(fun(c) {
+        fold_left((+), 0, map2((*), r, c))
+        }, yss)
+    }, xss)
+}

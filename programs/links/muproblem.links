@@ -1,0 +1,160 @@
+# Primitives
+sig fork : (a) {Fork:(a) {}-> b|_}~> b
+fun fork(t) {do Fork(t)}
+
+sig yield : Comp({Yield:()|_}, ())
+fun yield() {do Yield}
+
+# Run handler
+sig run : (Comp({},a)) {}~> a
+handler run { case Return(x) -> x }
+
+#
+# Queue interface
+#
+typename Queue(a::Type) = [a];
+
+sig enqueue : (a) {Enqueue:(a) {}-> ()|_}~> ()
+fun enqueue(e) {do Enqueue(e)}
+
+sig dequeue : Comp({Dequeue:a|_}, a)
+fun dequeue() {do Dequeue}
+
+
+#
+# Handlers with recursive rows
+#
+typename H1(e::Row) = forall a :: Presence, b :: Presence .
+                       (Comp({Fork:(() {Fork{a},Enqueue{b}|e}~> ()) {}-> ()
+                             ,Enqueue:(() {Fork{a},Enqueue{b}|e}~> ()) {}-> ()
+                             |e}
+                            ,() ));
+
+sig h1 : (H1({ |e})) -> H1({ |e})
+open handler h1 {
+  case Fork(t,k) -> enqueue(fun () { k(()) })
+  case Return(x) -> ()
+}
+
+typename H2(e::Row) = forall a :: Presence, b :: Presence .
+                       (Comp({Fork:(() {Fork{a},Enqueue{b}|e}~> ()) {}-> ()
+                                       ,Enqueue:(() {Fork{a},Enqueue{b}|e}~> ()) {}-> ()
+                                       |e}
+                            ,() ));
+
+sig h2 : (H2({ |e})) -> H2({ |e})
+open handler h2 {
+  case Fork(t,k) -> enqueue(fun () { k(()) }); t()
+  case Return(x) -> ()
+}
+
+
+typename H3(e::Row) = H2({ |e});
+
+#sig h3 : (H3({ |e})) -> H3({ |e})
+#sig h3 : (mu a . (() {Enqueue:(() {Enqueue:(mu e1 . (() { Enqueue:e1,Fork{c}|d}~> ())) {}-> (),Fork{c}|d}~> ()) {}-> (),Fork:(a) {}-> ()|d}~> ())) -> # a = () -e-> ()
+#                  () {Enqueue:(() {Enqueue:(mu e2 . (() { Enqueue:e2,Fork{c}|d}~> ())) {}-> (),Fork{c}|d}~> ()) {}-> (),Fork{c}         |d}~> ()
+#          (mu a . () {Enqueue:(() {|(mu b . Enqueue:(() {|b}~> ())                     {}-> (),Fork{c},wild|d)}~> ()) {}-> (),Fork:(a) {}-> ()|d}~> _) ->
+#	          () {Enqueue:(() {|(mu g . Enqueue:(() {|g}~> ()) {}-> (),Fork{c},wild|d)}~> ()) {}-> (),Fork{c}|d}~> ()
+
+#           (mu a . (() {Enqueue:(() {Enqueue:mu b . ((() {Enqueue:b,Fork{c}|d}~> ()) {}-> ()),Fork{c}|d}~> ()) {}-> (),Fork:(a) {}-> ()|d}~> ())) -> # a = () -e-> ()
+#                    () {Enqueue:(() {Enqueue:mu b . ((() {Enqueue:b,Fork{c}|d}~> ()) {}-> ()),Fork{c}|d}~> ()) {}-> (),Fork{c}         |d}~> ()
+#sig h3 :   (mu a . (() {Enqueue:(() {Enqueue:mu b . ((() {Enqueue:b,Fork{c},Yield{d}|%e}~> ()) {}-> ()),Fork{c},Yield{d} |%e}~> ()) {}-> (),Fork:(a) {}-> (),Yield:()  |%e}~> _)) ->
+#  	            () {Enqueue:(() {Enqueue:mu b . ((() {Enqueue:b,Fork{c},Yield{d}|%e}~> ()) {}-> ()),Fork{c},Yield{d} |%e}~> ()) {}-> (),Fork{c}         ,Yield{d}  |%e}~> ()
+
+typename Scheduler(e::Row,r) = forall fp :: Presence, yp :: Presence .
+                               (mu a . (() {Dequeue:mu b . (() {Dequeue:b
+                                                               ,Enqueue:(() {Dequeue:b,Enqueue:mu c . ((() {Dequeue:b,Enqueue:c,Fork{fp},Yield{yp}|e}~> r) {}-> ())
+                                                                            ,Fork{fp},Yield{yp}|e}~> r) {}-> ()
+                                                               ,Fork{fp},Yield{yp}|e}~> r)
+                                           ,Enqueue:(() {Dequeue:mu b . (() {Dequeue:b
+                                                                            ,Enqueue:(() {Dequeue:b,Enqueue:mu c . ((() {Dequeue:b,Enqueue:c,Fork{fp},Yield{yp} |e}~> r) {}-> ())
+                                                                                         ,Fork{fp},Yield{yp}|e}~> r) {}-> ()
+                                                                            ,Fork{fp},Yield{yp}
+                                                                            |e}~> r)
+                                                        ,Enqueue:mu c . ((() {Dequeue:mu b . (() {Dequeue:b,Enqueue:c,Fork{fp},Yield{yp}|e}~> r)
+                                                                             ,Enqueue:c
+                                                                             ,Fork{fp},Yield{yp}|e}~> r) {}-> ())
+                                                        ,Fork{fp},Yield{yp} |e}~> r) {}-> ()
+                                           ,Fork:(a) {}-> (),Yield|e}~> r )) ;
+
+# typename Scheduler(e::Row,r) = forall fp :: Presence, yp :: Presence .
+#                                 (mu a . (Comp({
+#                                                Enqueue:(() {Enqueue:mu b . ((() {Enqueue:b
+#                                                                                 ,Fork{fp}
+#                                                                                 ,Yield{yp}
+#                                                                                 |e}~> r) {}-> r)
+#                                                            ,Fork{fp}
+#                                                            ,Yield{yp}
+#                                                            |e}~> r) {}-> ()
+#                                               ,Fork:(a) {}-> r
+#                                               ,Yield{yp}
+#                                               |e}, r)));
+                                             
+#sig h4 : (Scheduler({Dequeue:(() {Dequeue:mu q . ((() {Dequeue:q,Enqueue:%,Fork{_},Yield{_} |e}~> ())),Enqueue:%,Fork{_},Yield{_} |e}~> ()) {}-> () |e}, ())) ->
+#          Scheduler({Dequeue:(() {Dequeue:mu q . ((() {Dequeue:q,Enqueue:%,Fork{_},Yield{_} |e}~> ())),Enqueue:%,Fork{_},Yield{_} |e}~> ()) {}-> () |e}, ())
+
+# sig h4 : (mu a . (() {Dequeue:mu b . (() {Dequeue:b
+#                                          ,Enqueue:(() {Dequeue:b,Enqueue:mu c . ((() {Dequeue:b,Enqueue:c,Fork{fp},Yield{yp}|e}~> ()) {}-> ())
+#                                                       ,Fork{fp},Yield{yp}|e}~> ()) {}-> ()
+#                                          ,Fork{fp},Yield{yp}|e}~> ())
+#                      ,Enqueue:(() {Dequeue:mu b . (() {Dequeue:b
+#                                                       ,Enqueue:(() {Dequeue:b,Enqueue:mu c . ((() {Dequeue:b,Enqueue:c,Fork{fp},Yield{yp} |e}~> ()) {}-> ())
+#                                                                              ,Fork{fp},Yield{yp}|e}~> ()) {}-> ()
+#                                                       ,Fork{fp},Yield{yp}
+#                                                       |e}~> ())
+#                                   ,Enqueue:mu c . ((() {Dequeue:mu b . (() {Dequeue:b
+#                                                                           ,Enqueue:c
+#                                                                           ,Fork{fp},Yield{yp}|e}~> ())
+#                                                       ,Enqueue:c
+#                                                       ,Fork{fp},Yield{yp}|e}~> ()) {}-> ())
+#                                   ,Fork{fp},Yield{yp} |e}~> ()) {}-> ()
+#                      ,Fork:(a) {}-> (),Yield|e}~> _)) -> %xyz
+# fun h4(m)() {
+#   open handle(m) {
+#     case Fork(t,k)  -> enqueue(fun () { k(()) }); h4(t)()
+#     case Yield(k)   -> enqueue(fun () { k(()) }); dequeue()()
+#     case Return(x)  -> ()
+#   }
+# }
+
+sig h4 : (Scheduler({ |e}, a)) -> Scheduler({ |e}, a)
+fun h4(m)() {
+  open handle(m) {
+    case Fork(t,k)  -> enqueue(fun () { k(()) }); h4(t)()
+    case Yield(k)   -> enqueue(fun () { k(()) }); dequeue()()
+    case Return(x)  -> x
+  }
+}
+
+fun h3(m)() {
+open handle(m) {
+  case Fork(t,k) -> enqueue(fun () { k(()) }); h3(t)()
+  case Yield(k)  -> enqueue(fun () { k(()) }); dequeue()()
+  case Return(x) -> ()
+} }
+
+#sig h3 : (mu a . () {Enqueue:(() {Enqueue:mu b . (() {Enqueue:b,Fork{c},Yield{d}|(mu e . Dequeue:mu f . () {Dequeue:f,Enqueue:(() {Enqueue:mu g . (() {Enqueue:g,Fork{h},Yield{i}|(mu j . Dequeue:f|k)}~> ()) {}-> (),Fork{h},Yield{i}|(mu l . Dequeue:f|k)}~> ()) {}-> (),Fork{h},Yield{i}|k}~> ()|k)}~> ()) {}-> (),Fork{c},Yield{d}|(mu m . Dequeue:mu n . () {Dequeue:n,Enqueue:(() {Enqueue:mu o . (() {Enqueue:o,Fork{h},Yield{i}|(mu p . Dequeue:n|k)}~> ()) {}-> (),Fork{h},Yield{i}|(mu q . Dequeue:n|k)}~> ()) {}-> (),Fork{h},Yield{i}|k}~> ()|k)}~> ()) {}-> (),Fork:(a) {}-> (),Yield|(mu r . Dequeue:mu s . () {Dequeue:s,Enqueue:(() {Enqueue:mu t . (() {Enqueue:t,Fork{h},Yield{i}|(mu u . Dequeue:s|k)}~> ()) {}-> (),Fork{h},Yield{i}|(mu v . Dequeue:s|k)}~> ()) {}-> (),Fork{h},Yield{i}|k}~> ()|k)}~> _) ->
+#                 () {Enqueue:(() {Enqueue:mu y . (() {Enqueue:y,Fork{c},Yield{d}|(mu z . Dequeue:mu ab . () {Dequeue:ab,Enqueue:(() {Enqueue:mu bb . (() {Enqueue:bb,Fork{h},Yield{i}|(mu cb . Dequeue:ab|k)}~>()) {}-> (),Fork{h},Yield{i}|(mu db . Dequeue:ab|k)}~> ()) {}-> (),Fork{h},Yield{i}|k}~> ()|k)}~> ()) {}-> (),Fork{c},Yield{d}|(mu eb . Dequeue:mu fb . () {Dequeue:fb,Enqueue:(() {Enqueue:mu gb . (() {Enqueue:gb,Fork{h},Yield{i}|(mu hb . Dequeue:fb|k)}~> ()) {}-> (),Fork{h},Yield{i}|(mu ib . Dequeue:fb|k)}~> ()) {}-> (),Fork{h},Yield{i}|k}~> ()|k)}~> ()) {}-> (),Fork{c},Yield{d}|(mu jb . Dequeue:mu kb . () {Dequeue:kb,Enqueue:(() {Enqueue:mu lb . (() {Enqueue:lb,Fork{h},Yield{i}|(mu mb . Dequeue:kb|k)}~> ()) {}-> (),Fork{h},Yield{i}|(mu nb . Dequeue:kb|k)}~> ()) {}-> (),Fork{h},Yield{i}|k}~> ()|k)}~> ()
+
+sig h5 : (mu a . (() {Dequeue:Maybe(mu b . (() {Dequeue:Maybe(b)
+                                                               ,Enqueue:(() {Dequeue:Maybe(b),Enqueue:mu c . ((() {Dequeue:Maybe(b),Enqueue:c,Fork{fp},Yield{yp}|e}~> r) {}-> ())
+                                                                            ,Fork{fp},Yield{yp}|e}~> r) {}-> ()
+                                                               ,Fork{fp},Yield{yp}|e}~> r))
+                                           ,Enqueue:(() {Dequeue:Maybe(mu b . (() {Dequeue:Maybe(b)
+                                                                            ,Enqueue:(() {Dequeue:Maybe(b),Enqueue:mu c . ((() {Dequeue:Maybe(b),Enqueue:c,Fork{fp},Yield{yp} |e}~> r) {}-> ())
+                                                                                         ,Fork{fp},Yield{yp}|e}~> r) {}-> ()
+                                                                            ,Fork{fp},Yield{yp}
+                                                                            |e}~> r))
+                                                        ,Enqueue:mu c . ((() {Dequeue:Maybe(mu b . (() {Dequeue:Maybe(b),Enqueue:c,Fork{fp},Yield{yp}|e}~> r))
+                                                                             ,Enqueue:c
+                                                                             ,Fork{fp},Yield{yp}|e}~> r) {}-> ())
+                                                        ,Fork{fp},Yield{yp} |e}~> r) {}-> ()
+                                           ,Fork:(a) {}-> (),Yield|e}~> r )) -> %xyz
+fun h5(m)() {
+  open handle(m) {
+   case Fork(t,k) -> enqueue(fun () { k(()) }); h5(t)()
+   case Yield(k)  -> enqueue(fun () { k(()) }); fromJust(dequeue())()
+   case Return(x) -> x
+  }
+}

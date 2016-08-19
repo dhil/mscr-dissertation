@@ -1,0 +1,134 @@
+typename Comp(e::Row, a) = () ~e~> a;
+typename Maybe(a) = [|Just:a|Nothing|];
+typename Zero = [||];
+typename Toss = [|Heads|Tails|];
+
+#snippet:toss.links
+sig toss : Comp({Choose:Bool |e}, Toss)
+fun toss() { if (do Choose) Heads else Tails }
+#end
+
+#snippet:drunkToss.links
+sig drunkToss : Comp({Choose:Bool,Fail:Zero |e}, Toss)
+fun drunkToss() { if (do Choose) toss()
+                  else switch (do Fail) { } }
+#end
+
+#snippet:randomResult.links
+sig randomResult : (Comp({Choose:Bool |e}, a)) ->
+                    Comp({Choose{_}   |e}, a)
+handler randomResult {
+  case Return(x)      -> x
+  case Choose(resume) -> resume(random() > 0.5)
+}
+#end
+
+#snippet:allResults.links
+sig allResults : (Comp({Choose:Bool |e},  a)) ->
+                  Comp({Choose{_}   |e}, [a])
+handler allResults {
+  case Return(x)      -> [x]
+  case Choose(resume) -> resume(true) ++ resume(false)
+}
+#end
+
+#snippet:maybeResult.links
+sig maybeResult : (Comp({Fail:Zero |e},       a)) ->
+                   Comp({Fail{_}   |e}, Maybe(a))
+handler maybeResult {
+  case Return(x) -> Just(x)
+  case Fail(_)   -> Nothing
+}
+#end
+
+
+# Various show functions
+fun fold_left(f,acc,xs) {  
+  switch(xs) {
+    case x :: xs -> fold_left(f, f(acc,x), xs)
+    case []      -> acc
+  }
+}
+
+fun map(f,xs) {
+  switch(xs) {
+    case x1 :: xs -> f(x1) :: map(f,xs)
+    case [] -> []
+  }
+}
+
+fun intersperse(y, xs) {
+   switch (xs) {
+     case []      -> []    
+     case [x]     -> [x]
+     case x :: xs -> x :: y :: intersperse(y,xs)
+   }
+}
+
+## Various conversion functions
+fun showList(showX)(xs) {
+  var xs = fold_left(fun (acc, x) { acc ^^ x }
+                    , ""
+                    , intersperse(",", map(showX, xs)));
+  "[" ^^ xs ^^ "]"
+}
+
+fun showToss(t) {
+   switch(t) {
+     case Heads -> "Heads"
+     case Tails -> "Tails"
+   }
+}
+
+fun showMaybe(s)(m) {
+   switch (m) {
+      case Just(x) -> "Just(" ^^ s(x) ^^ ")"
+      case Nothing -> "Nothing"
+   }
+}
+###
+
+## Running examples
+fun ex1() {
+  print("#snippet:randomResult.output");
+  print(showToss(randomResult(toss)()));
+  print("#end")
+}
+
+fun ex2() {
+  print("#snippet:allResults.output");
+  print(showList(showToss)(allResults(toss)()));
+  print("#end")  
+}
+
+fun ex3() {
+  print("#snippet:maybeRandomResult.output");
+  print(showMaybe(showToss)(maybeResult(randomResult(toss))()));
+  print("#end")  
+}
+
+fun ex4() {
+  print("#snippet:maybeAllResults.output");
+  print(showMaybe(showList(showToss))(maybeResult(allResults(toss))()));
+  print("#end")  
+}
+
+fun ex5() {
+  print("#snippet:allMaybeResults.output");
+  print(showList(showMaybe(showToss))(allResults(maybeResult(toss))()));
+  print("#end")  
+}
+
+fun ex6() {
+  print("#snippet:allMaybeResults2.output");
+  print(showList(showMaybe(showToss))(allResults(maybeResult(drunkToss))()));
+  print("#end")  
+}
+
+fun runAll() {
+  ex1(); ex2(); ex3();
+  ex4(); ex5(); ex6();
+  ()
+}
+
+runAll()

@@ -1,0 +1,94 @@
+# Basic scheduler
+
+# Primitives
+sig fork : (a) {Fork:(a) {}-> b|_}~> b
+fun fork(t) {do Fork(t)}
+
+sig yield : Comp({Yield:()|_}, ())
+fun yield() {do Yield}
+
+# Run handler
+#sig run : (Comp({},a)) ~> a
+handler run { case Return(x) -> x }
+
+#
+# Queue interface
+#
+typename Queue(a::Type) = [a];
+
+sig enqueue : (a) {Enqueue:(a) {}-> ()|_}~> ()
+fun enqueue(e) {do Enqueue(e)}
+
+sig dequeue : Comp({Dequeue:a|_}, a)
+fun dequeue() {do Dequeue}
+
+sig is_empty : Comp({IsEmpty:Bool|_}, Bool)
+fun is_empty() {do IsEmpty}
+
+sig size : Comp({Size:Int|_},Int)
+fun size() {do Size}
+
+# Fair queue implementation
+sig queue : (Queue(a)) ->
+                  (Comp({Dequeue:Maybe(a) ,Enqueue:(a) {}-> ()|e}, b)) -> 
+                   Comp({Dequeue{_},Enqueue{_}         |e}, b)
+open handler queue(q) {
+  case Enqueue(e,k) -> k(())(q ++ [e])
+  case Dequeue(k)   ->
+    switch (q) {
+      case p :: q -> k(Just(p))(q)
+      case []     -> k(Nothing)(q)
+    }
+  case Return(x)    -> x
+}
+
+# Scheduler
+#typename Thread(e::Row,a) = (() {Fork:(Thread(e,a)) {}-> (),Yield|e}~> a);
+typename Thread(e::Row,a) = (mu t . (() {Fork:(t) {}-> (),Yield|e}~> a));
+typename Scheduler(e::Row,r) = forall fp :: Presence, yp :: Presence .
+                               (mu a . (() {Dequeue:Maybe(mu b . (() {Dequeue:Maybe(b)
+                                                               ,Enqueue:(() {Dequeue:Maybe(b),Enqueue:mu c . ((() {Dequeue:Maybe(b),Enqueue:c,Fork{fp},Yield{yp}|e}~> r) {}-> ())
+                                                                            ,Fork{fp},Yield{yp}|e}~> r) {}-> ()
+                                                               ,Fork{fp},Yield{yp}|e}~> r))
+                                           ,Enqueue:(() {Dequeue:Maybe(mu b . (() {Dequeue:Maybe(b)
+                                                                            ,Enqueue:(() {Dequeue:Maybe(b),Enqueue:mu c . ((() {Dequeue:Maybe(b),Enqueue:c,Fork{fp},Yield{yp} |e}~> r) {}-> ())
+                                                                                         ,Fork{fp},Yield{yp}|e}~> r) {}-> ()
+                                                                            ,Fork{fp},Yield{yp}
+                                                                            |e}~> r))
+                                                        ,Enqueue:mu c . ((() {Dequeue:Maybe(mu b . (() {Dequeue:Maybe(b),Enqueue:c,Fork{fp},Yield{yp}|e}~> r))
+                                                                             ,Enqueue:c
+                                                                             ,Fork{fp},Yield{yp}|e}~> r) {}-> ())
+                                                        ,Fork{fp},Yield{yp} |e}~> r) {}-> ()
+                                           ,Fork:(a) {}-> (),Yield|e}~> r )) ;
+
+#sig scheduler : (Scheduler({ |e}, a)) -> Scheduler({ |e}, a)
+open handler scheduler {
+  case Fork(t,k) -> enqueue(fun () { k(()) }); scheduler(t)()
+  case Yield(k)  -> enqueue(fun () { k(()) }); fromJust(dequeue())()
+  case Return(x) ->
+     switch (dequeue()) {
+       case Just(t) -> t()
+       case Nothing -> x
+     }
+}
+
+fun repeat(r)(f) {
+  var x = f();
+  if (r > 1) repeat(r-1)(f) else x
+}
+
+# Example
+#sig worker : (Int) -> Worker
+fun worker(id)() {
+  print("Hello from worker " ^^ intToString(id));
+  var _ = yield();
+  ()
+}
+
+#sig hello : Thread({Fork:(() {Yield|_}~> ()) {}-> ()|_}, ())
+#sig hello : Thread({ |e2}, ())
+fun hello() {
+  var _ = fork(fun() { repeat(5)(worker(1)) });
+  var _ = fork(fun() { repeat(5)(worker(2)) });
+  ()
+}

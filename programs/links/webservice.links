@@ -1,0 +1,296 @@
+#
+# Development of a small web-service using handlers
+#
+# Messaging service API? Name: jibber-jabber? Chitter (Cheep)?
+
+# Modelling a http method
+typename Method      = [|Get|Put|Post|Delete|];
+#typename Resource    = (name:String,proc:String,data:[(String,String)]);
+typename Resource    = (service:String,data:[(String,String)]);
+typename Request     = (method:Method,resource:Resource);
+typename HttpStatus  = [|BadRequest|InternalError|OK|];
+typename Either(a,b) = [|Left:a|Right:b|];
+
+typename Json        = [|Member:(String,Json)
+                        |List:[Json]
+                        |Object:[Json]
+                        |PrimVal:String
+                        |];
+
+typename Result      = [|List:[Result]
+                        |User:String
+                        |Ok:()
+                        |];
+
+# Queries
+var users = [(user="Alice"),(user="Bob")];
+fun getUser(u) {
+    search(fun(v) { u === v.user }, users)
+}
+
+# Basic operations
+sig get : (r) {Get:(r) {}-> s|_}~> s
+fun get(r) server {do Get(r)}
+
+sig put : (r) {Put:(r) {}-> ()|_}~> ()
+fun put(r) server {do Put(r)}
+
+sig post : (r) {Post:(r) {}-> ()|_}~> ()
+fun post(r) server {do Post(r)}
+
+sig remove : (r) {Delete:(r) {}-> ()|_}~> ()
+fun remove(r) server {do Delete(r)}
+
+# Failure handler
+sig fail : () {Fail:Zero|_}~> _
+fun fail() server {switch (do Fail) { }}
+
+sig maybe : (Comp({Fail:_|e},a)) -> Comp({Fail{_}|e}, Maybe(a))
+fun maybe(m)() server {
+  open handle(m) {
+    case Fail(_)   -> Nothing
+    case Return(x) -> Just(x)
+  }
+}
+
+fun fetchUsers(r, k) {
+  # Fetch single or multiple users?
+  var res =
+    lookup("user", r.data) >>=
+        fun (u) { getUser(u) >>=
+                   fun(u) { return (u.user) }
+                };
+  var res = fmap(fun(u) { User(u) }, res);
+  if (isJust(res)) k(fromJust(res)) else fail()
+}
+
+# Handle get There a typechecker bug here. The typechecker infers the
+# below type, but it fails to unify the continuation codomains when
+# the type signature is given explicitly.
+sig getter : (Comp({Fail:Zero,Get:(Resource) {}-> Result|e}, a)) ->
+              Comp({Fail:Zero,Get{_}|e}, a)
+fun getter(m)() server {
+  open handle(m) {
+    case Return(x) -> x
+    case Get(r : Resource,k)  -> {
+       switch (r.service) {
+         case "accounts/lookup" -> fetchUsers(r,k)
+         case _                 -> fail()
+       }
+    }
+  }
+}
+
+sig run : (Comp({}, a)) ~> a
+fun run(m) server {
+  handle(m) { case Return(x) -> x }
+}
+
+# dispatcher
+sig dispatch : (Request) -> Comp({ |%e},a) #() -%e-> a
+fun dispatch(r)() {
+  switch (r.method) {
+    case Get    -> get(r.resource)
+    case _      -> fail()
+#    case Post   -> post(r)
+#    case Put    -> put(r)
+#    case Delete -> remove(r)
+  }
+}
+
+fun alternative(p,q)() {
+  switch (p()) {
+    case Nothing -> q()
+    case x       -> x
+  }
+}
+
+op p <|> q {
+   alternative(p,q)
+}
+
+sig handleRequest : () ~> String
+fun handleRequest() server {
+  var request  = getRequest();
+  var response = request >>=
+                  fun(r) { run -<-
+                            maybe -<-
+                              getter -<
+                                dispatch(r)
+                         };
+  jsonToString(jsonifyM(response)(jsonifyResult))
+}
+
+# Main page
+sig main : () ~> Page
+fun main() client {
+  page
+   <html>
+    <head>
+      <title>Small web-service example</title>
+    </head>
+    <body>
+        {stringToXml(handleRequest())}     
+
+      <fieldset>
+       <legend>Debug info</legend>
+       <ul>
+        <li>Environment size: {intToXml(length(environment()))}</li>
+       </ul>
+      </fieldset>
+    </body>
+    </html>
+}
+
+# Server-side auxiliary functions
+# Retrieves the value associated with a given url parameter name
+sig getParam : (String) ~> Maybe(String)
+fun getParam(p) server { lookup(p, environment()) }
+
+sig getMethod : () ~> Method
+fun getMethod() server {
+  switch (getParam("method")) {
+    case Just(m) ->
+       switch (implode(map(toLower, explode(m)))) {
+         case "post"   -> Post
+         case "put"    -> Put
+         case "delete" -> Delete
+         case _        -> Get
+       }
+    case _ -> Get
+  }
+}
+
+# Weak equality on strings aka. case-insensitive equality testing
+fun lowercase(s) { implode(map(toLower,explode(s))) }
+sig === : (String,String) ~> Bool
+op p === q server {  
+  lowercase(p) == lowercase(q)
+}
+
+# Maybe monad
+sig >>= : (Maybe(a), (a) -e-> Maybe(b)) -e-> Maybe(b)
+op m >>= f server {
+  switch (m) {
+    case Just(x) -> f(x)
+    case Nothing -> Nothing
+  }
+}
+
+sig return : (a) -> Maybe(a)
+fun return(x) server { Just(x) }
+
+sig fmap : ((a) -e-> b, Maybe(a)) -e-> Maybe(b)
+fun fmap(f, m) {
+  switch(m) {
+    case Just(x) -> Just(f(x))
+    case Nothing -> Nothing
+  }
+}
+
+# splits on `sep`
+fun splitOn(sep, xs) server {
+  var s = elemIndex(sep, xs) >>=
+            fun(i) { return( (take(i, xs), drop(i+1, xs)) ) };
+  switch (s) {
+    case Just(([],ys)) -> splitOn(sep, ys)
+    case Just((xs,ys)) -> xs :: splitOn(sep, ys)
+    case Nothing       -> if (xs == []) [] else [xs]
+  }
+}
+
+# Parses a resource string
+sig parseResourceUrl : (String, [(String,String)]) ~> Maybe(Resource)
+fun parseResourceUrl(url, ps) server {
+   if (url =~ /^[a-z]+\/[a-z]+$/) {
+     var [col,mem] = splitOn('/', explode(url));
+#     Just((name=lowercase(implode(col)),proc=lowercase(implode(mem)),data=ps))
+     Just((service=url,data=ps))
+   } else { Nothing }
+}
+
+# Parses the current request
+sig getRequest : () ~> Maybe(Request)
+fun getRequest() server {
+  var ps =
+     filter( fun((k,_)) { not( k === "method" || k === "resource" ) }
+           , environment()); # filters out "special" parameters
+  var method = getMethod();
+  # Build Resource
+  getParam("resource") >>=
+     curry(flip(parseResourceUrl))(ps) >>=
+        fun(r) { return( (method=getMethod(), resource=r) ) }
+}
+
+# show association list
+# specialised for strings
+fun showAssocList(l) server {
+  "[" ^^ (if (length(l) > 0) {
+            var (k,v) = hd(l);
+            fold_left(fun(acc,(k,v)) { acc ^^ ",(" ^^ k ^^ "," ^^ v ^^ ")" }, "(" ^^ k ^^ "," ^^ v ^^ ")", tl(l))
+          } else "")
+      ^^ "]"
+}
+
+# show method
+fun showMethod(m) server {
+  switch(m) {
+    case Get -> "Get"
+    case Post -> "Post"
+    case Put -> "Put"
+    case Delete -> "Delete"
+  }
+}
+
+# show resource
+fun showResource(r) server {
+#  "(name=" ^^ r.name ^^ ",proc=" ^^ r.proc ^^ ",data=" ^^ showAssocList(r.data) ^^ ")"
+  "(service=" ^^ r.service ^^ ",data=" ^^ showAssocList(r.data) ^^ ")"
+}
+
+# show request
+fun showRequest(r) server {
+  "(method=" ^^ showMethod(r.method) ^^ ",resource=" ^^ showResource(r.resource) ^^ ")"
+}
+
+# Json encoders
+sig jsonifyResult : (Result) ~> Json
+fun jsonifyResult(r) {
+  fun jsonifyResult_aux(r) {
+    switch(r) {
+      case List(rs) -> List(map(jsonifyResult_aux,rs))
+      case User(u)  -> Member("user", PrimVal(u))
+      case _        -> Member("_", PrimVal("OK"))
+    }
+  }
+  Object([jsonifyResult_aux(r)])
+}
+
+sig jsonifyL : ([a]) -> ((a) ~e~> Json) ~e~> Json
+fun jsonifyL(xs)(encoder) server {
+  List(map(encoder,xs))
+}
+
+sig jsonifyM : (Maybe(a)) -> ((a) -e-> Json) -e-> Json
+fun jsonifyM(m)(encoder) server {
+  fromMaybe(fmap(encoder,m), Object([]))
+}
+
+sig jsonToString : (Json) ~> String
+fun jsonToString(j) server {
+  switch (j) {
+    case PrimVal(s)  -> "\"" ^^ s ^^ "\""
+    case Member(n,j) -> "\"" ^^ n ^^ "\": " ^^ jsonToString(j)
+    case Object(js)  ->
+       "{" ^^ (if (length(js) > 0)
+                  fold_left(fun(acc, j) { acc ^^ "," ^^ jsonToString(j) }, jsonToString(hd(js)), tl(js))
+               else "") ^^ "}"
+    case List(js)   ->
+       "[" ^^ (if (length(js) > 0)
+                  fold_left(fun(acc, j) { acc ^^ "," ^^ jsonToString(j) }, jsonToString(hd(js)), tl(js))
+               else "") ^^ "]"
+  }
+}
+
+# Run example
+main()

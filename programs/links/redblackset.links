@@ -1,0 +1,153 @@
+typename Ordering = [|GT
+                     |EQ
+                     |LT
+                     |];
+
+typename Comparer(a::Type,e::Row) = (a,a) ~e~> Ordering;
+
+typename Colour = [|R|B|BB|];
+
+typename RedBlackSet(a::Type) = [|E
+                                 |EE
+                                 |Node:(Colour,RedBlackSet(a),a,RedBlackSet(a))
+                                 |];
+
+sig rbEmpty : () -> RedBlackSet(a)
+fun rbEmpty() { E }
+
+sig rbLookup : (a, RedBlackSet(a), Comparer(a, { |e})) ~e~> Maybe(a)
+fun rbLookup(x, rb, cmp) {
+    switch (rb) {
+      case E -> Nothing
+      case Node(_,l,y,r) ->
+         switch (cmp(x,y)) {
+           case LT -> rbLookup(x, l, cmp)
+           case EQ -> Just(y)
+           case GT -> rbLookup(x, r, cmp)
+         }
+      case _ -> error("Impossible case rbMember")
+    }
+}
+
+sig rbMember : (a, RedBlackSet(a), Comparer(a, { |e})) ~e~> Bool
+fun rbMember(x, rb, cmp) {
+    switch (rbLookup(x, rb, cmp)) {
+      case Nothing   -> false
+      case otherwise -> true
+    }
+}
+
+sig rbBalance : (Colour, RedBlackSet(a), a, RedBlackSet(a)) -> RedBlackSet(%b)
+fun rbBalance(c,left,x,right) {
+    switch ((c,left,x,right)) {
+      case (B, Node(R, Node(R, a, x, b), y, c), z, d) -> Node(R, Node(B, a, x, b), y, Node(B, c, z, d))
+      case (B, Node(R, a, x, Node(R, b, y, c)), z, d) -> Node(R, Node(B, a, x, b), y, Node(B, c, z, d))
+      case (B, a, x, Node(R, Node(R, b, y, c), z, d)) -> Node(R, Node(B, a, x, b), y, Node(B, c, z, d))
+      case (B, a, x, Node(R, b, y, Node(R, c, z, d))) -> Node(R, Node(B, a, x, b), y, Node(B, c, z, d))
+      case (BB, a, x, Node(R, Node(R, b, y, c), z, d)) -> Node(B, Node(B, a, x, b), y, Node(B, c, z, d))
+      case (BB, Node(R, a, x, Node(R, b, y, c)), z, d) -> Node(B, Node(B, a, x, b), y, Node(B, c, z, d))
+      case body                                               -> Node(body)
+    }
+}
+
+sig rbInsert : (a, RedBlackSet(a), (a,a) ~e~> Ordering) ~e~> RedBlackSet(a)
+fun rbInsert(x, rb, cmp) {
+   fun blacken(rb) {
+     switch (rb) {
+       case Node(R, Node(R, a, x, b), y, c) -> Node(B,Node(R, a, x, b), y, c)
+       case Node(R, a, x, Node(R, b, y, c)) -> Node(B, a, x, Node(R, b, y, c))
+       case otherwise -> rb
+     }
+   }
+   
+   fun ins(rb) {
+     switch (rb) {
+       case E -> Node(R, E, x, E)
+       case (Node(colour, a, y, b) as rb) ->
+          switch (cmp(x, y)) {
+             case LT -> rbBalance(colour, ins(a), y, b)
+             case EQ -> rb
+             case GT -> rbBalance(colour, a, y, ins(b))
+          }
+       case _     -> error("Impossible case rbInsert")
+     }
+   }
+   blacken(ins(rb))
+}
+
+fun rbRotate(colour, left, x, right) {
+  switch ((colour, left, x, right)) {
+     case (R, Node(BB, a, x, b), y, Node(B, c, z, d)) -> rbBalance(B, Node(R, Node(B, a, x, b), y, c), z, d)
+     case (R, EE, y, Node(B, c, z, d)) -> rbBalance(B, Node(R, E, y, c), z, d)
+     case (R, Node(B, a, x, b), y, Node(BB, c, z, d)) -> rbBalance(B, a, x, Node(R, b, y, Node(B, c, z, d)))
+     case (R, Node(BB, a, x, b), y, Node(B, c, z, d)) -> rbBalance(BB, Node(R, Node(B, a, x, b), y, c), z, d)
+     case (B, Node(BB, a, x ,b), y, Node(B, c, z, d)) -> rbBalance(BB, Node(R, Node(B, a, x, b), y, c), z, d)
+     case (B, EE, y, Node(B, c, z, d)) -> rbBalance(BB, Node(R, E, y, c), z, d)
+     case (B, Node(B, a, x, b), y, Node(BB, c, z, d)) -> rbBalance(BB, a, x, Node(R, b, y, Node(B, c, z, d)))
+     case (B, Node(B, a, x, b), y, EE) -> rbBalance(BB, a, x, Node(R, b, y, E))
+     case (B, Node(BB, a, w, b), x, Node(R, Node(B, c, y, d), z, e)) ->
+       Node(B, rbBalance(B, Node(R, Node(B, a, w, b), x, c), y, d), z, e)
+     case (B, EE, x, Node(R, Node(B, c, y, d), z, e)) -> Node(B, rbBalance(B, Node(R, E, x, c), y, d), z, e)
+     case (B, Node(R, a, w, Node(B, b, x, c)), y, EE) -> Node(B, a, w, rbBalance(B, b, x, Node(R, c, y, E)))
+     case (colour, a, x, b) -> Node(colour, a, x, b)
+  }
+}
+
+sig rbDelete : (a, RedBlackSet(a), Comparer(a, { |e})) ~e~> RedBlackSet(a)
+fun rbDelete(x, rb, cmp) {
+
+   fun min_del(rb) {
+      switch(rb : RedBlackSet(a)) {
+        case Node(R, E, x, E)   -> (x, E)
+        case Node(B, E, x, E) -> (x, EE)
+        case Node(B, E, x, Node(R, E, y, E)) -> (x, Node(B, E, y, E))
+        case Node(c, a, x, b) ->
+           var (y, d) = min_del(a);
+           (y, rbRotate(c, d, x, b))
+        case _ -> error("Impossible case min_del")
+      }
+   }
+   
+   fun del(rb) {
+      switch(rb : RedBlackSet(a)) {
+        case E -> E
+        case Node(R, E, y, E) ->
+           switch(cmp(x, y)) {
+              case EQ        -> E
+              case otherwise -> Node(R, E, y, E)
+           }
+        case Node(B, E, y, E) ->
+           switch(cmp(x, y)) {
+              case EQ         -> EE
+              case otherwise  -> Node(B, E, y, E)
+           }
+        case Node(B, Node(R, E, y, E), z, E) ->
+           switch(cmp(x, z)) {
+              case LT -> Node(B, del(Node(R, E, y, E)), z, E)
+              case EQ -> Node(B, E, y, E)
+              case GT -> Node(B, Node(R, E, y, E), z, E)
+           }
+        case Node(c, a, y, b) ->
+           switch(cmp(x, y)) {
+              case LT -> rbRotate(c, del(a), y, b)
+              case EQ ->
+                var (z,d) = min_del(b);
+                rbRotate(c, a, z, d)
+              case GT -> rbRotate(c, a, y, del(b))
+           }
+        case _ -> error("Impossible case del")
+      }
+   }
+   fun redden(rb) {
+      switch(rb : RedBlackSet(a)) {
+         case Node(B, Node(B, a, x ,b), y, Node(B, c, z, d)) -> Node(R, Node(B, a, x ,b), y, Node(B, c, z, d))
+         case t -> t
+      }
+   }
+   del(redden(rb))   
+}
+
+sig rbReplace : (a, a, RedBlackSet(a), Comparer(a, { |e})) ~e~> RedBlackSet(a)
+fun rbReplace(x, y, rb, cmp) {
+    rbInsert(y, rbDelete(x, rb, cmp), cmp)
+}

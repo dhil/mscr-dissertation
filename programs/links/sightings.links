@@ -1,0 +1,20 @@
+# Sightings example
+
+fun cometSighted(id, zenith, azimuth) {
+  print("Comet#" ^^ intToString(id) ^^ " sighted (" ^^ floatToString(zenith) ^^ ", " ^^ floatToString(azimuth) ^^ ")")
+}
+
+fun celebSighted(name, venue) {
+  print(name ^^ " has been seen in " ^^ venue)
+}
+
+var p3 = spawn {
+  fun loop() {
+    var _ = switch(recv()) {
+      case PassingComet(id, zenith, azimuth) -> cometSighted(id, zenith, azimuth)
+      case CelebritySighting(name, venue)    -> celebSighted(name, venue)
+    };
+    loop()
+  }
+  loop()
+};
