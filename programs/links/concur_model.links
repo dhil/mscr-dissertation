@@ -39,7 +39,7 @@ fun names(gen, seed) {
 }
 #snippet:freshnames.links
 sig pidgenerator : (Int) ->
-                   (Comp({FreshName:Int|e}, b)) ->
+                   (Comp({FreshName:Int |e}, b)) ->
                     Comp({FreshName{_} |e}, b)
 handler pidgenerator(nextPid) {
   case Return(x)    -> x
@@ -338,6 +338,9 @@ fun pop(x, alist) {
   }
 }
 
+sig dictEmpty : () -> Dictionary(k,a)
+fun dictEmpty() { [] }
+
 sig dictLookup : (k, Dictionary(k,a)) ~> Maybe(a)
 var dictLookup = lookup;
 
@@ -349,9 +352,11 @@ fun dictModify(k, x, dict) {
 typename Mailbox(a::Type) = Dictionary(Pid, Queue(a));
 
 #snippet:enqueueMessage.links
+
+
 sig enqueueMessage :
-  (Pid, a) {Get: Dictionary(Pid,Queue(a))
-           ,Put:(Dictionary(Pid,Queue(a))) {}-> ()|_}~> ()
+  (Int, a) {Get: Dictionary(Int,Queue(a))
+           ,Put:(Dictionary(Int,Queue(a))) {}-> ()|_}~> ()
 fun enqueueMessage(pid, msg) {
   var dict = get();
   var q = switch (dictLookup(pid, dict)) {
@@ -364,8 +369,8 @@ fun enqueueMessage(pid, msg) {
 
 #snippet:dequeueMessage.links
 sig dequeueMessage :
-  (Pid) {Get: Dictionary(Pid,Queue(a))
-        ,Put:(Dictionary(Pid,Queue(a))) {}-> ()|_}~> Maybe(a)
+  (Int) {Get: Dictionary(Int,Queue(a))
+        ,Put:(Dictionary(Int,Queue(a))) {}-> ()|_}~> Maybe(a)
 fun dequeueMessage(pid) {
   switch (dictLookup(pid, get())) {
     case Nothing -> Nothing
@@ -395,14 +400,14 @@ fun dequeueMessage(pid) {
 #   }
 # }
 
-sig mailbox : (Comp({Get:Dictionary(Pid,Queue(a)),Put:(Dictionary(Pid,Queue(a))) {}-> ()
-                    ,Recv:(EProcess({ |_})) {}-> Maybe(a)
-                    ,Send:(EProcess({ |_}),a) {}-> ()|e}, b)) ->
-               Comp({Get:Dictionary(Pid,Queue(a)),Put:(Dictionary(Pid,Queue(a))) {}-> ()
-                    ,Recv{_}
-                    ,Send{_}                         |e}, b)
+sig communication : (Comp({Get:Dictionary(Pid,Queue(a)),Put:(Dictionary(Pid,Queue(a))) {}-> ()
+                          ,Recv:(EProcess({ |_})) {}-> Maybe(a)
+                          ,Send:(EProcess({ |_}),a) {}-> ()|e}, b)) ->
+                     Comp({Get:Dictionary(Pid,Queue(a)),Put:(Dictionary(Pid,Queue(a))) {}-> ()
+                          ,Recv{_}
+                          ,Send{_}                         |e}, b)
 #snippet:communication.links
-handler mailbox {
+handler communication {
   case Return(x)             -> x
   case Recv(proc,resume)     ->
     var msg = dequeueMessage(getPid(proc));
@@ -456,21 +461,19 @@ fun sieve() {
   print(intToString(myprime));
   fun loop(neighbour) {
     switch (precv()) {
-       case Stop -> stop(neighbour)
-       case Candidate(prime) ->
-       if (prime `mod` myprime == 0) {
-         loop(neighbour)
-       } else {
-         var neighbour =
-           switch (neighbour) {
-             case Just(pid) -> pid
-             case Nothing   -> pspawn(sieve)
-           };
-         neighbour !! Candidate(prime);
-         loop(Just(neighbour))
-       }
-    }
-  }
+      case Stop -> stop(neighbour)
+      case Candidate(prime) ->
+      if (prime `mod` myprime == 0) {
+        loop(neighbour)
+      } else {
+        var neighbour =
+          switch (neighbour) {
+            case Just(pid) -> pid
+            case Nothing   -> pspawn(sieve)
+          };
+        neighbour !! Candidate(prime);
+        loop(Just(neighbour))
+  } } }
   loop(Nothing)
 }
 #end
@@ -486,8 +489,7 @@ fun foreach(xs, action) {
 fun generator(n)() {
   var first = pspawn(sieve);
   foreach([2..n], fun(p) { first !! Candidate(p) });
-  first !! Stop
-}
+  first !! Stop }
 #end
 
 #snippet:basicRoundrobin.links
@@ -599,6 +601,6 @@ fun nthfib(n)() {
   print("Fib: " ^^ intToString(precv()))
 }
 
-var dummy = run -<- pidgenerator -<- evalState([]) -<- mailbox -<- evalState(emptyQueue()) -<- roundrobin -< generator(101);
+var dummy = run -<- pidgenerator -<- evalState(dictEmpty()) -<- communication -<- evalState(emptyQueue()) -<- roundrobin -< generator(101);
 
 #var dummy = run(names(incrPid, 0)(evalState([])(mailbox(evalState(emptyQueue())(roundrobin(generator(200)))))));
