@@ -211,7 +211,107 @@ My dissertation~\cite{Hillerstrom16b} ties together three pieces of my work:
 %% WHY, HOW, and WHAT
 \begin{frame}
   \frametitle{The dissertation in one slide}
-  
+  \begin{description}
+  \item[Hypothesis] We can lift the (message-passing) concurrency
+    implementation into the programming language level using handlers.
+  \item[Consequence] Leaner compiler, ability to easily change the
+    concrete concurrency implementation.
+  \end{description}
+\end{frame}
+
+%% Contributions
+\begin{frame}
+  \frametitle{Contributions}
+\begin{itemize}
+  \item A compiler for Links, that support native compilation of
+  multi-shot handlers~\cite{HillerstromLS16}. We describe a
+  translation from the Links IR to the OCaml IR which demonstrates how
+  to encode multi-shot handlers in the OCaml IR.
+\item A reconstruction of the message-passing concurrency model of
+  Links using effect handlers~\cite{Hillerstrom16a}, that maintains
+  the type-safe communication property of the original built-in
+  implementation.
+\item A formalisation of the implementation of effect handlers in
+  Links~\cite{HillerstromL16}.
+\end{itemize}
+\end{frame}
+
+%% Compiler backend
+\begin{frame}[fragile]
+\frametitle{Compiler pipeline}
+\begin{figure}
+\centering
+\tikzset{frontend/.style={
+        draw=black,  
+        rectangle, 
+        minimum width={width("Lambda Compiler")}}
+}
+
+\tikzset{backend/.style={
+        draw=black,  
+        rectangle, 
+        minimum width={width("Lambda Compiler")}}
+}
+
+\tikzset{exterior/.style={
+        draw=black,
+        rectangle,
+        minimum width={width("Interpreter")}}
+}
+\tikzset{every picture/.style={yscale=0.75,xscale=0.75,transform shape}}
+\begin{tikzpicture}
+  %% Frontend
+  \node (FrontendLabel) {\textbf{\textit{Frontend}}};
+  \node [frontend, below=of FrontendLabel,yshift=20pt] (Parser) {Parser};
+  \node [frontend, below=of Parser,yshift=10pt]   (EDesugar) {Early desugar};
+  \node [frontend, below=of EDesugar,yshift=10pt] (Typechecker) {Type checker};
+  % Arrows
+  \draw [->] (Parser.south)   -- (EDesugar.north)    {};
+  \draw [->] (EDesugar.south) -- (Typechecker.north) {};
+  % Frame
+  \node [draw,rectangle,thick,minimum width=125pt,minimum
+height=140pt,fit=(FrontendLabel)(Parser)(Typechecker)] (Frontend) {};  
+
+  %% Source
+  \node [exterior,left=of Frontend] (Source) {Source};
+  % Arrow from Source to box
+  \draw [->,thick] (Source.east) -- (Frontend.west) {};
+
+  %% Links backend
+  \node [right=of FrontendLabel,xshift=70pt] (BackendLabel) {\textbf{\textit{Backend}}};
+  \node [backend,below=of BackendLabel,yshift=20pt] (IRCompiler) {IR Compiler};
+  \node [backend,below=of IRCompiler,yshift=15pt] (PMCompiler) {\begin{tabular}{l}Pattern\\Matching\\ Compiler\end{tabular}};
+  % Arrows
+  \draw [->] ([xshift=5pt]IRCompiler.south west)  -- ([xshift=5pt]PMCompiler.north west) {};
+  \draw [->] ([xshift=-5pt]PMCompiler.north east) -- ([xshift=-5pt]IRCompiler.south east) {};
+  % Frame
+  \node [draw,rectangle,thick,minimum width=125pt,minimum height=140pt,fit=(BackendLabel)(IRCompiler)(PMCompiler),yshift=-5pt] (Backend) {};
+  % Arrows
+  \draw [->,thick] (Frontend.east)                -- (Backend.west) {};
+
+  %% Interpreter
+  \node [exterior,right=of Backend] (Interpreter) {Interpreter};
+  % Arrow
+  \draw [->,thick] (Backend.east) -- (Interpreter.west) {};  
+
+  %% Lambda backend
+  \node [below=of Backend,yshift=-5pt] (LambdaBackendLabel) {\textbf{\textit{Native backend}}};
+  \node [backend,below=of LambdaBackendLabel,yshift=20pt] (IR2Lambda) {IR to Lambda};
+  \node [backend,below=of IR2Lambda,yshift=10pt] (OCamlBackend) {OCaml backend};
+  % Arrows
+  \draw [->] (IR2Lambda.south) -- (OCamlBackend.north) {};
+  % Frame
+  \node [draw,rectangle,thick,minimum width=125pt,minimum height=100pt,fit=(LambdaBackendLabel)(IR2Lambda)(OCamlBackend)] (LambdaBackend) {};
+  % Arrow
+  \draw [->,thick] (Backend.south) -- (LambdaBackend.north) {};
+
+  %% Binary
+  %\node [draw,rectangle,below=of Source,yshift=-96pt] (Binary) {Binary};
+  %\draw [->,thick] (LambdaBackend.west)  -- (Binary.east) {};
+  \node [exterior,right=of LambdaBackend] (Binary) {Binary};
+  \draw [->,thick] (LambdaBackend.east)  -- (Binary.west) {};
+\end{tikzpicture}
+\end{figure}
 \end{frame}
 
 %% Abstract concurrency specification
@@ -219,30 +319,45 @@ My dissertation~\cite{Hillerstrom16b} ties together three pieces of my work:
   \frametitle{An abstract message-passing model}
 Operations for processes
 \begin{itemize}
-  \item \lstinline$Spawn : (() \{ |e\}-> ()) -> Process(\{ |e\})$
+\item An abstract type \lstinline$EProcess(\{ |e\})$ for processes
+  with effects \lstinline$e$
+  \item \lstinline$Spawn : (() \{ |e\}-> ()) -> EProcess(\{ |e\})$
   \item \lstinline$Yield : ()$
-  \item \lstinline$Self : Process(\{ |e\})$
+  \item \lstinline$Myself : EProcess(\{ |e\})$
 \end{itemize}
 \vfill
 Operations for communication
 \begin{itemize}
-  \item \lstinline$Send : (m, Process(\{ |e\})) -> ()$
+  \item \lstinline$Send : (m, EProcess(\{ |e\})) -> ()$
   \item \lstinline$Recv : () -> Maybe(m)$
 \end{itemize}
 \vfill
 Many possible instantiations of this model.
 \end{frame}
 
-\begin{frame}
+\begin{frame}[fragile]
   \frametitle{Message-passing model instantiation}
-  Roundrobin scheduler. Basic idea: enqueue and dequeue continuations.
-  Modular implementation.
-  Global state to manage mailboxes.
+  
+  \begin{itemize}
+    \item A scheduler that enqueues/dequeues the resumption functions.
+    \item State for maintaining the process queue.
+    \item A mailbox for communication.
+    \item State for maintaining mailbox(es).
+    \item A process identification generator.
+  \end{itemize}
+
+Concretely, this looks like:
+\begin{lstlisting}
+run -<- pidgenerator 
+    -<- evalState(emptyMailbox()) -<- communication 
+    -<- evalState(emptyQueue())   -<- roundrobin 
+    -<  <plug in your concurrent computation here>
+\end{lstlisting}
 \end{frame}
 
 %% Intuition behind the sieve example
 \begin{frame}
-\frametitle{The intuition behind the sieve example}
+\frametitle{An example concurrent program (Sieve of Eratosthenes)}
 \begin{figure}
 \tikzset{my ellipse/.style={
         draw=black, 
@@ -279,7 +394,7 @@ Many possible instantiations of this model.
 
 %% Evaluation
 \begin{frame}
-  \frametitle{Evaluation of concurrency implementation}
+  \frametitle{Evaluation of the concurrency implementation}
 \begin{onlyenv}<1-1>
   \begin{figure}
     \centering
